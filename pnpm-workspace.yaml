@@ -1,0 +1,12 @@
+minimumReleaseAgeExclude:
+  - '@types/node@26.6.4'
+  - vite@8.3.2
+
+# esbuild 的平台二进制由 pnpm 的 optionalDependencies 机制直接提供，
+# 其 postinstall（node install.js）仅做软链校验，忽略它不影响构建。
+ignoredBuiltDependencies:
+  - esbuild
+
+# pnpm 12 默认对「存在未批准构建脚本的依赖」以非零码退出（strictDepBuilds）。
+# 本项目无需任何依赖的 postinstall，关闭严格模式以便 CI / 部署时 install 干净通过。
+strictDepBuilds: false

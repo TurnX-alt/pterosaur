@@ -1,0 +1,220 @@
+.login-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fade-in var(--dur) var(--ease);
+}
+
+.login-modal__card {
+  position: relative;
+  z-index: 1;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--separator);
+  box-shadow: var(--shadow-lg);
+  animation: modal-in var(--dur-slow) var(--ease);
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.login-modal__head h2 {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.login-modal__hint {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+/* ---------- Tabs ---------- */
+.login-modal__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+  margin-bottom: 20px;
+}
+
+.login-modal__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.login-modal__tab--active {
+  background: var(--bg-elevated-2);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- QR ---------- */
+.login-modal__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.login-modal__qr-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 190px;
+  height: 190px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  overflow: hidden;
+}
+
+.login-modal__qr-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.login-modal__qr-box--mask::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.login-modal__qr-refresh {
+  position: absolute;
+  z-index: 2;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-modal__qr-done {
+  position: absolute;
+  z-index: 2;
+  color: #34c759;
+  display: flex;
+}
+
+.login-modal__qr-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* ---------- 手机号表单 ---------- */
+.login-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-modal__field span {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.login-modal__field input {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--separator-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.login-modal__field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.login-modal__submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  margin-top: 4px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.login-modal__submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.login-modal__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-modal__error {
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12.5px;
+  text-align: center;
+}

@@ -1,0 +1,257 @@
+.track-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.track-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 56px 24px;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.track-list__empty svg {
+  opacity: 0.4;
+}
+
+/* ---------- 表头 ---------- */
+.track-list__head {
+  display: grid;
+  grid-template-columns: var(--tl-cols);
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--separator);
+  margin-bottom: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+/* ---------- 行 ---------- */
+.track-row {
+  display: grid;
+  grid-template-columns: var(--tl-cols);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.track-row:hover {
+  background: var(--bg-hover);
+}
+
+.track-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.track-row--current {
+  background: var(--bg-active);
+}
+
+.track-row--current:hover {
+  background: var(--bg-active);
+}
+
+/* 默认列宽：序号 / 标题 / 专辑 / 时长 / 操作 */
+.track-list,
+.track-list__head,
+.track-row {
+  --tl-cols: 32px minmax(0, 4fr) minmax(0, 2.4fr) 56px 76px;
+}
+
+/* ---------- 列：序号 ---------- */
+.col-index {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.track-row--current .col-index {
+  color: var(--accent);
+}
+
+.col-index__num {
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.col-index__play,
+.col-index__pause {
+  position: absolute;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.track-row:hover .col-index__num {
+  opacity: 0;
+}
+
+.track-row:hover .col-index__play {
+  opacity: 1;
+  color: var(--text);
+}
+
+.col-index__pause {
+  opacity: 1;
+}
+
+/* 播放中的跳动音柱 */
+.eq-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+
+.eq-bars i {
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: eq 0.9s ease-in-out infinite;
+}
+
+.eq-bars i:nth-child(1) {
+  animation-delay: 0s;
+  height: 60%;
+}
+.eq-bars i:nth-child(2) {
+  animation-delay: 0.25s;
+  height: 100%;
+}
+.eq-bars i:nth-child(3) {
+  animation-delay: 0.5s;
+  height: 40%;
+}
+.eq-bars i:nth-child(4) {
+  animation-delay: 0.15s;
+  height: 80%;
+}
+
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* ---------- 列：标题 ---------- */
+.col-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.col-title__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.col-title__name {
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.track-row--current .col-title__name {
+  color: var(--accent);
+}
+
+.col-title__artist {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.vip-badge {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 列：专辑 / 时长 ---------- */
+.col-album {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.col-duration {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.track-list__head .col-duration {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ---------- 列：操作 ---------- */
+.col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.row-action {
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.track-row:hover .row-action,
+.row-action:focus-visible,
+.row-action--active {
+  opacity: 1;
+}
+
+/* 已喜欢的红心常驻显示 */
+.col-actions .icon-btn--active {
+  opacity: 1;
+}
+
+/* ---------- 窄屏：隐藏专辑列 ---------- */
+@media (max-width: 760px) {
+  .track-list,
+  .track-list__head,
+  .track-row {
+    --tl-cols: 28px minmax(0, 1fr) 52px 68px;
+  }
+
+  .col-album {
+    display: none;
+  }
+
+  .row-action {
+    opacity: 1;
+  }
+}

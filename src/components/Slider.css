@@ -1,0 +1,103 @@
+.slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.slider--disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.slider:focus-visible {
+  outline: none;
+}
+
+.slider:focus-visible .slider__thumb {
+  opacity: 1;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ---------- 轨道 ---------- */
+.slider__rail {
+  position: relative;
+  width: 100%;
+  background: var(--bg-active);
+  border-radius: 999px;
+  overflow: hidden;
+  transition: height var(--dur-fast) var(--ease);
+}
+
+.slider--md {
+  height: 16px;
+}
+
+.slider--md .slider__rail {
+  height: 4px;
+}
+
+.slider--sm {
+  height: 12px;
+}
+
+.slider--sm .slider__rail {
+  height: 3px;
+}
+
+/* 悬浮 / 拖拽时轨道加粗（Apple Music 手感） */
+.slider--hover.slider--md .slider__rail,
+.slider--dragging.slider--md .slider__rail {
+  height: 6px;
+}
+
+.slider--hover.slider--sm .slider__rail,
+.slider--dragging.slider--sm .slider__rail {
+  height: 4px;
+}
+
+.slider__fill {
+  height: 100%;
+  background: var(--text-secondary);
+  border-radius: 999px;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.slider--hover .slider__fill,
+.slider--dragging .slider__fill {
+  background: var(--accent);
+}
+
+/* ---------- 把手 ---------- */
+.slider__thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%) scale(0.8);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+  pointer-events: none;
+}
+
+.slider--hover .slider__thumb,
+.slider--dragging .slider__thumb {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.slider--dragging .slider__thumb {
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+/* 浅色主题下把手需要描边才可见 */
+:root[data-theme='light'] .slider__thumb {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+}

@@ -1,0 +1,147 @@
+.playerbar {
+  grid-area: playerbar;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(320px, 2fr) minmax(180px, 1fr);
+  align-items: center;
+  gap: 16px;
+  height: var(--playerbar-height);
+  padding: 0 20px;
+  background: var(--glass-player);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-top: 1px solid var(--separator);
+  z-index: 50;
+}
+
+/* ============================ 左：曲目信息 ============================ */
+.playerbar__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.playerbar__cover-btn {
+  display: flex;
+  padding: 0;
+  border-radius: var(--radius-md);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.playerbar__cover-btn:hover {
+  transform: scale(1.04);
+}
+
+.playerbar__meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.playerbar__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.playerbar__artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.playerbar__empty {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+/* ============================ 中：控制 + 进度 ============================ */
+.playerbar__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.playerbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.playerbar__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.playerbar__time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: center;
+}
+
+.playerbar__progress .slider {
+  flex: 1;
+}
+
+/* ============================ 右：音量 + 队列 ============================ */
+.playerbar__right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+
+.playerbar__volume {
+  width: 92px;
+  margin: 0 4px;
+}
+
+/* ============================ 响应式 ============================ */
+@media (max-width: 1080px) {
+  .playerbar__volume {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .playerbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'left right'
+      'center center';
+    grid-template-rows: 1fr auto;
+    height: auto;
+    padding: 8px 16px 10px;
+    gap: 6px;
+  }
+
+  .playerbar__left {
+    grid-area: left;
+  }
+
+  .playerbar__right {
+    grid-area: right;
+  }
+
+  .playerbar__center {
+    grid-area: center;
+  }
+
+  .playerbar__right .icon-btn:not([aria-label='播放队列']) {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .playerbar__meta {
+    max-width: 42vw;
+  }
+}

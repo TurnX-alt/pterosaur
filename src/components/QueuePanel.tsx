@@ -1,0 +1,87 @@
+import { X, Trash2, Play } from 'lucide-react'
+import { usePlayer } from '../store/player.js'
+import { useQueuePanel } from '../store/ui.js'
+import { Cover } from './Cover.js'
+import { IconButton } from './IconButton.js'
+import './QueuePanel.css'
+
+/**
+ * 右侧滑出的播放队列面板。展示当前队列，可点击跳转、删除、清空。
+ */
+export function QueuePanel() {
+  const open = useQueuePanel((s) => s.queueOpen)
+  const setOpen = useQueuePanel((s) => s.setQueueOpen)
+  const queue = usePlayer((s) => s.queue)
+  const index = usePlayer((s) => s.index)
+  const playIndex = usePlayer((s) => s.playIndex)
+  const removeAt = usePlayer((s) => s.removeAt)
+  const clearQueue = usePlayer((s) => s.clearQueue)
+
+  return (
+    <>
+      {open && <div className="queue-scrim" onClick={() => setOpen(false)} aria-hidden />}
+      <aside className={`queue-panel${open ? ' queue-panel--open' : ''}`} aria-hidden={!open} aria-label="播放队列">
+        <div className="queue-panel__head">
+          <h2>播放队列</h2>
+          <div className="queue-panel__head-actions">
+            {queue.length > 0 && (
+              <button type="button" className="queue-panel__clear" onClick={clearQueue}>
+                <Trash2 size={14} /> 清空
+              </button>
+            )}
+            <IconButton label="关闭队列" size="sm" onClick={() => setOpen(false)}>
+              <X size={18} />
+            </IconButton>
+          </div>
+        </div>
+
+        <div className="queue-panel__count">{queue.length} 首曲目</div>
+
+        <div className="queue-panel__list">
+          {queue.length === 0 ? (
+            <div className="queue-panel__empty">队列为空，去挑几首歌吧</div>
+          ) : (
+            queue.map((t, i) => {
+              const active = i === index
+              return (
+                <div
+                  key={`${t.id}-${i}`}
+                  className={`queue-item${active ? ' queue-item--active' : ''}`}
+                  onClick={() => playIndex(i)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      playIndex(i)
+                    }
+                  }}
+                >
+                  <div className="queue-item__index">
+                    {active ? <Play size={13} fill="currentColor" /> : i + 1}
+                  </div>
+                  <Cover src={t.cover} alt={t.title} radius="sm" size={40} />
+                  <div className="queue-item__meta">
+                    <div className="queue-item__title ellipsis">{t.title}</div>
+                    <div className="queue-item__artist ellipsis">{t.artist}</div>
+                  </div>
+                  <IconButton
+                    label="从队列移除"
+                    size="sm"
+                    className="queue-item__remove"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeAt(i)
+                    }}
+                  >
+                    <X size={15} />
+                  </IconButton>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </aside>
+    </>
+  )
+}

@@ -1,0 +1,547 @@
+/* ============================ 首页 ============================ */
+.home {
+  padding: 0 32px 40px;
+  max-width: 1600px;
+}
+
+.home__hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 32px 0 8px;
+}
+
+.home__greeting {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.home__sub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.home__cta {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.home__cta:hover {
+  background: var(--accent-hover);
+}
+
+/* ---------- 快捷入口 ---------- */
+.home__shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  text-align: left;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.shortcut:hover:not(:disabled) {
+  background: var(--bg-elevated-2);
+  transform: translateY(-1px);
+}
+
+.shortcut:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shortcut__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.shortcut__icon--fav {
+  background: linear-gradient(135deg, #fa243c, #ff6a5e);
+  color: #fff;
+}
+
+.shortcut__icon--recent {
+  background: linear-gradient(135deg, #5e5ce6, #8e8aff);
+  color: #fff;
+}
+
+.shortcut__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcut__text strong {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.shortcut__text small {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ---------- 精选单曲 ---------- */
+.home__featured {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.featured-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  text-align: left;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.featured-item:hover {
+  background: var(--bg-elevated-2);
+}
+
+.featured-item__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.featured-item__title {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.featured-item__artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.featured-item__play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.featured-item:hover .featured-item__play {
+  opacity: 1;
+}
+
+/* ============================ 浏览 / 电台 ============================ */
+.browse {
+  padding: 0 32px 40px;
+  max-width: 1600px;
+}
+
+.browse__header {
+  padding: 32px 0 4px;
+}
+
+.browse__title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.browse__tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  width: fit-content;
+}
+
+.browse__tab {
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.browse__tab--active {
+  background: var(--bg-elevated-2);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================ 搜索 ============================ */
+.search {
+  padding: 0 32px 40px;
+  max-width: 1600px;
+}
+
+.search__header {
+  padding: 28px 0 8px;
+}
+
+.search__label {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.search__title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+/* ============================ 歌单详情 ============================ */
+.detail {
+  max-width: 1600px;
+}
+
+.detail__hero {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  padding: 32px 32px 24px;
+}
+
+.detail__cover {
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-lg);
+}
+
+.detail__info {
+  min-width: 0;
+  flex: 1;
+}
+
+.detail__type {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.detail__name {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin: 8px 0;
+  word-break: break-word;
+}
+
+.detail__desc {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-height: 3em;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.detail__meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 32px 20px;
+}
+
+.detail__play {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 22px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.detail__play:hover {
+  background: var(--accent-hover);
+  transform: scale(1.03);
+}
+
+.detail__list {
+  padding: 0 20px 20px;
+}
+
+/* ============================ 资料库 ============================ */
+.library {
+  padding: 0 32px 40px;
+  max-width: 1600px;
+}
+
+.library__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32px 0 8px;
+}
+
+.library__title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.library__new {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--bg-elevated-2);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.library__new:hover {
+  background: var(--bg-active);
+}
+
+/* ============================ 响应式 ============================ */
+@media (max-width: 760px) {
+  .home,
+  .browse,
+  .search,
+  .library {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .detail__hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    padding: 24px 16px 18px;
+  }
+
+  .detail__cover {
+    width: 160px;
+    height: 160px;
+  }
+
+  .detail__name {
+    font-size: 28px;
+  }
+
+  .detail__actions,
+  .detail__list {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .home__greeting,
+  .browse__title,
+  .search__title,
+  .library__title {
+    font-size: 24px;
+  }
+}
+
+/* ============================ 电台 hero ============================ */
+.radio-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 24px;
+  padding: 22px 24px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(120deg, var(--bg-elevated), var(--bg-elevated-2));
+  border: 1px solid var(--separator);
+}
+
+.radio-hero__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #fa243c, #ff7a5e);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(250, 36, 60, 0.34);
+}
+
+.radio-hero__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.radio-hero__text h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.radio-hero__text p {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+@media (max-width: 640px) {
+  .radio-hero {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .radio-hero__text {
+    order: 3;
+    flex-basis: 100%;
+  }
+}
+
+/* ============================ 资料库入口卡片 ============================ */
+.lib-entries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.lib-entry {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  text-align: left;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.lib-entry:hover {
+  background: var(--bg-elevated-2);
+  transform: translateY(-1px);
+}
+
+.lib-entry__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.lib-entry__icon--fav {
+  background: linear-gradient(135deg, #fa243c, #ff6a5e);
+}
+
+.lib-entry__icon--recent {
+  background: linear-gradient(135deg, #5e5ce6, #8e8aff);
+}
+
+.lib-entry__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.lib-entry__text strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.lib-entry__text small {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+}
+
+/* ============================ 我喜欢的音乐封面 ============================ */
+.fav-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #fa243c, #ff7a5e);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 760px) {
+  .fav-cover {
+    width: 160px;
+    height: 160px;
+  }
+}
+
+/* ============================ 最近播放封面 ============================ */
+.recent-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, #5e5ce6, #8e8aff);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 760px) {
+  .recent-cover {
+    width: 160px;
+    height: 160px;
+  }
+}
