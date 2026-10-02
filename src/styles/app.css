@@ -17,8 +17,8 @@
   grid-template-columns: var(--sidebar-width) 1fr;
   grid-template-rows: 1fr var(--playerbar-height);
   grid-template-areas:
-    'sidebar main'
-    'playerbar playerbar';
+    "sidebar main"
+    "playerbar playerbar";
   height: 100vh;
   height: 100dvh;
   width: 100vw;
@@ -118,8 +118,12 @@
 
 /* ============================ 响应式 ============================ */
 @media (max-width: 900px) {
-  :root {
-    --sidebar-width: 72px;
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    grid-template-areas:
+      "main"
+      "playerbar";
   }
 
   .page,
@@ -127,17 +131,6 @@
     padding-left: 16px;
     padding-right: 16px;
   }
-}
-
-@media (max-width: 640px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'main'
-      'playerbar';
-  }
-
-  /* 移动端隐藏常驻侧栏，改由 Topbar 抽屉触发（见 Sidebar 组件） */
 }
 
 .error-retry {

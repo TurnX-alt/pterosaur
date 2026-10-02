@@ -198,11 +198,40 @@
   color: var(--text);
 }
 
+/* ---------- 汉堡按钮（窄屏侧边栏触发器） ---------- */
+.topbar__burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.topbar__burger:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.topbar__burger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* ---------- 窄屏 ---------- */
-@media (max-width: 640px) {
+@media (max-width: 900px) {
   .topbar {
     gap: 10px;
     padding: 0 12px;
+  }
+
+  .topbar__burger {
+    display: flex;
   }
 
   .topbar__nav {

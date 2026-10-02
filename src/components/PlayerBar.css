@@ -1,7 +1,10 @@
 .playerbar {
   grid-area: playerbar;
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(320px, 2fr) minmax(180px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(320px, 2fr) minmax(
+      180px,
+      1fr
+    );
   align-items: center;
   gap: 16px;
   height: var(--playerbar-height);
@@ -111,38 +114,67 @@
   }
 }
 
+/* 非播放态右侧默认隐藏（有曲目时才显示） */
+.playerbar__play-mobile {
+  display: none;
+}
+
+.playerbar__fav-mobile {
+  display: none;
+}
+
+/* ---------- 窄屏 / 移动端（≤860px）：单行精简 ---------- */
 @media (max-width: 860px) {
   .playerbar {
     grid-template-columns: 1fr auto;
-    grid-template-areas:
-      'left right'
-      'center center';
-    grid-template-rows: 1fr auto;
+    grid-template-areas: "left right";
+    grid-template-rows: auto;
     height: auto;
-    padding: 8px 16px 10px;
-    gap: 6px;
+    padding: 8px 12px;
+    gap: 8px;
+    align-items: center;
   }
 
   .playerbar__left {
     grid-area: left;
+    min-width: 0;
   }
 
   .playerbar__right {
     grid-area: right;
+    flex-shrink: 0;
+    gap: 2px;
   }
 
+  /* 隐藏中间全部（控制 + 进度） */
   .playerbar__center {
-    grid-area: center;
-  }
-
-  /* 窄屏精简右侧：隐藏静音键，保留音量与「添加到歌单」菜单 */
-  .playerbar__right .icon-btn[aria-label='静音'],
-  .playerbar__right .icon-btn[aria-label='取消静音'] {
     display: none;
   }
-}
 
-@media (max-width: 520px) {
+  /* 隐藏桌面端左侧喜爱、右侧静音/音量 */
+  .playerbar__fav-desktop {
+    display: none;
+  }
+
+  .playerbar__right .icon-btn[aria-label="静音"],
+  .playerbar__right .icon-btn[aria-label="取消静音"] {
+    display: none;
+  }
+
+  .playerbar__volume {
+    display: none;
+  }
+
+  /* 移动端按钮显形 */
+  .playerbar__play-mobile {
+    display: inline-flex !important;
+    margin-right: 4px;
+  }
+
+  .playerbar__fav-mobile {
+    display: inline-flex !important;
+  }
+
   .playerbar__meta {
     max-width: 42vw;
   }

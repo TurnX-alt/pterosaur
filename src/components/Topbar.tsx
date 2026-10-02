@@ -1,13 +1,23 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Search, ChevronLeft, ChevronRight, Sun, Moon, User, LogOut } from 'lucide-react'
-import { useTheme } from '../hooks/useTheme.js'
-import { useAuth } from '../store/auth.js'
-import { Cover } from './Cover.js'
-import './Topbar.css'
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Sun,
+  Moon,
+  User,
+  LogOut,
+  Menu,
+} from "lucide-react";
+import { useTheme } from "../hooks/useTheme.js";
+import { useAuth } from "../store/auth.js";
+import { useSidebarDrawer } from "../store/ui.js";
+import { Cover } from "./Cover.js";
+import "./Topbar.css";
 
 interface TopbarProps {
-  searchRef: React.RefObject<HTMLInputElement | null>
+  searchRef: React.RefObject<HTMLInputElement | null>;
 }
 
 /**
@@ -16,49 +26,71 @@ interface TopbarProps {
  * 采用半透明毛玻璃 + sticky，滚动时内容从其下方穿过。
  */
 export function Topbar({ searchRef }: TopbarProps) {
-  const navigate = useNavigate()
-  const [params] = useSearchParams()
-  const [keyword, setKeyword] = useState(params.get('q') ?? '')
-  const mode = useTheme((s) => s.mode)
-  const setMode = useTheme((s) => s.setMode)
-  const status = useAuth((s) => s.status)
-  const openModal = useAuth((s) => s.openModal)
-  const logout = useAuth((s) => s.logout)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [keyword, setKeyword] = useState(params.get("q") ?? "");
+  const mode = useTheme((s) => s.mode);
+  const setMode = useTheme((s) => s.setMode);
+  const status = useAuth((s) => s.status);
+  const openModal = useAuth((s) => s.openModal);
+  const logout = useAuth((s) => s.logout);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const toggleSidebar = useSidebarDrawer((s) => s.toggleSidebar);
 
   // URL 上的 q 变化时同步输入框（例如从其他页面跳来搜索）
   useEffect(() => {
-    setKeyword(params.get('q') ?? '')
-  }, [params])
+    setKeyword(params.get("q") ?? "");
+  }, [params]);
 
   // 点击外部关闭账户菜单
   useEffect(() => {
-    if (!menuOpen) return
-    const close = () => setMenuOpen(false)
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [menuOpen])
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menuOpen]);
 
   const submit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const q = keyword.trim()
-    if (!q) return
-    navigate(`/search?q=${encodeURIComponent(q)}`)
-  }
+    e.preventDefault();
+    const q = keyword.trim();
+    if (!q) return;
+    navigate(`/search?q=${encodeURIComponent(q)}`);
+  };
 
   // 解析当前系统偏好下的「实际」明暗，用于决定切换目标与图标
   const prefersDark =
-    mode === 'system' ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true) : mode === 'dark'
+    mode === "system"
+      ? (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true)
+      : mode === "dark";
 
-  const toggleTheme = () => setMode(prefersDark ? 'light' : 'dark')
+  const toggleTheme = () => setMode(prefersDark ? "light" : "dark");
 
   return (
     <header className="topbar">
+      <button
+        type="button"
+        className="topbar__burger"
+        onClick={toggleSidebar}
+        aria-label="打开侧边栏"
+      >
+        <Menu size={20} strokeWidth={2} />
+      </button>
+
       <div className="topbar__nav">
-        <button type="button" className="topbar__round" onClick={() => navigate(-1)} aria-label="后退">
+        <button
+          type="button"
+          className="topbar__round"
+          onClick={() => navigate(-1)}
+          aria-label="后退"
+        >
           <ChevronLeft size={18} strokeWidth={2.4} />
         </button>
-        <button type="button" className="topbar__round" onClick={() => navigate(1)} aria-label="前进">
+        <button
+          type="button"
+          className="topbar__round"
+          onClick={() => navigate(1)}
+          aria-label="前进"
+        >
           <ChevronRight size={18} strokeWidth={2.4} />
         </button>
       </div>
@@ -83,10 +115,14 @@ export function Topbar({ searchRef }: TopbarProps) {
           type="button"
           className="topbar__round"
           onClick={toggleTheme}
-          aria-label={prefersDark ? '切换到浅色' : '切换到深色'}
-          title={prefersDark ? '浅色模式' : '深色模式'}
+          aria-label={prefersDark ? "切换到浅色" : "切换到深色"}
+          title={prefersDark ? "浅色模式" : "深色模式"}
         >
-          {prefersDark ? <Sun size={17} strokeWidth={2} /> : <Moon size={17} strokeWidth={2} />}
+          {prefersDark ? (
+            <Sun size={17} strokeWidth={2} />
+          ) : (
+            <Moon size={17} strokeWidth={2} />
+          )}
         </button>
 
         {status.logged ? (
@@ -95,29 +131,39 @@ export function Topbar({ searchRef }: TopbarProps) {
               type="button"
               className="topbar__avatar"
               onClick={(e) => {
-                e.stopPropagation()
-                setMenuOpen((v) => !v)
+                e.stopPropagation();
+                setMenuOpen((v) => !v);
               }}
               aria-label="账户菜单"
               aria-expanded={menuOpen}
             >
-              <Cover src={status.avatarUrl} alt={status.nickname ?? '用户'} rounded size={28} />
+              <Cover
+                src={status.avatarUrl}
+                alt={status.nickname ?? "用户"}
+                rounded
+                size={28}
+              />
             </button>
             {menuOpen && (
-              <div className="topbar__menu" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="topbar__menu"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="topbar__menu-head">
                   <Cover src={status.avatarUrl} alt="" rounded size={36} />
                   <div>
                     <div className="topbar__menu-name">{status.nickname}</div>
-                    {status.vip && <div className="topbar__menu-vip">VIP 会员</div>}
+                    {status.vip && (
+                      <div className="topbar__menu-vip">VIP 会员</div>
+                    )}
                   </div>
                 </div>
                 <button
                   type="button"
                   className="topbar__menu-item"
                   onClick={() => {
-                    void logout()
-                    setMenuOpen(false)
+                    void logout();
+                    setMenuOpen(false);
                   }}
                 >
                   <LogOut size={15} /> 退出登录
@@ -133,5 +179,5 @@ export function Topbar({ searchRef }: TopbarProps) {
         )}
       </div>
     </header>
-  )
+  );
 }

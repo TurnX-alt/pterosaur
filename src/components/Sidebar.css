@@ -102,33 +102,53 @@
   color: var(--accent);
 }
 
-/* ---------- 窄屏：仅图标 ---------- */
-@media (max-width: 900px) {
-  .sidebar__brand {
-    justify-content: center;
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .sidebar__name,
-  .nav-item__label,
-  .sidebar__section-head span {
-    display: none;
-  }
-
-  .sidebar__section-head {
-    justify-content: center;
-  }
-
-  .nav-item {
-    justify-content: center;
-    padding: 10px;
-  }
+/* ============================ 抽屉遮罩 ============================ */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-slow) var(--ease);
 }
 
-/* ---------- 移动端：隐藏常驻侧栏 ---------- */
-@media (max-width: 640px) {
+.sidebar-scrim--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ============================ 窄屏（<900px）：抽屉替代常驻侧栏 ============================ */
+@media (max-width: 900px) {
   .sidebar {
     display: none;
   }
+
+  .sidebar--drawer-open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 45;
+    width: 280px;
+    padding: 16px 12px;
+    background: var(--glass-sidebar);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border-right: 1px solid var(--separator);
+    overflow-y: auto;
+    animation: sidebar-slide-in var(--dur-slow) var(--ease) forwards;
+  }
+
+  @keyframes sidebar-slide-in {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  /* 抽屉内恢复完整文字（窄屏默认仅图标规则已删除，无需覆盖） */
 }
