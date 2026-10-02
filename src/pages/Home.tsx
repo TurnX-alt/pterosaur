@@ -18,8 +18,7 @@ import './pages.css'
  *
  * - 顶部问候 + 快捷入口（最近播放 / 我喜欢的音乐）；
  * - 「为你推荐歌单」横向卡片；
- * - 「继续收听」最近播放列表；
- * - 未登录时引导登录以解锁 VIP。
+ * - 「继续收听」最近播放列表。
  */
 export function Home() {
   const navigate = useNavigate()
@@ -27,7 +26,6 @@ export function Home() {
   const favorites = useLibrary((s) => s.favorites)
   const playTracks = usePlayer((s) => s.playTracks)
   const status = useAuth((s) => s.status)
-  const openModal = useAuth((s) => s.openModal)
 
   const recommend = useAsync<Playlist[]>(() => api.recommend(12), [], [])
   const [featured, setFeatured] = useState<Track[]>([])
@@ -59,13 +57,7 @@ export function Home() {
             {greeting}
             {status.logged && status.nickname ? `，${status.nickname}` : ''}
           </h1>
-          <p className="home__sub">无需登录，随意畅听{!status.logged && '；登录网易云可解锁 VIP 曲目'}</p>
         </div>
-        {!status.logged && (
-          <button type="button" className="home__cta" onClick={openModal}>
-            登录解锁 VIP
-          </button>
-        )}
       </header>
 
       {/* 快捷入口 */}

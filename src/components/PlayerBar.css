@@ -135,7 +135,9 @@
     grid-area: center;
   }
 
-  .playerbar__right .icon-btn:not([aria-label='播放队列']) {
+  /* 窄屏精简右侧：隐藏静音键，保留音量与「添加到歌单」菜单 */
+  .playerbar__right .icon-btn[aria-label='静音'],
+  .playerbar__right .icon-btn[aria-label='取消静音'] {
     display: none;
   }
 }

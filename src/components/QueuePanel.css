@@ -1,7 +1,7 @@
 .queue-scrim {
   position: fixed;
   inset: 0;
-  z-index: 59;
+  z-index: 998;
   background: rgba(0, 0, 0, 0.32);
   animation: fade-in var(--dur) var(--ease);
 }
@@ -10,8 +10,8 @@
   position: fixed;
   top: 0;
   right: 0;
-  bottom: var(--playerbar-height);
-  z-index: 60;
+  height: 100vh;
+  z-index: 999;
   width: 360px;
   max-width: 90vw;
   display: flex;

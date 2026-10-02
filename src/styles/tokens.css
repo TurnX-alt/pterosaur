@@ -13,6 +13,10 @@
   --accent-press: #d91e33;
   --accent-soft: rgba(250, 36, 60, 0.14);
 
+  /* ---------- 危险操作色 ---------- */
+  --danger: #ff453a;
+  --danger-soft: rgba(255, 69, 58, 0.14);
+
   /* ---------- 尺寸 ---------- */
   --sidebar-width: 248px;
   --playerbar-height: 88px;

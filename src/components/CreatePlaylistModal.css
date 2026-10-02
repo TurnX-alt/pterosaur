@@ -1,0 +1,133 @@
+.cp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cp-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fade-in var(--dur) var(--ease);
+}
+
+.cp-modal__card {
+  position: relative;
+  z-index: 1;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--separator);
+  box-shadow: var(--shadow-lg);
+  animation: cp-modal-in var(--dur-slow) var(--ease);
+}
+
+@keyframes cp-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cp-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.cp-modal__head h2 {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.cp-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cp-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-modal__field span {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.cp-modal__field input {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--separator-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.cp-modal__field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.cp-modal__hint {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+}
+
+.cp-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.cp-modal__btn {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.cp-modal__btn--ghost {
+  color: var(--text-secondary);
+}
+
+.cp-modal__btn--ghost:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.cp-modal__btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cp-modal__btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.cp-modal__btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

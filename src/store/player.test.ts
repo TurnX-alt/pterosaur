@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { usePlayer, advanceOnEnd, shuffledIndexes } from './player.js'
+import { usePlayer, advanceOnEnd, shuffledIndexes, currentPlayMode } from './player.js'
 import type { Track } from '../../shared/types.js'
 
 /** 构造测试用曲目。 */
@@ -176,6 +176,77 @@ describe('usePlayer 播放模式', () => {
     usePlayer.getState().toggleShuffle()
     const s = usePlayer.getState()
     expect(s.shuffle).toBe(false)
+    expect(s.queue.map((t) => t.id)).toEqual(['1', '2', '3', '4', '5'])
+    expect(s.current?.id).toBe(currentId)
+  })
+})
+
+describe('currentPlayMode 派生', () => {
+  it('shuffle 优先于 repeat', () => {
+    expect(currentPlayMode(true, 'off')).toBe('shuffle')
+    expect(currentPlayMode(true, 'one')).toBe('shuffle')
+  })
+
+  it('非随机时按 repeat 映射', () => {
+    expect(currentPlayMode(false, 'off')).toBe('order')
+    expect(currentPlayMode(false, 'all')).toBe('repeat-all')
+    expect(currentPlayMode(false, 'one')).toBe('repeat-one')
+  })
+})
+
+describe('usePlayer.cyclePlayMode（合并播放模式按钮）', () => {
+  beforeEach(() => {
+    usePlayer.getState().playTracks(SONGS, 2)
+  })
+
+  /** 读取当前派生模式。 */
+  const mode = () => {
+    const s = usePlayer.getState()
+    return currentPlayMode(s.shuffle, s.repeat)
+  }
+
+  it('从 repeat-all 依次循环 all->one->shuffle->order->all', () => {
+    expect(mode()).toBe('repeat-all')
+    usePlayer.getState().cyclePlayMode()
+    expect(mode()).toBe('repeat-one')
+    usePlayer.getState().cyclePlayMode()
+    expect(mode()).toBe('shuffle')
+    usePlayer.getState().cyclePlayMode()
+    expect(mode()).toBe('order')
+    usePlayer.getState().cyclePlayMode()
+    expect(mode()).toBe('repeat-all')
+  })
+
+  it('order/repeat-one 之间切换不改动随机态与队列', () => {
+    const before = usePlayer.getState().queue.map((t) => t.id)
+    usePlayer.setState({ shuffle: false, repeat: 'off' })
+    expect(mode()).toBe('order')
+    usePlayer.getState().cyclePlayMode() // -> repeat-all
+    const after = usePlayer.getState().queue.map((t) => t.id)
+    expect(after).toEqual(before)
+    expect(usePlayer.getState().shuffle).toBe(false)
+  })
+
+  it('切换到 shuffle 开启随机并保持当前曲目在队首', () => {
+    const currentId = usePlayer.getState().current?.id
+    usePlayer.setState({ shuffle: false, repeat: 'all' })
+    usePlayer.getState().cyclePlayMode() // all -> one
+    usePlayer.getState().cyclePlayMode() // one -> shuffle
+    const s = usePlayer.getState()
+    expect(s.shuffle).toBe(true)
+    expect(s.queue[0].id).toBe(currentId)
+    expect(s.queue).toHaveLength(5)
+  })
+
+  it('从 shuffle 切回 order 恢复原始顺序并保持当前曲目', () => {
+    usePlayer.setState({ shuffle: false, repeat: 'all' })
+    usePlayer.getState().cyclePlayMode() // -> repeat-one
+    usePlayer.getState().cyclePlayMode() // -> shuffle
+    const currentId = usePlayer.getState().current?.id
+    usePlayer.getState().cyclePlayMode() // shuffle -> order
+    const s = usePlayer.getState()
+    expect(s.shuffle).toBe(false)
+    expect(s.repeat).toBe('off')
     expect(s.queue.map((t) => t.id)).toEqual(['1', '2', '3', '4', '5'])
     expect(s.current?.id).toBe(currentId)
   })

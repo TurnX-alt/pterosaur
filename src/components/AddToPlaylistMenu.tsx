@@ -1,30 +1,32 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, ListPlus, Heart, Check } from 'lucide-react'
+import { Plus, Check, Download, Loader2 } from 'lucide-react'
 import type { Track } from '../../shared/types.js'
 import { useLibrary } from '../store/library.js'
+import { downloadTrack } from '../lib/download.js'
 import './AddToPlaylistMenu.css'
 
 interface AddToPlaylistMenuProps {
   track: Track
+  /** 菜单展开方向：默认向下；位于屏幕底部（如播放条）时用 `up` 向上弹出。 */
+  direction?: 'down' | 'up'
   /** 触发按钮的渲染（由调用方决定外观），点击后打开菜单 */
   children: (props: { onClick: (e: React.MouseEvent) => void; open: boolean }) => React.ReactNode
 }
 
 /**
- * 「添加到歌单」下拉菜单：可收藏、新建歌单、或加入已有本地歌单。
+ * 「添加到歌单」下拉菜单：下载到本地 + 加入/移出已有本地歌单。
  *
+ * 点击某歌单一次为加入，再点一次为从中移除（切换态）。
  * 采用受控浮层 + 点击外部关闭；菜单锚定在触发按钮附近。
  */
-export function AddToPlaylistMenu({ track, children }: AddToPlaylistMenuProps) {
+export function AddToPlaylistMenu({ track, direction = 'down', children }: AddToPlaylistMenuProps) {
   const [open, setOpen] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const playlists = useLibrary((s) => s.playlists)
-  const favorites = useLibrary((s) => s.favorites)
-  const toggleFavorite = useLibrary((s) => s.toggleFavorite)
   const addToPlaylist = useLibrary((s) => s.addToPlaylist)
-  const createPlaylist = useLibrary((s) => s.createPlaylist)
+  const removeFromPlaylist = useLibrary((s) => s.removeFromPlaylist)
   const wrapRef = useRef<HTMLDivElement | null>(null)
-
-  const isFav = favorites.some((t) => t.id === track.id)
 
   useEffect(() => {
     if (!open) return
@@ -42,59 +44,68 @@ export function AddToPlaylistMenu({ track, children }: AddToPlaylistMenuProps) {
     }
   }, [open])
 
-  const handleNew = () => {
-    const name = window.prompt('新歌单名称', '我的歌单')
-    if (name === null) return
-    const id = createPlaylist(name.trim() || '我的歌单', [track])
-    void id
-    setOpen(false)
+  const handleDownload = async () => {
+    if (downloading) return
+    setDownloadError(null)
+    setDownloading(true)
+    try {
+      await downloadTrack(track)
+      setOpen(false)
+    } catch (e) {
+      setDownloadError(e instanceof Error ? e.message : '下载失败')
+    } finally {
+      setDownloading(false)
+    }
   }
 
   return (
-    <div className="atp" ref={wrapRef}>
-      {children({ onClick: (e) => { e.stopPropagation(); setOpen((v) => !v) }, open })}
+    <div className={`atp${direction === 'up' ? ' atp--up' : ''}`} ref={wrapRef}>
+      {children({ onClick: (e) => { e.stopPropagation(); setDownloadError(null); setOpen((v) => !v) }, open })}
       {open && (
         <div className="atp__menu" role="menu" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             role="menuitem"
             className="atp__item"
-            onClick={() => {
-              toggleFavorite(track)
-              setOpen(false)
-            }}
+            onClick={handleDownload}
+            disabled={downloading}
           >
-            {isFav ? <Check size={16} className="atp__check" /> : <Heart size={16} />}
-            <span>{isFav ? '已在我喜欢的音乐' : '添加到喜欢的音乐'}</span>
+            {downloading ? <Loader2 size={16} className="atp__spin" /> : <Download size={16} />}
+            <span>{downloading ? '正在下载…' : '下载到本地'}</span>
           </button>
 
-          <button type="button" role="menuitem" className="atp__item" onClick={handleNew}>
-            <ListPlus size={16} />
-            <span>新建歌单</span>
-          </button>
+          {downloadError && <div className="atp__error">{downloadError}</div>}
 
-          {playlists.length > 0 && <div className="atp__sep" />}
+          {playlists.length > 0 && (
+            <>
+              <div className="atp__sep" />
+              <div className="atp__sub">
+                {playlists.map((p) => {
+                  const inList = p.tracks.some((t) => t.id === track.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      role="menuitem"
+                      className="atp__item"
+                      onClick={() => {
+                        // 点一次加入，再点一次移除；不关闭菜单，便于连续调整多个歌单
+                        if (inList) removeFromPlaylist(p.id, track.id)
+                        else addToPlaylist(p.id, track)
+                      }}
+                    >
+                      {inList ? <Check size={16} className="atp__check" /> : <Plus size={16} />}
+                      <span className="ellipsis">{p.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
 
-          <div className="atp__sub">
-            {playlists.map((p) => {
-              const inList = p.tracks.some((t) => t.id === track.id)
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  role="menuitem"
-                  className="atp__item"
-                  onClick={() => {
-                    if (!inList) addToPlaylist(p.id, track)
-                    setOpen(false)
-                  }}
-                >
-                  {inList ? <Check size={16} className="atp__check" /> : <Plus size={16} />}
-                  <span className="ellipsis">{p.name}</span>
-                </button>
-              )
-            })}
-          </div>
+          {playlists.length === 0 && (
+            <div className="atp__empty">还没有歌单，可在侧边栏「资料库」处新建</div>
+          )}
         </div>
       )}
     </div>

@@ -5,13 +5,10 @@ import {
   Pause,
   SkipBack,
   SkipForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
   Heart,
   ListMusic,
 } from 'lucide-react'
-import { usePlayer } from '../store/player.js'
+import { usePlayer, currentPlayMode } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useQueuePanel } from '../store/ui.js'
 import { seekTo } from '../hooks/audioElement.js'
@@ -21,12 +18,13 @@ import type { Lyric } from '../../shared/types.js'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
 import { Slider } from './Slider.js'
+import { PLAY_MODE_META } from './playMode.js'
 import './NowPlaying.css'
 
 /**
  * 全屏播放页（Apple Music「正在播放」）。
  *
- * 左侧封面（带动态模糊背景），右侧同步歌词 + 控制。
+ * 左侧封面（带动态模糊背景），右侧上部同步歌词、下部播放控制。
  * 由 store.expanded 控制显隐，Esc 关闭。
  */
 export function NowPlaying() {
@@ -39,14 +37,14 @@ export function NowPlaying() {
   const toggle = usePlayer((s) => s.toggle)
   const next = usePlayer((s) => s.next)
   const prev = usePlayer((s) => s.prev)
-  const cycleRepeat = usePlayer((s) => s.cycleRepeat)
-  const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const cyclePlayMode = usePlayer((s) => s.cyclePlayMode)
   const setExpanded = usePlayer((s) => s.setExpanded)
 
   const favorites = useLibrary((s) => s.favorites)
   const toggleFavorite = useLibrary((s) => s.toggleFavorite)
   const isFav = current ? favorites.some((t) => t.id === current.id) : false
   const toggleQueue = useQueuePanel((s) => s.toggleQueue)
+  const queueOpen = useQueuePanel((s) => s.queueOpen)
 
   const [lyric, setLyric] = useState<Lyric | null>(null)
   const [lyricLoading, setLyricLoading] = useState(false)
@@ -87,16 +85,23 @@ export function NowPlaying() {
     return idx
   }, [lyric, position])
 
-  // 自动滚动到当前行
+  // 自动滚动到当前行（居中）
   const listRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const el = listRef.current
     if (!el || activeIndex < 0) return
     const line = el.querySelector<HTMLElement>(`[data-idx="${activeIndex}"]`)
     if (!line) return
-    const target = line.offsetTop - el.clientHeight / 2 + line.clientHeight / 2
-    el.scrollTo({ top: Math.max(0, target), behavior: 'smooth' })
+    // 以容器可视区为基准计算偏移，避免 offsetTop 受定位祖先影响
+    const elRect = el.getBoundingClientRect()
+    const lineRect = line.getBoundingClientRect()
+    const delta = lineRect.top - elRect.top - (el.clientHeight - line.clientHeight) / 2
+    el.scrollTo({ top: el.scrollTop + delta, behavior: 'smooth' })
   }, [activeIndex])
+
+  const mode = currentPlayMode(shuffle, repeat)
+  const modeMeta = PLAY_MODE_META[mode]
+  const ModeIcon = modeMeta.icon
 
   if (!current) return null
 
@@ -115,8 +120,13 @@ export function NowPlaying() {
             <span>正在播放</span>
             <strong className="ellipsis">{current.album || '单曲'}</strong>
           </div>
-          <IconButton label="播放队列" size="md" onClick={toggleQueue}>
-            <ListMusic size={20} strokeWidth={2} />
+          <IconButton
+            label={isFav ? '取消喜欢' : '喜欢'}
+            size="md"
+            active={isFav}
+            onClick={() => toggleFavorite(current)}
+          >
+            <Heart size={20} strokeWidth={2} fill={isFav ? 'currentColor' : 'none'} />
           </IconButton>
         </header>
 
@@ -131,58 +141,11 @@ export function NowPlaying() {
             />
           </div>
 
-          {/* 右：歌词 + 控制 */}
+          {/* 右：歌词（上）+ 控制（下） */}
           <div className="nowplaying__panel">
             <div className="nowplaying__info">
               <h1 className="nowplaying__title ellipsis">{current.title}</h1>
               <p className="nowplaying__artist ellipsis">{current.artist}</p>
-            </div>
-
-            {/* 进度 */}
-            <div className="nowplaying__progress">
-              <Slider
-                value={position}
-                max={duration || 0}
-                onChange={() => {}}
-                onCommit={(v) => seekTo(v)}
-                disabled={!duration}
-                ariaLabel="播放进度"
-                size="md"
-              />
-              <div className="nowplaying__times">
-                <span>{formatTime(position)}</span>
-                <span>-{formatTime(Math.max(0, duration - position))}</span>
-              </div>
-            </div>
-
-            {/* 控制 */}
-            <div className="nowplaying__controls">
-              <IconButton label={shuffle ? '关闭随机' : '随机播放'} size="md" active={shuffle} onClick={toggleShuffle}>
-                <Shuffle size={20} strokeWidth={2} />
-              </IconButton>
-              <IconButton label="上一首" size="lg" onClick={prev}>
-                <SkipBack size={26} strokeWidth={2} fill="currentColor" />
-              </IconButton>
-              <IconButton label={isPlaying ? '暂停' : '播放'} size="lg" primary onClick={toggle} className="nowplaying__play">
-                {isPlaying ? <Pause size={28} strokeWidth={2.2} fill="currentColor" /> : <Play size={28} strokeWidth={2.2} fill="currentColor" />}
-              </IconButton>
-              <IconButton label="下一首" size="lg" onClick={next}>
-                <SkipForward size={26} strokeWidth={2} fill="currentColor" />
-              </IconButton>
-              <IconButton
-                label={repeat === 'off' ? '不循环' : repeat === 'all' ? '列表循环' : '单曲循环'}
-                size="md"
-                active={repeat !== 'off'}
-                onClick={cycleRepeat}
-              >
-                {repeat === 'one' ? <Repeat1 size={20} strokeWidth={2} /> : <Repeat size={20} strokeWidth={2} />}
-              </IconButton>
-            </div>
-
-            <div className="nowplaying__actions">
-              <IconButton label={isFav ? '取消喜欢' : '喜欢'} size="md" active={isFav} onClick={() => toggleFavorite(current)}>
-                <Heart size={22} strokeWidth={2} fill={isFav ? 'currentColor' : 'none'} />
-              </IconButton>
             </div>
 
             {/* 歌词 */}
@@ -214,6 +177,51 @@ export function NowPlaying() {
                   </p>
                 ))
               )}
+            </div>
+
+            {/* 进度 */}
+            <div className="nowplaying__progress">
+              <Slider
+                value={position}
+                max={duration || 0}
+                onChange={() => {}}
+                onCommit={(v) => seekTo(v)}
+                disabled={!duration}
+                ariaLabel="播放进度"
+                size="md"
+              />
+              <div className="nowplaying__times">
+                <span>{formatTime(position)}</span>
+                <span>-{formatTime(Math.max(0, duration - position))}</span>
+              </div>
+            </div>
+
+            {/* 控制：语义与底部播放栏一致（模式合并按钮 + 队列按钮） */}
+            <div className="nowplaying__controls">
+              <IconButton
+                label={`播放模式：${modeMeta.label}`}
+                size="md"
+                onClick={cyclePlayMode}
+              >
+                <ModeIcon size={20} strokeWidth={2} />
+              </IconButton>
+              <IconButton label="上一首" size="lg" onClick={prev}>
+                <SkipBack size={26} strokeWidth={2} fill="currentColor" />
+              </IconButton>
+              <IconButton label={isPlaying ? '暂停' : '播放'} size="lg" primary onClick={toggle} className="nowplaying__play">
+                {isPlaying ? <Pause size={28} strokeWidth={2.2} fill="currentColor" /> : <Play size={28} strokeWidth={2.2} fill="currentColor" />}
+              </IconButton>
+              <IconButton label="下一首" size="lg" onClick={next}>
+                <SkipForward size={26} strokeWidth={2} fill="currentColor" />
+              </IconButton>
+              <IconButton
+                label={queueOpen ? '关闭播放队列' : '播放队列'}
+                size="md"
+                active={queueOpen}
+                onClick={toggleQueue}
+              >
+                <ListMusic size={20} strokeWidth={2} />
+              </IconButton>
             </div>
           </div>
         </div>

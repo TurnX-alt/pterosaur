@@ -1,6 +1,7 @@
 import { Play, Shuffle, Clock, Trash2 } from 'lucide-react'
 import { useLibrary } from '../store/library.js'
 import { usePlayer } from '../store/player.js'
+import { confirmDialog } from '../store/ui.js'
 import { TrackList } from '../components/TrackList.js'
 import { IconButton } from '../components/IconButton.js'
 import { Empty } from '../components/States.js'
@@ -47,8 +48,14 @@ export function RecentPage() {
           <IconButton
             label="清空最近播放"
             size="lg"
-            onClick={() => {
-              if (window.confirm('确定清空最近播放记录吗？')) clearRecent()
+            onClick={async () => {
+              const ok = await confirmDialog({
+                title: '清空最近播放记录？',
+                message: `将删除全部 ${recent.length} 条播放记录，此操作无法撤销。`,
+                confirmText: '清空',
+                danger: true,
+              })
+              if (ok) clearRecent()
             }}
           >
             <Trash2 size={19} strokeWidth={2} />

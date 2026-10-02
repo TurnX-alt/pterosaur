@@ -81,8 +81,9 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 48px;
-  align-items: center;
+  align-items: stretch;
   padding-top: 12px;
 }
 
@@ -171,14 +172,9 @@
   height: 62px !important;
 }
 
-.nowplaying__actions {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
 /* 歌词 */
 .nowplaying__lyrics {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -186,6 +182,15 @@
   scroll-behavior: smooth;
   mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 78%, transparent);
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 12%, #000 78%, transparent);
+  /* 隐藏滚动条（仍可滚动），避免破坏沉浸观感 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.nowplaying__lyrics::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .nowplaying__lyrics-empty {
@@ -245,6 +250,7 @@
 
   .nowplaying__body {
     grid-template-columns: 1fr;
+    grid-template-rows: none;
     gap: 20px;
     align-content: start;
     overflow-y: auto;

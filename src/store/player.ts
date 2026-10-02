@@ -3,6 +3,43 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type { RepeatMode, Track } from '../../shared/types.js'
 import { streamUrl } from '../../shared/types.js'
 
+/**
+ * 播放模式：把「随机」与「循环」合并为单一 UI 概念，供播放条的合并按钮循环切换。
+ *
+ * - `order`      顺序播放（不循环）
+ * - `repeat-all` 列表循环
+ * - `repeat-one` 单曲循环
+ * - `shuffle`    随机播放
+ */
+export type PlayMode = 'order' | 'repeat-all' | 'repeat-one' | 'shuffle'
+
+/** 合并模式的循环顺序。 */
+const MODE_CYCLE: PlayMode[] = ['order', 'repeat-all', 'repeat-one', 'shuffle']
+
+/** 由底层 `shuffle` + `repeat` 派生当前播放模式。 */
+export function currentPlayMode(shuffle: boolean, repeat: RepeatMode): PlayMode {
+  if (shuffle) return 'shuffle'
+  if (repeat === 'off') return 'order'
+  if (repeat === 'one') return 'repeat-one'
+  return 'repeat-all'
+}
+
+/** 播放模式对应的底层 `shuffle` / `repeat` 组合。 */
+function modeToState(mode: PlayMode): { shuffle: boolean; repeat: RepeatMode } {
+  switch (mode) {
+    case 'order':
+      return { shuffle: false, repeat: 'off' }
+    case 'repeat-one':
+      return { shuffle: false, repeat: 'one' }
+    case 'shuffle':
+      return { shuffle: true, repeat: 'all' }
+    case 'repeat-all':
+    default:
+      return { shuffle: false, repeat: 'all' }
+  }
+}
+
+
 /** 播放状态切片（不持久化的运行时状态）。 */
 interface PlaybackState {
   /** 当前曲目。 */
@@ -48,6 +85,8 @@ interface PlaybackActions {
   toggleMute: () => void
   cycleRepeat: () => void
   toggleShuffle: () => void
+  /** 合并「随机 / 循环」为单一按钮：循环切换播放模式。 */
+  cyclePlayMode: () => void
   clearQueue: () => void
   removeAt: (index: number) => void
   setExpanded: (v: boolean) => void
@@ -212,6 +251,29 @@ export const usePlayer = create<PlayerStore>()(
           // 关闭打乱：恢复原始顺序，并保持当前曲目
           const idx = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
           set({ shuffle: false, queue: baseQueue, index: Math.max(idx, 0) })
+        }
+      },
+      cyclePlayMode: () => {
+        const { shuffle, repeat, baseQueue, current } = get()
+        const mode = currentPlayMode(shuffle, repeat)
+        const next = MODE_CYCLE[(MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length]
+        const target = modeToState(next)
+
+        // 仅当随机状态发生翻转时才需要重排 / 恢复队列，其余情况只改 repeat。
+        if (target.shuffle === shuffle) {
+          set({ repeat: target.repeat })
+          return
+        }
+        if (target.shuffle) {
+          // 进入随机：以当前曲目为种子重排
+          const seed = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
+          const order = shuffledIndexes(baseQueue.length, Math.max(seed, 0))
+          const queue = order.map((i) => baseQueue[i])
+          set({ shuffle: true, repeat: target.repeat, queue, index: 0, current: queue[0] ?? null })
+        } else {
+          // 退出随机：恢复原始顺序并保持当前曲目
+          const idx = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
+          set({ shuffle: false, repeat: target.repeat, queue: baseQueue, index: Math.max(idx, 0) })
         }
       },
       clearQueue: () =>

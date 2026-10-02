@@ -4,18 +4,14 @@ import {
   Pause,
   SkipBack,
   SkipForward,
-  Shuffle,
-  Repeat,
-  Repeat1,
   Volume2,
   VolumeX,
   Volume1,
   Heart,
   ListMusic,
-  Maximize2,
-  Mic2,
+  MoreHorizontal,
 } from 'lucide-react'
-import { usePlayer } from '../store/player.js'
+import { usePlayer, currentPlayMode } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useQueuePanel } from '../store/ui.js'
 import { seekTo } from '../hooks/audioElement.js'
@@ -23,6 +19,8 @@ import { formatTime } from '../../shared/types.js'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
 import { Slider } from './Slider.js'
+import { AddToPlaylistMenu } from './AddToPlaylistMenu.js'
+import { PLAY_MODE_META } from './playMode.js'
 import './PlayerBar.css'
 
 export function PlayerBar() {
@@ -39,8 +37,7 @@ export function PlayerBar() {
   const prev = usePlayer((s) => s.prev)
   const setVolume = usePlayer((s) => s.setVolume)
   const toggleMute = usePlayer((s) => s.toggleMute)
-  const cycleRepeat = usePlayer((s) => s.cycleRepeat)
-  const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const cyclePlayMode = usePlayer((s) => s.cyclePlayMode)
   const setExpanded = usePlayer((s) => s.setExpanded)
 
   const favorites = useLibrary((s) => s.favorites)
@@ -60,6 +57,9 @@ export function PlayerBar() {
   }, [])
 
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
+  const mode = currentPlayMode(shuffle, repeat)
+  const modeMeta = PLAY_MODE_META[mode]
+  const ModeIcon = modeMeta.icon
 
   return (
     <footer className="playerbar">
@@ -96,8 +96,13 @@ export function PlayerBar() {
       {/* ---------- 中：控制 + 进度 ---------- */}
       <div className="playerbar__center">
         <div className="playerbar__controls">
-          <IconButton label={shuffle ? '关闭随机播放' : '开启随机播放'} size="sm" active={shuffle} onClick={toggleShuffle}>
-            <Shuffle size={17} strokeWidth={2} />
+          {/* 播放模式：随机 / 循环合并为单一按钮，点击循环切换；靠专属图标区分状态 */}
+          <IconButton
+            label={`播放模式：${modeMeta.label}`}
+            size="sm"
+            onClick={cyclePlayMode}
+          >
+            <ModeIcon size={17} strokeWidth={2} />
           </IconButton>
           <IconButton label="上一首" size="md" onClick={prev} disabled={!current}>
             <SkipBack size={20} strokeWidth={2} fill="currentColor" />
@@ -115,13 +120,14 @@ export function PlayerBar() {
           <IconButton label="下一首" size="md" onClick={next} disabled={!current}>
             <SkipForward size={20} strokeWidth={2} fill="currentColor" />
           </IconButton>
+          {/* 原循环按钮位置改为播放队列 */}
           <IconButton
-            label={repeat === 'off' ? '不循环' : repeat === 'all' ? '列表循环' : '单曲循环'}
+            label={queueOpen ? '关闭播放队列' : '播放队列'}
             size="sm"
-            active={repeat !== 'off'}
-            onClick={cycleRepeat}
+            active={queueOpen}
+            onClick={toggleQueue}
           >
-            {repeat === 'one' ? <Repeat1 size={17} strokeWidth={2} /> : <Repeat size={17} strokeWidth={2} />}
+            <ListMusic size={17} strokeWidth={2} />
           </IconButton>
         </div>
 
@@ -140,14 +146,8 @@ export function PlayerBar() {
         </div>
       </div>
 
-      {/* ---------- 右：音量 + 队列 + 歌词 + 展开 ---------- */}
+      {/* ---------- 右：音量 + 菜单（原「展开播放页」位置改放添加到歌单菜单） ---------- */}
       <div className="playerbar__right">
-        <IconButton label="歌词" size="sm" onClick={() => setExpanded(true)} disabled={!current}>
-          <Mic2 size={17} strokeWidth={2} />
-        </IconButton>
-        <IconButton label={queueOpen ? '关闭播放队列' : '播放队列'} size="sm" active={queueOpen} onClick={toggleQueue}>
-          <ListMusic size={17} strokeWidth={2} />
-        </IconButton>
         <IconButton label={muted ? '取消静音' : '静音'} size="sm" onClick={toggleMute} disabled={!current}>
           <VolumeIcon size={17} strokeWidth={2} />
         </IconButton>
@@ -160,9 +160,15 @@ export function PlayerBar() {
             size="sm"
           />
         </div>
-        <IconButton label="展开播放页" size="sm" onClick={() => setExpanded(true)} disabled={!current}>
-          <Maximize2 size={16} strokeWidth={2} />
-        </IconButton>
+        {current && (
+          <AddToPlaylistMenu track={current} direction="up">
+            {({ onClick, open }) => (
+              <IconButton label="添加到歌单" size="sm" active={open} onClick={onClick}>
+                <MoreHorizontal size={17} strokeWidth={2} />
+              </IconButton>
+            )}
+          </AddToPlaylistMenu>
+        )}
       </div>
     </footer>
   )

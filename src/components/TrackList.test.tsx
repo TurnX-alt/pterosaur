@@ -53,9 +53,9 @@ describe('TrackList', () => {
     }
   })
 
-  it('VIP 曲目显示徽标', () => {
+  it('VIP 曲目不再显示徽标（歌单内隐藏 VIP chip）', () => {
     render(<TrackList tracks={SONGS} />)
-    expect(screen.getByText('VIP')).toBeInTheDocument()
+    expect(screen.queryByText('VIP')).not.toBeInTheDocument()
   })
 
   it('时长格式化显示（200s -> 3:20）', () => {

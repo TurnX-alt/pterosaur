@@ -113,10 +113,7 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
             <span className="col-title">
               <Cover src={t.cover} alt={t.title} radius="sm" size={40} />
               <span className="col-title__text">
-                <span className="col-title__name ellipsis">
-                  {t.title}
-                  {t.fee === 'vip' && <em className="vip-badge">VIP</em>}
-                </span>
+                <span className="col-title__name ellipsis">{t.title}</span>
                 <span className="col-title__artist ellipsis">{t.artist}</span>
               </span>
             </span>

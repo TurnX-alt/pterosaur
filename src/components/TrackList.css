@@ -168,9 +168,6 @@
 .col-title__name {
   font-size: 14px;
   font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .track-row--current .col-title__name {
@@ -180,18 +177,6 @@
 .col-title__artist {
   font-size: 12.5px;
   color: var(--text-secondary);
-}
-
-.vip-badge {
-  flex-shrink: 0;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  font-style: normal;
-  letter-spacing: 0.02em;
 }
 
 /* ---------- 列：专辑 / 时长 ---------- */

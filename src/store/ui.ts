@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { Track } from '../../shared/types.js'
 
 /**
  * 临时 UI 状态（不持久化）：队列面板开合等。
@@ -18,3 +19,94 @@ export const useQueuePanel = create<UiState>()((set) => ({
   toggleQueue: () => set((s) => ({ queueOpen: !s.queueOpen })),
   setQueueOpen: (v) => set({ queueOpen: v }),
 }))
+
+/** 新建歌单弹窗的打开参数。 */
+export interface CreatePlaylistOptions {
+  /** 预置曲目（如从「添加到歌单」菜单发起时带入当前曲目）。 */
+  tracks?: Track[]
+  /** 创建成功回调，返回新歌单 ID（用于跳转）。 */
+  onDone?: (id: string) => void
+}
+
+interface CreatePlaylistUiState {
+  open: boolean
+  tracks: Track[]
+  onDone: ((id: string) => void) | null
+  openCreate: (opts?: CreatePlaylistOptions) => void
+  closeCreate: () => void
+}
+
+/**
+ * 新建歌单弹窗的 UI 状态（全局单例，弹窗挂载在 App 顶层）。
+ *
+ * 取代原生 `window.prompt`，保持与登录弹窗一致的视觉风格。
+ */
+export const useCreatePlaylist = create<CreatePlaylistUiState>()((set) => ({
+  open: false,
+  tracks: [],
+  onDone: null,
+  openCreate: (opts) =>
+    set({ open: true, tracks: opts?.tracks ?? [], onDone: opts?.onDone ?? null }),
+  closeCreate: () => set({ open: false, tracks: [], onDone: null }),
+}))
+
+/** 确认弹窗的参数。 */
+export interface ConfirmOptions {
+  /** 标题（主问句）。 */
+  title: string
+  /** 补充说明（可选）。 */
+  message?: string
+  /** 确认按钮文案，默认「确定」。 */
+  confirmText?: string
+  /** 取消按钮文案，默认「取消」。 */
+  cancelText?: string
+  /** 是否为危险操作（确认按钮用强调/警示色）。 */
+  danger?: boolean
+}
+
+interface ConfirmUiState {
+  open: boolean
+  options: ConfirmOptions
+  /** 内部：当前挂起的 Promise resolve，供弹窗关闭时回填结果。 */
+  resolve: ((value: boolean) => void) | null
+  /**
+   * 打开确认弹窗，返回用户选择的 Promise（true 确认 / false 取消）。
+   *
+   * 取代原生 `window.confirm`，调用方可 `if (await confirmDialog({...})) ...`。
+   */
+  confirm: (opts: ConfirmOptions) => Promise<boolean>
+  /** 结束弹窗并回填结果。 */
+  settle: (value: boolean) => void
+}
+
+const DEFAULT_CONFIRM: ConfirmOptions = { title: '' }
+
+/**
+ * 全局确认弹窗的 UI 状态（弹窗挂载在 App 顶层）。
+ */
+export const useConfirmDialog = create<ConfirmUiState>()((set, get) => ({
+  open: false,
+  options: DEFAULT_CONFIRM,
+  resolve: null,
+  confirm: (opts) =>
+    new Promise<boolean>((resolve) => {
+      // 若已有挂起的确认，先以「取消」结清，避免 Promise 泄漏
+      get().resolve?.(false)
+      set({ open: true, options: opts, resolve })
+    }),
+  settle: (value) => {
+    get().resolve?.(value)
+    set({ open: false, options: DEFAULT_CONFIRM, resolve: null })
+  },
+}))
+
+/**
+ * 打开确认弹窗的命令式入口（取代 `window.confirm`）。
+ *
+ * @example
+ * if (await confirmDialog({ title: '删除歌单？', danger: true })) { ... }
+ */
+export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
+  return useConfirmDialog.getState().confirm(opts)
+}
+

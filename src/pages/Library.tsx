@@ -2,7 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, ListMusic, Heart, Clock } from 'lucide-react'
 import { useLibrary } from '../store/library.js'
 import { usePlayer } from '../store/player.js'
+import { useCreatePlaylist } from '../store/ui.js'
 import { Cover } from '../components/Cover.js'
+import { PlaylistCard } from '../components/PlaylistCard.js'
 import { Empty } from '../components/States.js'
 
 /**
@@ -11,16 +13,14 @@ import { Empty } from '../components/States.js'
 export function LibraryPage() {
   const navigate = useNavigate()
   const playlists = useLibrary((s) => s.playlists)
+  const savedPlaylists = useLibrary((s) => s.savedPlaylists)
   const favorites = useLibrary((s) => s.favorites)
   const recent = useLibrary((s) => s.recent)
-  const createPlaylist = useLibrary((s) => s.createPlaylist)
+  const openCreate = useCreatePlaylist((s) => s.openCreate)
   const playTracks = usePlayer((s) => s.playTracks)
 
   const handleCreate = () => {
-    const name = window.prompt('新歌单名称', '我的歌单')
-    if (name === null) return
-    const id = createPlaylist(name.trim() || '我的歌单')
-    navigate(`/playlist/${id}`)
+    openCreate({ onDone: (id) => navigate(`/playlist/${id}`) })
   }
 
   return (
@@ -88,6 +88,19 @@ export function LibraryPage() {
           </div>
         )}
       </section>
+
+      {savedPlaylists.length > 0 && (
+        <section className="section">
+          <div className="section-head">
+            <h2 className="section-title">收藏的歌单</h2>
+          </div>
+          <div className="card-grid">
+            {savedPlaylists.map((p) => (
+              <PlaylistCard key={p.id} playlist={p} onClick={() => navigate(`/playlist/${p.id}`)} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

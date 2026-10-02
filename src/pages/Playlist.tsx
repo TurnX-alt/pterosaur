@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Play, Shuffle, Trash2 } from 'lucide-react'
+import { Play, Shuffle, Trash2, Heart } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
+import { confirmDialog } from '../store/ui.js'
 import type { Playlist, Track } from '../../shared/types.js'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
@@ -33,8 +34,16 @@ export function PlaylistPage() {
 
   const playlists = useLibrary((s) => s.playlists)
   const deletePlaylist = useLibrary((s) => s.deletePlaylist)
+  const renamePlaylist = useLibrary((s) => s.renamePlaylist)
+  const savedPlaylists = useLibrary((s) => s.savedPlaylists)
+  const toggleSavePlaylist = useLibrary((s) => s.toggleSavePlaylist)
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+
+  // 本地歌单标题的内联重命名
+  const [renaming, setRenaming] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
+  const renameRef = useRef<HTMLInputElement | null>(null)
 
   // 本地歌单：直接从 store 取
   const local = useMemo(() => (isLocal ? playlists.find((p) => p.id === id) : undefined), [isLocal, playlists, id])
@@ -53,10 +62,51 @@ export function PlaylistPage() {
   const loading = !isLocal && remote.loading
   const error = !isLocal ? remote.error : isLocal && !local ? '歌单不存在' : null
 
+  // 在线歌单是否已收藏到资料库（仅保存引用，按路由 id 判断）
+  const isSaved = !isLocal && savedPlaylists.some((p) => p.id === id)
+
   const handlePlay = (shuffle = false) => {
     if (!tracks.length) return
     if (shuffle && !usePlayer.getState().shuffle) toggleShuffle()
     playTracks(tracks, shuffle ? Math.floor(Math.random() * tracks.length) : 0)
+  }
+
+  // 切换歌单时退出重命名态
+  useEffect(() => {
+    setRenaming(false)
+  }, [id])
+
+  // 进入重命名时聚焦并全选
+  useEffect(() => {
+    if (renaming) {
+      const el = renameRef.current
+      el?.focus()
+      el?.select()
+    }
+  }, [renaming])
+
+  const startRename = () => {
+    setRenameValue(local?.name ?? '')
+    setRenaming(true)
+  }
+
+  const commitRename = () => {
+    const next = renameValue.trim()
+    if (next && next !== local?.name) renamePlaylist(id, next)
+    setRenaming(false)
+  }
+
+  const handleDelete = async () => {
+    const ok = await confirmDialog({
+      title: '删除歌单？',
+      message: `「${playlist?.name ?? ''}」将被删除，此操作无法撤销。`,
+      confirmText: '删除',
+      danger: true,
+    })
+    if (ok) {
+      deletePlaylist(id)
+      navigate('/')
+    }
   }
 
   if (loading) {
@@ -83,7 +133,31 @@ export function PlaylistPage() {
         <Cover src={playlist.cover} alt={playlist.name} radius="lg" className="detail__cover" />
         <div className="detail__info">
           <span className="detail__type">{isLocal ? '本地歌单' : '歌单'}</span>
-          <h1 className="detail__name">{playlist.name}</h1>
+          {isLocal && renaming ? (
+            <input
+              ref={renameRef}
+              className="detail__name detail__name--editing"
+              value={renameValue}
+              maxLength={60}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitRename()
+                else if (e.key === 'Escape') setRenaming(false)
+              }}
+              aria-label="重命名歌单"
+            />
+          ) : isLocal ? (
+            <h1
+              className="detail__name detail__name--editable"
+              onClick={startRename}
+              title="点击重命名"
+            >
+              {playlist.name}
+            </h1>
+          ) : (
+            <h1 className="detail__name">{playlist.name}</h1>
+          )}
           {!isLocal && playlist.description && <p className="detail__desc">{playlist.description}</p>}
           <p className="detail__meta">
             {playlist.creator && <span>{playlist.creator} · </span>}
@@ -102,17 +176,18 @@ export function PlaylistPage() {
         <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!tracks.length}>
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
-        {isLocal && (
+        {!isLocal && (
           <IconButton
-            label="删除歌单"
+            label={isSaved ? '取消收藏' : '收藏到资料库'}
             size="lg"
-            onClick={() => {
-              if (window.confirm(`确定删除歌单「${playlist.name}」吗？`)) {
-                deletePlaylist(id)
-                navigate('/library')
-              }
-            }}
+            active={isSaved}
+            onClick={() => toggleSavePlaylist(playlist)}
           >
+            <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          </IconButton>
+        )}
+        {isLocal && (
+          <IconButton label="删除歌单" size="lg" onClick={handleDelete}>
             <Trash2 size={19} strokeWidth={2} />
           </IconButton>
         )}

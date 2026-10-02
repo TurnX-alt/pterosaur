@@ -31,6 +31,24 @@
   }
 }
 
+/* 向上弹出（用于屏幕底部的播放条） */
+.atp--up .atp__menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  animation-name: atp-in-up;
+}
+
+@keyframes atp-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .atp__item {
   display: flex;
   align-items: center;
@@ -70,4 +88,34 @@
 .atp__sub {
   display: flex;
   flex-direction: column;
+}
+
+.atp__item:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.atp__spin {
+  animation: atp-spin 0.8s linear infinite;
+}
+
+@keyframes atp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.atp__error {
+  margin: 6px 10px 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--danger, #ff453a);
+}
+
+.atp__empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-tertiary);
+  text-align: center;
 }

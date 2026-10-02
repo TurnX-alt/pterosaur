@@ -19,18 +19,6 @@
   padding: 4px 10px 18px;
 }
 
-.sidebar__logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #fff;
-  flex-shrink: 0;
-}
-
 .sidebar__name {
   font-size: 17px;
   font-weight: 700;
@@ -45,11 +33,11 @@
 }
 
 .sidebar__playlists {
-  margin-top: 6px;
-  padding-top: 8px;
-  border-top: 1px solid var(--separator);
-  flex: 1;
-  min-height: 0;
+  margin-top: 2px;
+}
+
+.sidebar__saved {
+  margin-top: 2px;
 }
 
 .nav-item {
@@ -114,48 +102,6 @@
   color: var(--accent);
 }
 
-/* ---------- 底部用户区 ---------- */
-.sidebar__footer {
-  margin-top: auto;
-  padding-top: 14px;
-  border-top: 1px solid var(--separator);
-}
-
-.sidebar__user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.sidebar__vip {
-  margin-left: auto;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.sidebar__login {
-  width: 100%;
-  padding: 9px 12px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.sidebar__login:hover {
-  background: var(--accent-hover);
-}
-
 /* ---------- 窄屏：仅图标 ---------- */
 @media (max-width: 900px) {
   .sidebar__brand {
@@ -166,9 +112,7 @@
 
   .sidebar__name,
   .nav-item__label,
-  .sidebar__section-head span,
-  .sidebar__user .nav-item__label,
-  .sidebar__vip {
+  .sidebar__section-head span {
     display: none;
   }
 
@@ -179,20 +123,6 @@
   .nav-item {
     justify-content: center;
     padding: 10px;
-  }
-
-  .sidebar__login {
-    font-size: 0;
-    padding: 10px;
-  }
-
-  .sidebar__login::after {
-    content: '登录';
-    font-size: 11px;
-  }
-
-  .sidebar__user {
-    justify-content: center;
   }
 }
 
