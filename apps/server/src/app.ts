@@ -18,6 +18,7 @@ import {
   loginStatus,
   userPlaylists,
   cookieHeaderFromSetCookies,
+  SESSION_COOKIE_NAMES,
 } from './netease.js'
 import type { ApiResult, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
 
@@ -41,19 +42,23 @@ function fail(error: string, needLogin = false): ApiResult<never> {
 function cookieOf(c: Context): string | undefined {
   const raw = c.req.header('cookie')
   if (!raw) return undefined
-  const keep = ['MUSIC_U', '__csrf', 'MUSIC_A', 'NMTID']
   const parts = raw
     .split(';')
     .map((s) => s.trim())
     .filter(Boolean)
-    .filter((kv) => keep.includes(kv.slice(0, kv.indexOf('='))))
+    .filter((kv) => SESSION_COOKIE_NAMES.includes(kv.slice(0, kv.indexOf('='))))
   return parts.length ? parts.join('; ') : undefined
 }
 
-/** 把网易云返回的 Set-Cookie 数组下发给浏览器（同源；生产 https 下安全存储）。 */
+/**
+ * 把登录响应中会话必需的 Set-Cookie 下发给浏览器（同源；生产 https 下安全存储）。
+ * 网易云 803 会附带数十条无关 cookie（clientlog / feedback 等），全部转发会撑大响应头。
+ */
 function forwardCookies(c: Context, cookies?: string[]) {
   if (!cookies?.length) return
   for (const raw of cookies) {
+    const name = raw.slice(0, raw.indexOf('='))
+    if (!SESSION_COOKIE_NAMES.includes(name)) continue
     const cleaned = raw.replace(/;\s*Secure/i, '').replace(/;\s*SameSite=\w+/i, '')
     c.header('Set-Cookie', `${cleaned}; Path=/; SameSite=Lax`, { append: true })
   }

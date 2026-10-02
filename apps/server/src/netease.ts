@@ -36,16 +36,18 @@ export function readCookieValue(cookies: string[] | undefined, name: string): st
   return undefined
 }
 
+/** 会话必需的网易云 cookie 名单：下发与回传均只处理这几项，避免多余 Set-Cookie 撑大响应头。 */
+export const SESSION_COOKIE_NAMES = ['MUSIC_U', '__csrf', 'MUSIC_A', 'NMTID']
+
 /** 把登录相关 cookie（MUSIC_U / __csrf 等）收敛为可直接透传给网易云的字符串。 */
 export function cookieHeaderFromSetCookies(cookies: string[] | undefined): string | undefined {
   if (!cookies?.length) return undefined
-  const keep = ['MUSIC_U', '__csrf', 'MUSIC_A', 'NMTID']
   const parts: string[] = []
   for (const c of cookies) {
     const kv = c.split(';')[0]?.trim()
     if (!kv) continue
     const name = kv.slice(0, kv.indexOf('='))
-    if (keep.includes(name)) parts.push(kv)
+    if (SESSION_COOKIE_NAMES.includes(name)) parts.push(kv)
   }
   return parts.length ? parts.join('; ') : undefined
 }
