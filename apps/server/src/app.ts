@@ -51,10 +51,10 @@ function cookieOf(c: Context): string | undefined {
 }
 
 /**
- * 把登录响应中会话必需的 Set-Cookie 下发给浏览器（同源；生产 https 下安全存储）。
- * 网易云 803 会附带数十条无关 cookie（clientlog / feedback 等），全部转发会撑大响应头。
+ * 只把登录响应中会话必需的 Set-Cookie 下发给浏览器（同源；生产 https 下安全存储）。
+ * 网易云登录响应会附带数十条无关 cookie（clientlog / feedback 等），全部转发会撑大响应头。
  */
-function forwardCookies(c: Context, cookies?: string[]) {
+function forwardSessionCookies(c: Context, cookies?: string[]) {
   if (!cookies?.length) return
   for (const raw of cookies) {
     const name = raw.slice(0, raw.indexOf('='))
@@ -238,7 +238,7 @@ export function createApp() {
       }
       const cookieHeader = cookieHeaderFromSetCookies(cookies)
       const status = await loginStatus(cookieHeader)
-      forwardCookies(c, cookies)
+      forwardSessionCookies(c, cookies)
       return c.json(ok<LoginStatus & { code: number }>({ ...status, code }))
     } catch (e) {
       return c.json(fail(`检查登录状态失败：${(e as Error).message}`), 502)
@@ -254,7 +254,7 @@ export function createApp() {
       if (!res?.cookies) return c.json(fail('登录失败，请检查手机号与密码'), 401)
       const cookieHeader = cookieHeaderFromSetCookies(res.cookies)
       const status = await loginStatus(cookieHeader)
-      forwardCookies(c, res.cookies)
+      forwardSessionCookies(c, res.cookies)
       return c.json(ok<LoginStatus>(status))
     } catch (e) {
       return c.json(fail(`登录失败：${(e as Error).message}`), 502)
