@@ -68,7 +68,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 **登录解锁 VIP：**
 1. 打开 `LoginModal` → `api.qrCreate` 取 key + 二维码图片。
 2. 前端每 2s 轮询 `api.qrCheck(key)`；后端调网易云 `login_qr_check`。
-3. 状态 803（成功）时，后端把网易云返回的 Set-Cookie 原样下发浏览器（`MUSIC_U` 等），并返回登录档案。
+3. 状态 803（成功）时，后端从网易云返回的 Set-Cookie 中挑出会话必需的几项（`MUSIC_U`、`__csrf`、`MUSIC_A`、`NMTID`）下发浏览器，并返回登录档案；网易云会附带数十条无关 cookie，全量下发会撑大响应头（网关缓冲超限时被 502 截断）。
 4. 此后浏览器请求自动带 cookie，后端 `cookieOf()` 提取并透传给网易云，VIP 曲目即可解析出音频地址。
 
 ## 外部系统
