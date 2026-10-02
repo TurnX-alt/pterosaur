@@ -1,0 +1,29 @@
+requires: |
+  nginx.has('music.xrl.im -> localhost:8788').uses('acme.sh')
+
+steps:
+  - name: Check mem
+    run: |
+      FREE_MB=$(free -m | awk '/^Mem:/{print $7}')
+      echo "可用内存: ${FREE_MB}MiB"
+      if [ "$FREE_MB" -lt 4096 ]; then
+        export NODE_OPTIONS="--max-old-space-size=1024"
+        echo "可用不足 4GiB, 限制 Node 堆上限为 1GiB"
+      else
+        echo "可用充足, 正常构建"
+      fi
+      # 写入 .env 供后续步骤读取
+      echo "NODE_OPTIONS=${NODE_OPTIONS:-}" > /tmp/_pterosaur_env
+  - name: Install
+    run: |
+      set -a; source /tmp/_pterosaur_env 2>/dev/null; set +a
+      pnpm install --frozen-lockfile
+  - name: Build
+    run: |
+      set -a; source /tmp/_pterosaur_env 2>/dev/null; set +a
+      pnpm build
+  - name: Run
+    run: |
+      pm2 delete pterosaur 2>/dev/null || true
+      pm2 start 'PORT=8788 pnpm start' --name pterosaur
+      pm2 save

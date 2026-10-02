@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vite/client", "@testing-library/jest-dom"]
+  },
+  "include": ["src"]
+}

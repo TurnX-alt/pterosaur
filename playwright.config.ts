@@ -24,7 +24,7 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: `pnpm build:web && cross-env NODE_ENV=production PORT=${WEB_PORT} API_PORT=${API_PORT} tsx server/index.ts`,
+    command: `pnpm build && cross-env NODE_ENV=production PORT=${WEB_PORT} API_PORT=${API_PORT} pnpm start`,
     url: `http://127.0.0.1:${WEB_PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

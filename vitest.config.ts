@@ -6,15 +6,14 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
+      '@': fileURLToPath(new URL('./apps/web/src', import.meta.url)),
     },
   },
   test: {
     environment: 'jsdom',
     globals: true,
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'shared/**/*.{test,spec}.ts'],
+    setupFiles: ['./apps/web/src/test/setup.ts'],
+    include: ['apps/*/src/**/*.{test,spec}.{ts,tsx}', 'packages/*/src/**/*.{test,spec}.ts'],
     css: false,
     restoreMocks: true,
   },

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

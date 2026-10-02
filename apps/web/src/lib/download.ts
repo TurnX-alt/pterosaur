@@ -1,0 +1,46 @@
+import type { Track } from '@pterosaur/shared/types'
+import { streamUrl } from '@pterosaur/shared/types'
+
+/** 根据 Content-Type 推断音频文件扩展名，默认 mp3。 */
+function extFromMime(mime: string | null): string {
+  if (!mime) return 'mp3'
+  const m = mime.toLowerCase()
+  if (m.includes('flac')) return 'flac'
+  if (m.includes('wav')) return 'wav'
+  if (m.includes('ogg')) return 'ogg'
+  if (m.includes('aac') || m.includes('mp4') || m.includes('m4a')) return 'm4a'
+  return 'mp3'
+}
+
+/** 将曲目名清洗为安全的文件名（去除路径分隔符与非法字符）。 */
+function safeFileName(track: Track, ext: string): string {
+  const base = `${track.title} - ${track.artist}`.replace(/[\\/:*?"<>|]/g, '_').trim()
+  return `${base || 'track'}.${ext}`
+}
+
+/**
+ * 将曲目下载到本地。
+ *
+ * 走同源音频代理 `/stream/:id` 拉取完整字节流（携带登录 cookie，
+ * 因此 VIP 曲目在登录后同样可下载），再以 Blob 触发浏览器保存。
+ *
+ * @throws 拉取失败或音源不可用（如未登录的 VIP 曲目）时抛出错误。
+ */
+export async function downloadTrack(track: Track): Promise<void> {
+  const res = await fetch(streamUrl(track.id), { credentials: 'include' })
+  if (!res.ok) {
+    const needLogin = res.status === 403
+    throw new Error(needLogin ? '该曲目需要登录 VIP 才能下载' : `下载失败（${res.status}）`)
+  }
+  const blob = await res.blob()
+  const ext = extFromMime(res.headers.get('content-type'))
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = safeFileName(track, ext)
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // 延迟释放，确保下载已开始
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
