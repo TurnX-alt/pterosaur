@@ -189,6 +189,19 @@
   max-width: 45%;
 }
 
+/* 专辑 / 艺人可点击链接：继承父级字号与颜色，无按钮外观，悬停下划线 */
+.nowplaying__link {
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.nowplaying__link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* 进度 */
 .nowplaying__progress {
   flex-shrink: 0;
@@ -373,5 +386,17 @@
 
   .nowplaying__controls {
     flex-shrink: 0;
+  }
+
+  /* 移动端性能：面板整块上推滑入（~400ms）期间，全屏 backdrop-filter 会逐帧重采样背景，
+     是进入沉浸页卡顿的主要来源；背景层 80px 超大半径模糊的栅格化也偏重。故降档：
+     scrim 改纯色叠层（背景本身已重度模糊，观感几乎无损），背景模糊半径减半。 */
+  .nowplaying__scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .nowplaying__bg {
+    filter: blur(40px) saturate(140%) brightness(0.5);
   }
 }

@@ -18,7 +18,22 @@ function resolveEnvPath(): string {
   return resolve(process.cwd(), '.env')
 }
 
+/**
+ * 仓库根目录的绝对路径（`.env` 的上一级）。
+ *
+ * 与 {@link ENV_PATH} 同样兼容源码运行与打包产物（均位于仓库根下两级）；jsdom 下回退到 cwd。
+ * 供服务端数据目录（如云同步的 `.data/`）复用，避免各处相对层级不一致。
+ */
+function resolveRootDir(): string {
+  const url = import.meta.url
+  if (url.startsWith('file:')) return fileURLToPath(new URL('../../../', url))
+  return process.cwd()
+}
+
 export const ENV_PATH = resolveEnvPath()
+
+/** 仓库根目录绝对路径。 */
+export const ROOT_DIR = resolveRootDir()
 
 /**
  * 加载 `.env` 到 `process.env`（若存在）。

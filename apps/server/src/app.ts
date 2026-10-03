@@ -26,7 +26,8 @@ import {
   cookieHeaderFromSetCookies,
   SESSION_COOKIE_NAMES,
 } from './netease.js'
-import type { ApiResult, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
+import type { ApiResult, LoginStatus, Playlist, Track, Lyric, SyncEnvelope } from '@pterosaur/shared/types'
+import { isSyncEnvelope, readLibrary, writeLibrary } from './syncStore.js'
 
 /** 音频地址缓存：id|level|凭证指纹 -> https url。网易云地址有时效，TTL 设短一些。 */
 const urlCache = new LRUCache<string, string>({ max: 2000, ttl: 15 * 60 * 1000 })
@@ -77,6 +78,15 @@ function credentialOf(c: Context): string | undefined {
 function credentialKey(cookie?: string): string {
   if (!cookie) return 'anon'
   return createHash('sha1').update(cookie).digest('hex').slice(0, 12)
+}
+
+/**
+ * 解析**访客本人**登录态下的 userId；未登录返回 `null`。
+ * 身份接口专用——**绝不回退到缺省凭证**，否则会把匿名访客当成运营者账号。
+ */
+async function requireUserId(c: Context): Promise<string | null> {
+  const st = await loginStatus(cookieOf(c))
+  return st.logged && st.userId ? String(st.userId) : null
 }
 
 /**
@@ -345,6 +355,36 @@ export function createApp() {
       return c.json(ok<Playlist[]>(await userPlaylists(uid, cookie)))
     } catch (e) {
       return c.json(fail(`获取用户歌单失败：${(e as Error).message}`), 502)
+    }
+  })
+
+  /* ============================ 云同步 ============================ */
+
+  /**
+   * 读取本人 library 的云端副本。以访客本人 cookie 判定身份（未登录 401）。
+   * 返回 `{ payload }`：`null` 表示云端尚无数据（首次开启同步）。
+   */
+  app.get('/api/sync/library', async (c) => {
+    const userId = await requireUserId(c)
+    if (!userId) return c.json(fail('未登录', true), 401)
+    try {
+      return c.json(ok<{ payload: SyncEnvelope | null }>({ payload: await readLibrary(userId) }))
+    } catch (e) {
+      return c.json(fail(`读取云同步失败：${(e as Error).message}`), 502)
+    }
+  })
+
+  /** 覆盖写入本人 library 的云端副本（LWW：调用方负责携带更新的 updatedAt）。 */
+  app.put('/api/sync/library', async (c) => {
+    const userId = await requireUserId(c)
+    if (!userId) return c.json(fail('未登录', true), 401)
+    const body: unknown = await c.req.json().catch(() => null)
+    if (!isSyncEnvelope(body)) return c.json(fail('同步载荷非法'), 400)
+    try {
+      await writeLibrary(userId, body)
+      return c.json(ok<SyncEnvelope>(body))
+    } catch (e) {
+      return c.json(fail(`写入云同步失败：${(e as Error).message}`), 400)
     }
   })
 

@@ -6,6 +6,7 @@ import type {
   Lyric,
   Playlist,
   SearchResults,
+  SyncEnvelope,
   Track,
 } from '@pterosaur/shared/types'
 import { API_BASE } from '@pterosaur/shared/types'
@@ -32,9 +33,10 @@ async function get<T>(path: string, query?: Record<string, string | number | und
   return json.data as T
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
+/** 带 JSON body 的写请求（POST / PUT），解析后端 `ApiResult` 包裹。 */
+async function send<T>(method: 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
-    method: 'POST',
+    method,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -47,6 +49,9 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   }
   return json.data as T
 }
+
+const post = <T>(path: string, body?: unknown): Promise<T> => send<T>('POST', path, body)
+const put = <T>(path: string, body?: unknown): Promise<T> => send<T>('PUT', path, body)
 
 export const api = {
   search: (keywords: string, limit = 30) => get<Track[]>(`${API_BASE}/search`, { keywords, limit }),
@@ -85,6 +90,12 @@ export const api = {
   logout: () => post<LoginStatus>(`${API_BASE}/auth/logout`),
 
   userPlaylists: (uid?: string) => get<Playlist[]>(`${API_BASE}/user/playlists`, { uid }),
+
+  /** 读取本人 library 的云端副本；`payload` 为 null 表示云端尚无数据。 */
+  syncGet: () => get<{ payload: SyncEnvelope | null }>(`${API_BASE}/sync/library`),
+
+  /** 覆盖写入本人 library 的云端副本（LWW）。 */
+  syncPut: (envelope: SyncEnvelope) => put<SyncEnvelope>(`${API_BASE}/sync/library`, envelope),
 }
 
 export type Api = typeof api

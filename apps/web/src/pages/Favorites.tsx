@@ -1,12 +1,13 @@
-import { Play, Shuffle, Heart, DiscAlbum } from 'lucide-react'
+import { Play, Shuffle, Heart } from 'lucide-react'
 import { useLibrary } from '../store/library.js'
 import { usePlayer } from '../store/player.js'
 import { TrackList } from '../components/TrackList.js'
 import { IconButton } from '../components/IconButton.js'
+import { RipButton } from '../components/RipButton.js'
 import { Empty } from '../components/States.js'
-import { downloadPlaylist } from '../lib/downloadPlaylist.js'
+import { useRip } from '../store/rip.js'
+import { isRipping, runRip } from '../lib/rip.js'
 import { confirmDialog } from '../store/ui.js'
-import { useState } from 'react'
 
 /**
  * 我喜欢的音乐。展示收藏曲目，支持顺序 / 随机播放。
@@ -16,8 +17,10 @@ export function FavoritesPage() {
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
 
-  const [downloading, setDownloading] = useState(false)
-  const [downloadLabel, setDownloadLabel] = useState<string | null>(null)
+  // 翻录进度：从全局 store 认领「我喜欢的音乐」那份（切走再回自动恢复）
+  const ripKey = 'favorites'
+  const ripJob = useRip((s) => s.job)
+  const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
 
   const handlePlay = (shuffle = false) => {
     if (!favorites.length) return
@@ -26,7 +29,7 @@ export function FavoritesPage() {
   }
 
   const handleDownloadPlaylist = async () => {
-    if (!favorites.length || downloading) return
+    if (!favorites.length || isRipping()) return
     const dur = favorites.reduce((sum, t) => sum + (t.duration || 0), 0)
     const durStr = dur > 0 ? `，总时长约 ${Math.round(dur / 60)} 分钟` : ''
     const ok = await confirmDialog({
@@ -35,16 +38,7 @@ export function FavoritesPage() {
       confirmText: '开始翻录',
     })
     if (!ok) return
-    setDownloading(true)
-    setDownloadLabel('正在打包 0 / ' + favorites.length)
-    try {
-      await downloadPlaylist(favorites, '我喜欢的音乐', (p) => {
-        setDownloadLabel(`正在打包 ${p.current} / ${p.total}`)
-      })
-    } finally {
-      setDownloading(false)
-      setDownloadLabel(null)
-    }
+    await runRip({ key: ripKey, tracks: favorites, zipName: '我喜欢的音乐' })
   }
 
   const totalDuration = favorites.reduce((sum, t) => sum + (t.duration || 0), 0)
@@ -73,14 +67,11 @@ export function FavoritesPage() {
         <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!favorites.length}>
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
-        <IconButton
-          label={downloadLabel ?? '翻录'}
-          size="lg"
+        <RipButton
+          progress={myRip}
+          disabled={!favorites.length || (ripJob !== null && ripJob.key !== ripKey)}
           onClick={handleDownloadPlaylist}
-          disabled={!favorites.length || downloading}
-        >
-          <DiscAlbum size={19} strokeWidth={2} />
-        </IconButton>
+        />
       </div>
 
       <div className="detail__list">

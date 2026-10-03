@@ -14,9 +14,41 @@ function extFromMime(mime: string | null): string {
   return 'mp3'
 }
 
+/** 根据图片 Content-Type 推断扩展名，默认 jpg。 */
+export function extFromImageMime(mime: string | null): string {
+  const m = (mime ?? '').toLowerCase()
+  if (m.includes('png')) return 'png'
+  if (m.includes('webp')) return 'webp'
+  if (m.includes('gif')) return 'gif'
+  if (m.includes('avif')) return 'avif'
+  if (m.includes('bmp')) return 'bmp'
+  return 'jpg'
+}
+
 /** 将曲目名清洗为安全的文件名。 */
 function safeName(title: string): string {
   return title.replace(/[\\/:*?"<>|]/g, '_').trim() || 'track'
+}
+
+/**
+ * 拉取封面图片并以 `cover.<ext>` 写入 ZIP。
+ *
+ * 封面是网易云 CDN 上的公共静态资源、无条件返回 `access-control-allow-origin: *`
+ * （图片直连的既有例外，见 ADR-013），故直接 `fetch` 取字节。任何失败都静默跳过——
+ * 封面缺失不应让整次翻录失败。
+ */
+async function addCoverToZip(zip: JSZip, coverUrl: string): Promise<void> {
+  try {
+    const res = await fetch(coverUrl, { mode: 'cors', credentials: 'omit' })
+    if (!res.ok) return
+    const type = res.headers.get('content-type')
+    if (!type || !type.startsWith('image/')) return
+    const blob = await res.blob()
+    if (blob.size === 0) return
+    zip.file(`cover.${extFromImageMime(type)}`, blob)
+  } catch {
+    /* 封面获取失败：忽略，仅缺封面文件 */
+  }
 }
 
 export interface DownloadProgress {
@@ -27,21 +59,28 @@ export interface DownloadProgress {
 }
 
 /**
- * 将歌单曲目打包为 ZIP 下载。
+ * 将歌单 / 专辑曲目打包为 ZIP 下载。
  *
  * 逐首通过同源音频代理 `/stream/:id` 拉取字节流，文件名按序号排列
  * （如 `01 - 曲名.mp3`），最终以 browser Blob 触发保存。
+ * 若提供 `coverUrl`（专辑翻录），另在 ZIP 根目录写入封面 `cover.<ext>`。
  *
- * @param tracks  歌单曲目列表
+ * @param tracks  曲目列表
+ * @param zipName  ZIP 文件名（不含扩展名）
  * @param onProgress  每完成/跳过一个曲目时回调
+ * @param coverUrl  可选封面地址；提供则一并打包（获取失败不阻断）
  */
 export async function downloadPlaylist(
   tracks: Track[],
   zipName: string,
   onProgress?: (p: DownloadProgress) => void,
+  coverUrl?: string,
 ): Promise<void> {
   const zip = new JSZip()
   const digits = String(tracks.length).length
+
+  // 封面先入包：即便后续曲目全部失败，封面仍在
+  if (coverUrl) await addCoverToZip(zip, coverUrl)
 
   for (let i = 0; i < tracks.length; i++) {
     const t = tracks[i]

@@ -65,7 +65,9 @@ function prefersReducedMotion(): boolean {
 export function startRouteTransition(update: () => void): void {
   const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
   if (!doc.startViewTransition || prefersReducedMotion() || hasBlockingOverlay()) {
-    update()
+    // 非转场路径同样以 flushSync 提交：让滚动恢复的布局 effect 先于归零执行，
+    // 否则归零会先跑、把旧条目的位置错误地记成 0。
+    flushSync(update)
     resetContentScroll()
     return
   }

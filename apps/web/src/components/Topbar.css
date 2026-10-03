@@ -198,6 +198,42 @@
   color: var(--text);
 }
 
+/* 带开关的菜单项：开关推到行尾 */
+.topbar__menu-item--switch {
+  justify-content: flex-start;
+}
+
+.topbar__switch {
+  position: relative;
+  margin-left: auto;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: var(--bg-active);
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.topbar__switch--on {
+  background: var(--accent);
+}
+
+.topbar__switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.topbar__switch--on .topbar__switch-knob {
+  transform: translateX(14px);
+}
+
 /* ---------- 汉堡按钮（窄屏侧边栏触发器） ---------- */
 .topbar__burger {
   display: none;

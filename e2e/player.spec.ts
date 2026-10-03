@@ -339,6 +339,29 @@ test.describe('全屏播放页与歌词', () => {
     await expect(page.locator('.nowplaying')).toHaveCount(0, { timeout: 3000 })
   })
 
+  test('沉浸页的专辑 / 歌手可点击跳转', async ({ page }) => {
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+    await page.locator('.playerbar__cover-btn').click()
+    await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
+
+    // 歌手名可点 → 跳转艺人页，且沉浸页自动收起
+    const artistLink = page.locator('.nowplaying__artist .nowplaying__link').first()
+    await expect(artistLink).toBeVisible({ timeout: 15000 })
+    await artistLink.click()
+    await expect(page).toHaveURL(/\/artist\//)
+    await expect(page.locator('.nowplaying')).toHaveCount(0, { timeout: 3000 })
+
+    // 再次展开：专辑名同样可点 → 跳转专辑页
+    await page.locator('.playerbar__cover-btn').click()
+    await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
+    const albumLink = page.locator('.nowplaying__header-title .nowplaying__link').first()
+    await expect(albumLink).toBeVisible({ timeout: 5000 })
+    await albumLink.click()
+    await expect(page).toHaveURL(/\/album\//)
+  })
+
   test('首行 / 末行歌词同样垂直居中', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })

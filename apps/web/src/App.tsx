@@ -22,6 +22,8 @@ import { FavoritesPage } from './pages/Favorites.js'
 import { RecentPage } from './pages/Recent.js'
 import { useAudioEngine } from './hooks/useAudioEngine.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
+import { useLibrarySync } from './hooks/useLibrarySync.js'
+import { useContentScrollRestoration } from './hooks/useContentScrollRestoration.js'
 import { useApplyTheme } from './hooks/useTheme.js'
 import { usePresence } from './hooks/usePresence.js'
 import { supportsViewTransition } from './lib/viewTransition.js'
@@ -33,20 +35,30 @@ import './styles/app.css'
 /** 沉浸播放页退出动画时长（与 NowPlaying.css 的 np-exit 时长保持一致）。 */
 const NP_EXIT_MS = 420
 
+/**
+ * 沉浸播放页宿主。
+ *
+ * 由**它**单独订阅 `expanded` 并驱动 presence —— 若把这层订阅留在 `App`，则每次开合都会
+ * 让整棵应用树（含当前路由页）重渲染，移动端点击封面进入时有可感卡顿。
+ */
+function NowPlayingLayer() {
+  const expanded = usePlayer((s) => s.expanded)
+  const { mounted, exiting } = usePresence(expanded, NP_EXIT_MS)
+  return mounted ? <NowPlaying open={expanded} exiting={exiting} /> : null
+}
+
 export default function App() {
   useApplyTheme()
   useAudioEngine()
+  useLibrarySync()
+  useContentScrollRestoration()
 
   const searchRef = useRef<HTMLInputElement | null>(null)
   const focusSearch = () => searchRef.current?.focus()
   useKeyboardShortcuts(focusSearch)
 
-  const expanded = usePlayer((s) => s.expanded)
   const modalOpen = useAuth((s) => s.modalOpen)
   const location = useLocation()
-
-  // 沉浸播放页常驻挂载，由 presence 驱动进入 / 退出动画
-  const { mounted: npMounted, exiting: npExiting } = usePresence(expanded, NP_EXIT_MS)
 
   // 探测 View Transition 能力并写入 <html data-vt>，供 CSS 降级进场动画判断
   const vt = useMemo(supportsViewTransition, [])
@@ -96,7 +108,7 @@ export default function App() {
       <PlayerBar />
 
       {/* 浮层：全屏播放页 / 队列 / 登录 / 新建歌单 / 设置 / 播放错误 */}
-      {npMounted && <NowPlaying open={expanded} exiting={npExiting} />}
+      <NowPlayingLayer />
       <QueuePanel />
       {modalOpen && <LoginModal />}
       <CreatePlaylistModal />

@@ -1,30 +1,12 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Track, Playlist, Album } from '@pterosaur/shared/types'
+import type { Track, Playlist, Album, LibraryData, LocalPlaylist } from '@pterosaur/shared/types'
 import { libraryStorage } from '../lib/libraryStorage.js'
 
-/** 用户自建歌单（本地存储，不含曲目正文，仅存曲目引用）。 */
-export interface LocalPlaylist {
-  id: string
-  name: string
-  /** 创建时间戳。 */
-  createdAt: number
-  /** 曲目列表（完整 Track，便于离线展示）。 */
-  tracks: Track[]
-}
+export type { LocalPlaylist }
 
-export interface LibraryState {
-  /** 收藏（我喜欢）的曲目。 */
-  favorites: Track[]
-  /** 最近播放（去重，最多 100 条）。 */
-  recent: Track[]
-  /** 本地自建歌单。 */
-  playlists: LocalPlaylist[]
-  /** 收藏的网易云歌单引用。 */
-  savedPlaylists: Playlist[]
-  /** 收藏的网易云专辑引用。 */
-  savedAlbums: Album[]
-}
+/** 资料库数据字段（收藏 / 最近 / 自建歌单 / 收藏的网易云歌单 · 专辑），亦即云同步载荷。 */
+export type LibraryState = LibraryData
 
 interface LibraryActions {
   toggleFavorite: (track: Track) => void

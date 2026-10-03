@@ -146,6 +146,16 @@
   background: var(--accent-hover);
 }
 
+/* 中性按钮：非危险操作（清理缓存）走这一档，避免与「重置」两个红按钮并排 */
+.settings-dialog__btn--neutral {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.settings-dialog__btn--neutral:hover:not(:disabled) {
+  background: var(--bg-active);
+}
+
 .settings-dialog__btn--danger {
   background: var(--danger, #ff453a);
   color: #fff;
@@ -153,4 +163,16 @@
 
 .settings-dialog__btn--danger:hover:not(:disabled) {
   filter: brightness(1.08);
+}
+
+/* 按钮行：并排的操作按钮（清理缓存 · 重置） */
+.settings-dialog__btnrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.settings-dialog__btnrow .settings-dialog__btn {
+  margin-top: 0;
 }

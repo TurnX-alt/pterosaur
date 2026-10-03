@@ -16,15 +16,11 @@ interface NavEntry {
   end?: boolean;
 }
 
-/** 主导航项。 */
+/** 主导航项（单一分组）。 */
 const NAV: NavEntry[] = [
   { to: "/", label: "立即收听", icon: Home, end: true },
   { to: "/browse", label: "浏览", icon: Compass },
   { to: "/radio", label: "电台", icon: Radio },
-];
-
-/** 收藏相关入口（唱片盒只装收藏的专辑）。 */
-const LIBRARY: NavEntry[] = [
   { to: "/crate", label: "唱片盒", icon: Disc3 },
   { to: "/favorites", label: "我喜欢的音乐", icon: Heart },
   { to: "/recent", label: "最近播放", icon: Clock },
@@ -102,21 +98,6 @@ export function Sidebar() {
               key={to}
               to={to}
               end={end}
-              className={({ isActive }) =>
-                `nav-item${isActive ? " nav-item--active" : ""}`
-              }
-            >
-              <Icon size={19} strokeWidth={1.9} />
-              <span className="nav-item__label">{label}</span>
-            </AppLink>
-          ))}
-        </nav>
-
-        <nav className="sidebar__nav" aria-label="我的音乐">
-          {LIBRARY.map(({ to, label, icon: Icon }) => (
-            <AppLink
-              key={to}
-              to={to}
               className={({ isActive }) =>
                 `nav-item${isActive ? " nav-item--active" : ""}`
               }

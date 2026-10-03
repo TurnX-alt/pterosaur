@@ -10,10 +10,13 @@ import {
   LogOut,
   Menu,
   Settings,
+  Cloud,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme.js";
 import { useViewNavigate } from "../hooks/useViewNavigate.js";
 import { useAuth } from "../store/auth.js";
+import { useSync } from "../store/sync.js";
+import { syncNow } from "../lib/sync.js";
 import { useSidebarDrawer, useSettingsDialog } from "../store/ui.js";
 import { Cover } from "./Cover.js";
 import "./Topbar.css";
@@ -39,6 +42,18 @@ export function Topbar({ searchRef }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleSidebar = useSidebarDrawer((s) => s.toggleSidebar);
   const openSettings = useSettingsDialog((s) => s.openSettings);
+  const syncEnabled = useSync((s) => s.enabled);
+
+  /** 切换云同步开关：开启时绑定当前账号并立即同步一次。 */
+  const toggleSync = () => {
+    const store = useSync.getState();
+    if (store.enabled) {
+      store.disable();
+    } else {
+      store.enable(status.userId);
+      void syncNow().catch((e) => console.warn("[sync] 首次同步失败", e));
+    }
+  };
 
   // URL 上的 q 变化时同步输入框（例如从其他页面跳来搜索）
   useEffect(() => {
@@ -170,6 +185,22 @@ export function Topbar({ searchRef }: TopbarProps) {
                     {status.vip && <div className="topbar__menu-plan">Pterosaur+</div>}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  className="topbar__menu-item topbar__menu-item--switch"
+                  onClick={toggleSync}
+                  aria-pressed={syncEnabled}
+                  data-testid="sync-toggle"
+                >
+                  <Cloud size={15} />
+                  <span>{syncEnabled ? "云同步已开启" : "开启云同步"}</span>
+                  <span
+                    className={`topbar__switch${syncEnabled ? " topbar__switch--on" : ""}`}
+                    aria-hidden
+                  >
+                    <span className="topbar__switch-knob" />
+                  </span>
+                </button>
                 <button
                   type="button"
                   className="topbar__menu-item"

@@ -103,6 +103,42 @@ async function storeCounts(page: Page): Promise<{ media: number; meta: number; f
   )
 }
 
+/**
+ * 读取 media store 的全部 key。
+ *
+ * 断言「某条缓存被清除」时用它而非总量：应用会**在后台把封面写入同一个池**，
+ * 若以总量为准则会与后台缓存竞态。种子条目的 key 是假地址，应用永不重取，故按 key 判定确定可靠。
+ */
+async function mediaKeys(page: Page): Promise<string[]> {
+  return page.evaluate(
+    (db) =>
+      new Promise<string[]>((resolve) => {
+        const req = indexedDB.open(db, 2)
+        req.onsuccess = () => {
+          const d = req.result
+          const tx = d.transaction('media', 'readonly')
+          const k = tx.objectStore('media').getAllKeys()
+          k.onsuccess = () => {
+            const keys = (k.result as IDBValidKey[]).map(String)
+            d.close()
+            resolve(keys)
+          }
+          tx.onerror = () => {
+            d.close()
+            resolve([])
+          }
+        }
+        req.onerror = () => resolve([])
+      }),
+    IDB_DB,
+  )
+}
+
+/** 读取 library 收藏数（不受媒体缓存竞态影响）。 */
+async function favoriteCount(page: Page): Promise<number> {
+  return (await storeCounts(page)).favorites
+}
+
 test.describe('设置弹窗', () => {
   test('顶栏齿轮打开设置；Esc 关闭', async ({ page }) => {
     await page.goto('/')
@@ -131,15 +167,14 @@ test.describe('设置弹窗', () => {
     await expect(page.getByTestId('cache-breakdown')).toContainText('歌曲')
     await expect(page.getByTestId('cache-breakdown')).toContainText('封面')
 
-    // 清理（经二次确认）
+    // 清理（无需二次确认，点击即生效）
     await page.getByTestId('clear-cache').click()
-    const confirm = page.getByRole('dialog', { name: '清理缓存？' })
-    await expect(confirm).toBeVisible()
-    await confirm.getByRole('button', { name: '清理', exact: true }).click()
 
     // 媒体缓存归零，资料库保留
-    await expect.poll(() => storeCounts(page), { timeout: 5000 }).toEqual({ media: 0, meta: 0, favorites: 1 })
-    await expect(page.getByTestId('cache-total')).toHaveText('0 B')
+    // 注：按 key 判定（而非总量），避免与应用后台写入封面缓存的竞态
+    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('123|exhigh')
+    await expect.poll(() => mediaKeys(page)).not.toContain('image|https://example.com/a.jpg')
+    expect(await favoriteCount(page)).toBe(1)
   })
 
   test('检查更新触发整页刷新', async ({ page }) => {
@@ -157,5 +192,34 @@ test.describe('设置弹窗', () => {
 
     const navType = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type ?? '')
     expect(navType).toBe('reload')
+  })
+
+  test('重置清空本机全部内容并刷新', async ({ page }) => {
+    await page.goto('/')
+    await seedMedia(page, { key: 'image|https://example.com/a.jpg', kind: 'image', size: 2048, mime: 'image/jpeg' })
+    await seedMedia(page, { key: '123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
+    await seedLibrary(page)
+    await page.evaluate(() => localStorage.setItem('pterosaur-probe', '1'))
+
+    await page.getByTestId('settings-button').click()
+    await page.getByTestId('reset-all').click()
+
+    const confirm = page.getByRole('dialog', { name: '重置？' })
+    await expect(confirm).toBeVisible()
+    await Promise.all([
+      page.waitForEvent('load'),
+      confirm.getByRole('button', { name: '重置', exact: true }).click(),
+    ])
+
+    // 整页刷新
+    const navType = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type ?? '')
+    expect(navType).toBe('reload')
+
+    // 本机内容清空：localStorage 与 IndexedDB（媒体缓存 + 资料库）
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('pterosaur-probe'))).toBeNull()
+    // 按 key / 收藏数判定，避免与应用后台写入封面缓存的竞态
+    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('123|exhigh')
+    await expect.poll(() => mediaKeys(page)).not.toContain('image|https://example.com/a.jpg')
+    expect(await favoriteCount(page)).toBe(0)
   })
 })

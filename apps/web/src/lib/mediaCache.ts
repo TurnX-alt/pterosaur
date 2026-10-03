@@ -16,6 +16,8 @@ export const CAP_BYTES = 16 * 1024 ** 3
 export const DEFAULT_LEVEL = 'exhigh'
 /** 配额安全系数：有效上限取 min(16GB, 配额 * 该系数)。 */
 export const QUOTA_SAFETY = 0.9
+/** 封面缓存有效期：7 天（毫秒）。从写入时刻起算，到期后访问即回源刷新（与外壳 7 天策略对齐）。 */
+export const IMAGE_TTL_MS = 7 * 24 * 3600 * 1000
 /** 封面缓存 key 前缀。 */
 const IMAGE_PREFIX = 'image|'
 
@@ -35,6 +37,11 @@ export interface MediaMeta {
   size: number
   /** 最近一次访问时间戳（毫秒），LRU 依据。 */
   lastAccess: number
+  /**
+   * 写入缓存的时间戳（毫秒），封面过期依据。
+   * 旧数据可能缺失：视作「很久以前写入」→ 封面按过期处理（下次回源刷新一次）。
+   */
+  cachedAt?: number
 }
 
 export interface CachedMedia {
@@ -130,6 +137,22 @@ export function pickEvictions(metas: MediaMeta[], capBytes: number, incomingSize
     projected -= m.size
   }
   return evicted
+}
+
+// ---- 过期判定（纯函数） ----
+
+/**
+ * 判断某条缓存是否已过期：**仅封面**按 {@link IMAGE_TTL_MS} 从写入时刻（`cachedAt`）起算，
+ * 音频不限时（仅受 LRU 淘汰）。缺 `cachedAt` 的旧封面视作 `0`（很久以前）→ 判为过期。
+ */
+export function isExpired(meta: MediaMeta, now: number = Date.now()): boolean {
+  if (meta.kind !== 'image') return false
+  return now - (meta.cachedAt ?? 0) >= IMAGE_TTL_MS
+}
+
+/** 从元数据列表筛出所有已过期的缓存 key（供启动期清扫）。 */
+export function expiredKeys(metas: MediaMeta[], now: number = Date.now()): string[] {
+  return metas.filter((m) => isExpired(m, now)).map((m) => m.key)
 }
 
 // ---- IndexedDB 存取 ----

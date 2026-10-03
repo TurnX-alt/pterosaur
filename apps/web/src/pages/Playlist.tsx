@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Play, Shuffle, Trash2, Heart, DiscAlbum } from 'lucide-react'
+import { Play, Shuffle, Trash2, Heart } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
@@ -11,8 +11,10 @@ import type { Playlist, Track } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
+import { RipButton } from '../components/RipButton.js'
 import { Loading, ErrorState } from '../components/States.js'
-import { downloadPlaylist } from '../lib/downloadPlaylist.js'
+import { useRip } from '../store/rip.js'
+import { isRipping, runRip } from '../lib/rip.js'
 
 /** 格式化播放量。 */
 function fmtCount(n?: number): string {
@@ -47,9 +49,10 @@ export function PlaylistPage() {
   const [renameValue, setRenameValue] = useState('')
   const renameRef = useRef<HTMLInputElement | null>(null)
 
-  // 翻录下载状态
-  const [downloading, setDownloading] = useState(false)
-  const [downloadLabel, setDownloadLabel] = useState<string | null>(null)
+  // 翻录进度：从全局 store 认领属于本歌单的那份（切走再回自动恢复）
+  const ripKey = `playlist:${id}`
+  const ripJob = useRip((s) => s.job)
+  const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
 
   // 本地歌单：直接从 store 取
   const local = useMemo(() => (isLocal ? playlists.find((p) => p.id === id) : undefined), [isLocal, playlists, id])
@@ -117,7 +120,7 @@ export function PlaylistPage() {
   }
 
   const handleDownloadPlaylist = async () => {
-    if (!tracks.length || downloading) return
+    if (!tracks.length || isRipping()) return
     const dur = tracks.reduce((sum, t) => sum + (t.duration || 0), 0)
     const durStr = dur > 0 ? `，总时长约 ${Math.round(dur / 60)} 分钟` : ''
     const ok = await confirmDialog({
@@ -126,16 +129,7 @@ export function PlaylistPage() {
       confirmText: '开始翻录',
     })
     if (!ok) return
-    setDownloading(true)
-    setDownloadLabel('正在打包 0 / ' + tracks.length)
-    try {
-      await downloadPlaylist(tracks, playlist?.name ?? '歌单', (p) => {
-        setDownloadLabel(`正在打包 ${p.current} / ${p.total}`)
-      })
-    } finally {
-      setDownloading(false)
-      setDownloadLabel(null)
-    }
+    await runRip({ key: ripKey, tracks, zipName: playlist?.name ?? '歌单' })
   }
 
   if (loading) {
@@ -220,14 +214,11 @@ export function PlaylistPage() {
             <Trash2 size={19} strokeWidth={2} />
           </IconButton>
         )}
-        <IconButton
-          label={downloadLabel ?? '翻录'}
-          size="lg"
+        <RipButton
+          progress={myRip}
+          disabled={!tracks.length || (ripJob !== null && ripJob.key !== ripKey)}
           onClick={handleDownloadPlaylist}
-          disabled={!tracks.length || downloading}
-        >
-          <DiscAlbum size={19} strokeWidth={2} />
-        </IconButton>
+        />
       </div>
 
       <div className="detail__list">

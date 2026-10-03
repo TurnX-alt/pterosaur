@@ -11,6 +11,7 @@ import {
 import { usePlayer, currentPlayMode } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useQueuePanel } from '../store/ui.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { seekTo } from '../hooks/audioElement.js'
 import { api } from '../api/client.js'
 import { formatTime } from '@pterosaur/shared/types'
@@ -46,6 +47,13 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
   const prev = usePlayer((s) => s.prev)
   const cyclePlayMode = usePlayer((s) => s.cyclePlayMode)
   const setExpanded = usePlayer((s) => s.setExpanded)
+  const navigate = useViewNavigate()
+
+  /** 跳转到专辑 / 艺人页：先收起沉浸页，否则整屏浮层会盖住目标页面。 */
+  const openEntity = (to: string) => {
+    setExpanded(false)
+    navigate(to)
+  }
 
   const favorites = useLibrary((s) => s.favorites)
   const toggleFavorite = useLibrary((s) => s.toggleFavorite)
@@ -142,7 +150,19 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
           </IconButton>
           <div className="nowplaying__header-title">
             <span>正在播放</span>
-            <strong className="ellipsis">{current.album || '单曲'}</strong>
+            <strong className="ellipsis">
+              {current.albumId && current.album ? (
+                <button
+                  type="button"
+                  className="nowplaying__link"
+                  onClick={() => openEntity(`/album/${current.albumId}`)}
+                >
+                  {current.album}
+                </button>
+              ) : (
+                current.album || '单曲'
+              )}
+            </strong>
           </div>
           <IconButton
             label={isFav ? '取消喜欢' : '喜欢'}
@@ -169,7 +189,24 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
           <div className="nowplaying__panel">
             <div className="nowplaying__info">
               <h1 className="nowplaying__title ellipsis">{current.title}</h1>
-              <p className="nowplaying__artist ellipsis">{current.artist}</p>
+              <p className="nowplaying__artist ellipsis">
+                {current.artistRefs?.length ? (
+                  current.artistRefs.map((a, i) => (
+                    <span key={`${a.id}-${i}`}>
+                      {i > 0 && ' / '}
+                      <button
+                        type="button"
+                        className="nowplaying__link"
+                        onClick={() => openEntity(`/artist/${a.id}`)}
+                      >
+                        {a.name}
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  current.artist
+                )}
+              </p>
             </div>
 
             {/* 歌词 */}

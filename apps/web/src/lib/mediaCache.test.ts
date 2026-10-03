@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   type MediaMeta,
   CAP_BYTES,
+  IMAGE_TTL_MS,
   audioKey,
   clearMediaCache,
   effectiveCap,
+  expiredKeys,
   imageKey,
+  isExpired,
   mediaUsage,
   parseRange,
   pickEvictions,
@@ -37,6 +40,45 @@ describe('imageKey', () => {
       'image|https://p1.music.126.net/a.jpg?param=600y600',
     )
     expect(imageKey(new URL('https://p1.music.126.net/a.jpg'))).toBe('image|https://p1.music.126.net/a.jpg')
+  })
+})
+
+describe('isExpired / expiredKeys', () => {
+  const image = (key: string, cachedAt?: number): MediaMeta => ({
+    key,
+    kind: 'image',
+    mime: 'image/jpeg',
+    size: 10,
+    lastAccess: 0,
+    cachedAt,
+  })
+
+  it('音频不受限时过期约束', () => {
+    const now = Date.now()
+    expect(isExpired(meta('a', 10, 0), now)).toBe(false)
+    // 即便带一个很旧的 cachedAt，音频也不过期
+    expect(isExpired({ ...meta('a', 10, 0), cachedAt: 0 }, now)).toBe(false)
+  })
+
+  it('封面未满 7 天不过期，满 7 天（含边界）过期', () => {
+    const now = 1_000_000_000_000
+    expect(isExpired(image('image|x', now - (IMAGE_TTL_MS - 1)), now)).toBe(false)
+    expect(isExpired(image('image|x', now - IMAGE_TTL_MS), now)).toBe(true)
+    expect(isExpired(image('image|x', now - IMAGE_TTL_MS - 1), now)).toBe(true)
+  })
+
+  it('缺 cachedAt 的旧封面视作很久以前 → 过期', () => {
+    expect(isExpired(image('image|x'), Date.now())).toBe(true)
+  })
+
+  it('expiredKeys 只挑出过期的封面', () => {
+    const now = 1_000_000_000_000
+    const metas: MediaMeta[] = [
+      { ...meta('123|exhigh', 100, 0), cachedAt: 0 }, // 音频：永不过期
+      image('image|fresh', now - 1000), // 新鲜封面
+      image('image|stale', now - IMAGE_TTL_MS), // 过期封面
+    ]
+    expect(expiredKeys(metas, now)).toEqual(['image|stale'])
   })
 })
 

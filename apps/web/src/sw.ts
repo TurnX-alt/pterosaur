@@ -5,7 +5,8 @@
  *    一路流式返回给 `<audio>`、一路 `clone()` 后写入 IndexedDB。
  * 2. 封面图片（`destination === 'image'`）：命中缓存直接返回；未命中以 **CORS** 重新拉取
  *    （网易云 CDN 返回 `access-control-allow-origin: *`），把可读字节写入**同一个** IndexedDB
- *    池 —— 与音频**共享 16GB LRU 预算**（见 ADR-013）。
+ *    池 —— 与音频**共享 16GB LRU 预算**（见 ADR-013）。封面自写入起 **7 天过期**：命中时若已过期
+ *    则清除并回源，启动时亦清扫一遍（见 ADR-015）；音频不限时，仅受 LRU 淘汰。
  * 3. 应用外壳（仅生产）：导航 HTML 走 NetworkFirst、同源 script/style 走 StaleWhileRevalidate，
  *    缓存 7 天后过期（见 `lib/shellCache.ts`）；precache 只含静态图标/清单。
  *
@@ -20,9 +21,11 @@ import {
   DEFAULT_LEVEL,
   deleteCached,
   effectiveCap,
+  expiredKeys,
   getAllMeta,
   getCached,
   imageKey,
+  isExpired,
   pickEvictions,
   putCached,
   requestPersistentQuota,
@@ -62,12 +65,20 @@ let capBytes = CAP_BYTES
 /** 正在缓存中的 key，避免并发重复下载/写入。 */
 const inflight = new Set<string>()
 
-/** 启动时申请持久化存储、读取配额并重建元数据索引。 */
+/** 启动时申请持久化存储、读取配额并重建元数据索引（顺带清扫过期的封面）。 */
 async function loadState(): Promise<void> {
   const quota = await requestPersistentQuota()
   capBytes = effectiveCap(quota)
   const metas = await getAllMeta()
-  metaByKey = new Map(metas.map((m) => [m.key, m]))
+  // 封面缓存 7 天过期：启动期先清算，避免过期项长期占用 16GB 预算
+  const stale = expiredKeys(metas)
+  if (stale.length) {
+    await deleteCached(stale)
+    const staleSet = new Set(stale)
+    metaByKey = new Map(metas.filter((m) => !staleSet.has(m.key)).map((m) => [m.key, m]))
+  } else {
+    metaByKey = new Map(metas.map((m) => [m.key, m]))
+  }
 }
 
 /** 从 `/stream/:id?level=` 解析出曲目 id / 档位 / 缓存 key；非音频代理路径返回 null。 */
@@ -94,7 +105,8 @@ async function storeResponse(base: Omit<MediaMeta, 'size' | 'lastAccess'>, respo
       for (const k of evicted) metaByKey.delete(k)
     }
 
-    const meta: MediaMeta = { ...base, size: blob.size, lastAccess: Date.now() }
+    const now = Date.now()
+    const meta: MediaMeta = { ...base, size: blob.size, lastAccess: now, cachedAt: now }
     await putCached(meta, blob)
     metaByKey.set(key, meta)
   } catch (err) {
@@ -104,10 +116,16 @@ async function storeResponse(base: Omit<MediaMeta, 'size' | 'lastAccess'>, respo
   }
 }
 
-/** 命中缓存即返回其切片，并刷新 LRU 时间戳。 */
+/** 命中缓存即返回其切片，并刷新 LRU 时间戳；已过期（封面超 7 天）则清除并按未命中处理。 */
 async function serveCached(key: string, rangeHeader: string | null): Promise<Response | null> {
   const cached = await getCached(key)
   if (!cached) return null
+  if (isExpired(cached.meta)) {
+    // 封面过期：清掉后回源重取（音频 kind !== 'image'，永不走到这里）
+    await deleteCached([key])
+    metaByKey.delete(key)
+    return null
+  }
   void touchCached(key)
   const meta = metaByKey.get(key)
   if (meta) meta.lastAccess = Date.now()

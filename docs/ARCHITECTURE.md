@@ -33,10 +33,11 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 
 | 模块 | 职责 |
 |------|------|
-| `server/app.ts` | 定义全部 HTTP 路由：搜索（单曲 + 多类型 `/api/search/all`）、艺人 / 专辑详情、发现、歌单、歌词、登录、音频流代理；统一 `ApiResult` 包裹与错误处理 |
+| `server/app.ts` | 定义全部 HTTP 路由：搜索（单曲 + 多类型 `/api/search/all`）、艺人 / 专辑详情、发现、歌单、歌词、登录、**云同步**、音频流代理；统一 `ApiResult` 包裹与错误处理 |
 | `server/netease.ts` | 封装 `NeteaseCloudMusicApi`，把网易云原始结构归一化为共享模型（含艺人引用 / 专辑 id），改写封面 / 音频为 https（缩略参数兼容已有查询串），解析 Set-Cookie 会话 |
+| `server/syncStore.ts` | 云同步的**文件型**持久化：按访客本人 `userId` 隔离，`<DATA_DIR>/sync/<userId>.json` 原子写（见 ADR-016） |
 | `server/index.ts` | 服务入口：生产模式挂载静态资源与 SPA 回退，启动 HTTP 服务 |
-| `shared/types.ts` | 前后端共享的数据模型（Track/Artist/Album/Playlist/Lyric/LoginStatus/ApiResult/SearchResults）与工具（formatTime/streamUrl） |
+| `shared/types.ts` | 前后端共享的数据模型（Track/Artist/Album/Playlist/Lyric/LoginStatus/ApiResult/SearchResults/**LocalPlaylist/LibraryData/SyncEnvelope**）与工具（formatTime/streamUrl） |
 | `shared/lyric.ts` | LRC 歌词解析：时间戳展开、排序、翻译对齐 |
 | `src/api/client.ts` | 前端 fetch 封装，解析 `ApiResult`，抛带 `needLogin` 的错误 |
 | `src/store/player.ts` | 播放核心状态机：队列、当前曲目、循环/随机、音量、进度；含持久化 |
@@ -44,19 +45,27 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `src/lib/idb.ts` | 低层 IndexedDB 封装（主线程与 SW 共用；`indexedDB` 不可用时优雅降级） |
 | `src/lib/coalesceWrites.ts` | 微任务级写合并的 `PersistStorage` 装饰器（同一 tick 内多次写入只落最后一次） |
 | `src/lib/libraryStorage.ts` | library 的 IDB `PersistStorage` + 旧 localStorage 数据一次性迁移 |
-| `src/lib/mediaCache.ts` | 媒体缓存领域逻辑（音频 + 封面：缓存 key / Range 切片 / LRU 计算）+ IDB 存取（主线程与 SW 共用） |
+| `src/lib/mediaCache.ts` | 媒体缓存领域逻辑（音频 + 封面：缓存 key / Range 切片 / LRU 计算 / **封面 7 天过期判定**）+ IDB 存取（主线程与 SW 共用）（见 ADR-015） |
 | `src/lib/shellCache.ts` | 应用外壳（导航 HTML + 同源 script/style）的 Workbox 运行时缓存，**7 天过期**（见 ADR-013） |
 | `src/lib/pwa.ts` | PWA 生命周期操作：注销 SW、清 Cache Storage、硬刷新（设置弹窗「检查更新」） |
+| `src/lib/reset.ts` | 「重置」：清空本机全部内容（IDB store / Cache Storage / SW 注册 / Web Storage）并刷新，**不动登录态** |
 | `src/lib/formatBytes.ts` | 字节数转人类可读字符串（设置弹窗展示缓存用量） |
-| `src/sw.ts` | 应用 Service Worker：`/stream/*` 音频与封面图片（CORS 拉取）写入**同一个** IDB 池（共用 16GB LRU）；生产下另经 Workbox 缓存应用外壳（见 ADR-012 / ADR-013） |
+| `src/lib/sync.ts` | library 云同步引擎：LWW 决策（`decideSync`）、载荷快照、订阅变更防抖推送、回声抑制（见 ADR-016） |
+| `src/lib/rip.ts` | 翻录（打包下载）任务：全局单任务 + 并发守卫，进度写入 rip store；下载在后台继续、不随组件卸载中止 |
+| `src/sw.ts` | 应用 Service Worker：`/stream/*` 音频与封面图片（CORS 拉取）写入**同一个** IDB 池（共用 16GB LRU；封面 7 天过期）；生产下另经 Workbox 缓存应用外壳（见 ADR-012 / ADR-013 / ADR-015） |
 | `src/store/auth.ts` | 登录态、登录弹窗开合、手机号/扫码登录动作 |
+| `src/store/sync.ts` | 云同步开关与记账（`enabled` / `userId` / `updatedAt`），持久化到 localStorage，默认关闭 |
+| `src/store/rip.ts` | 翻录进度的全局状态（`job`：合集 key + 已处理/总数），不持久化；页面按 key 认领，切换页面不丢失 |
 | `src/store/ui.ts` | 临时 UI 状态（队列面板开合等），不持久化 |
 | `src/hooks/useAudioEngine.ts` | 全局唯一 `<audio>` 的驱动：换源、播放/暂停、事件回写、结束推进、媒体会话 |
+| `src/hooks/useLibrarySync.ts` | 挂载 library 云同步引擎：开关 + 登录态满足时激活（立即同步一次并订阅变更防抖推送），在 `App` 顶层调用 |
 | `src/hooks/audioElement.ts` | audio 单例引用与命令式 `seekTo()` |
 | `src/hooks/useAsync.ts` | 通用取数钩子；可选 `cacheKey` 提供模块级内存缓存（命中即同步返回，参数切换免加载态） |
 | `src/hooks/usePresence.ts` | 让浮层在关闭后继续挂载以播放退出动画 |
+| `src/hooks/useContentScrollRestoration.ts` | 按历史条目恢复 `.app-content` 滚动位置（布局期恢复 + 次帧补一次），在 `App` 顶层调用 |
 | `src/hooks/useViewNavigate.ts` | 包装 `useNavigate`，使路由跳转经内容区转场 |
 | `src/lib/viewTransition.ts` | 内容区转场：自实现 `document.startViewTransition`（含浮层 / 减少动效 / 不支持时的降级判断） |
+| `src/lib/scrollMemory.ts` | 内容区滚动位置记忆：以 `location.key` 为键（前进新 key 归零、后退恢复） |
 | `src/components/*` | UI 组件（Sidebar/Topbar/PlayerBar/NowPlaying/QueuePanel/TrackList/EntityCards/AppLink/LoginModal/**SettingsDialog** 等） |
 | `src/pages/*` | 路由页面：Home/Browse/Radio/Search/Playlist/**Artist**/**Album**/**Crate（唱片盒）/Favorites/Recent |
 
@@ -101,6 +110,17 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 2. 服务启动时 `loadEnv()` 注入 `process.env`；内容接口取 `credentialOf(c) = 访客 cookie ?? NETEASE_COOKIE`，故匿名访客也能解析 VIP（见 ADR-014）。
 3. 身份接口（`/api/auth/status`、`/api/user/playlists`）仍只用访客 cookie——匿名访客依旧显示「未登录」，登录后以本人凭证优先。
 
+**封面缓存过期（7 天）：**
+封面写入 IDB 时记录 `cachedAt`（写入时刻）。SW 命中时若 `now - cachedAt ≥ 7 天` 则清除并按未命中回源重取；SW 启动（`loadState`）时顺带清扫一遍过期项。音频不设时间过期，仅受 LRU 淘汰（见 ADR-015）。
+
+**library 云同步（LWW）：**
+1. 用户在头像菜单开启「云同步」→ `store/sync.ts` 记 `enabled` 与绑定的 `userId`，并立即 `syncNow()`。
+2. `syncNow()` 拉取云端 `{ state, updatedAt }`；`decideSync` 比较本地 / 云端 `updatedAt`——云端更新则采用云端（`applyPayload`，期间抑制回声），否则把本地整份推上云端。
+3. `useLibrarySync` 在激活期间订阅 `useLibrary` 变更 → 防抖约 1.5s 推送；失活 / 换账号自动退订（见 ADR-016）。
+
+**设置重置：**
+`SettingsDialog` 的「重置」经二次确认后，先（若云同步已开启）推送空 library 清空云端副本，再 `resetAll()`：清空 `library` / `media` / `mediaMeta` 三个 IDB store、Cache Storage、SW 注册与 localStorage / sessionStorage，最后整页刷新；**不动登录 cookie**，故仍处登录态。
+
 ## 配置（环境变量）
 
 - 读取点全在服务端与构建脚本；前端源码不含自定义变量（仅 Vite 内置 `import.meta.env.PROD`）。
@@ -112,6 +132,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `NETEASE_COOKIE_UPDATED_AT` | 空 | 上述凭证的写入时间（ISO），仅供人读。 |
 | `PORT` | `8788` | 后端监听端口（`API_PORT` 可作次选回退）。 |
 | `HOST` | `0.0.0.0` | 后端监听地址。 |
+| `DATA_DIR` | `<仓库根>/.data` | 云同步数据目录（`sync/<userId>.json`）；已在 `.gitignore` 忽略（见 ADR-016）。 |
 | `API_PORT` / `API_TARGET` | `8788` / `http://127.0.0.1:8788` | 仅开发期 Vite 代理目标。 |
 | `NODE_ENV` | — | `production` 时同源托管 SPA 静态资源。 |
 
@@ -126,12 +147,18 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 - **https 边界**：网易云音频/封面返回 `http://`，后端统一改写为 `https://`（`netease.ts` 的 `https()`），保证在 https 站点上可用。
 - **会话边界**：登录态是用户本人的网易云 cookie，仅存于其浏览器；后端无状态，不持久化任何**用户**凭证（唯一例外是运营者可选持久化的缺省凭证，见下条与 ADR-014）。
 - **缺省凭证边界**：服务端可用 `.env` 的 `NETEASE_COOKIE` 作为未登录访客的缺省凭证，**仅用于内容解析**（搜索 / 播放 / 歌词等），绝不参与身份判断（见 ADR-014）。
-- **无状态后端**：除音频地址的短期 LRU 缓存外，后端不保存业务状态；重启即恢复，天然可水平扩展。
+- **后端持久化边界**：后端**默认为无状态**——除音频地址的短期 LRU 缓存（重启即恢复）外不保存业务状态。**两个可选例外**：(1) ADR-014 的缺省凭证（`.env`）；(2) ADR-016 的云同步——开启后服务端按**访客本人** `userId` 把 library 持久化到 `DATA_DIR/sync/<userId>.json`。云同步使「多实例水平扩展」不再成立（文件存储不共享），且 `.data/` 不入库。
+- **云同步边界**：`/api/sync/library` 为**身份接口**——身份只取访客本人 cookie，**绝不回退缺省凭证**；未登录 401。冲突策略为 LWW（整份 library + `updatedAt`，新者胜，删除随之同步），仅在「开关开启 且 已登录 且 账号与开启时绑定一致」时激活（见 ADR-016）。
+- **重置边界**：设置「重置」清空**本机**全部内容（IDB store + Cache Storage + SW 注册 + Web Storage）并整页刷新，**不清登录 cookie**（故仍登录）；因 SW 常驻持有 IDB 连接、`deleteDatabase` 会被阻塞，故以逐 store `clear()` 实现。若云同步已开启，先推送空 library 清空云端副本（顺序不可颠倒）。
+- **封面过期边界**：媒体缓存中仅**封面**按固定 TTL 7 天过期（从写入时刻 `cachedAt` 起算，与外壳 7 天策略对齐）；缺 `cachedAt` 的旧封面判为过期并平滑刷新；音频不设时间过期，仅受 LRU 淘汰（见 ADR-015）。
 - **共享类型边界**：`shared/` 不得引入 DOM 或 Node 专有 API，确保浏览器与 Node 两侧都能编译。
 - **静态托管边界**：生产必须运行 Node 后端（`pnpm start`），不能当纯静态站点部署——音频代理与登录都依赖它。
 - **数据契约兼容边界**：`Track.artistRefs` / `albumId` 为可选字段，旧的持久化数据（收藏 / 最近播放 / 队列）可能缺失，界面须降级为纯文本，不得假定其存在。
 - **转场边界**：项目用声明式 `<BrowserRouter>`，react-router 内置 `viewTransition` 在此不生效；内容区转场由 `src/lib/viewTransition.ts` 自实现。只给 `.app-content` 设 `view-transition-name`，`:root` 置 `none`；有浮层打开 / 减少动效 / 不支持 API 时跳过或降级（见 ADR-008）。
+- **滚动恢复边界**：内容区滚动位置以 `location.key` 为键记忆（`lib/scrollMemory.ts` + `hooks/useContentScrollRestoration.ts`）。**前进**（下钻 / 侧边栏 / 新开链接）得到新 key → 回到顶部；**后退 / 前进**（POP）复用旧 key → 恢复原位置。故「同页下钻再返回」回到原处，而「从侧边栏新开」从头开始。容器为内部滚动的 `.app-content`（不受浏览器窗口滚动恢复影响）；新增可滚动区域须沿用该容器或为其补对应恢复逻辑。
+- **浮层订阅边界**：高频 / 开合型状态（如 `player.expanded`）**不要**在 `App` 顶层订阅——`App` 一重渲染会带整棵应用树（含当前路由页）一起重渲染，移动端开合有可感卡顿。沉浸播放页的开合由独立的 `NowPlayingLayer` 订阅 `expanded` 并驱动 presence。
+- **移动端沉浸页性能边界**：`.nowplaying` 整块上推滑入期间，全屏 `backdrop-filter` 会逐帧重采样背景、背景层 `blur(80px)` 栅格化偏重；移动端（≤860px）降档为「scrim 纯色叠层 + 背景 `blur(40px)`」。改动这两处需回归移动端开合流畅度。
 - **毛玻璃前缀顺序边界**：CSS 压缩会丢弃未加前缀的 `backdrop-filter`，所有毛玻璃规则必须 `-webkit-backdrop-filter` 在前、`backdrop-filter` 在后（见 ADR-009）。
 - **缩略参数边界**：给网易云图片追加 `param=WxH` 必须走 `thumb()`，兼容地址已带查询串的情况（见 ADR-010）。
-- **客户端持久化边界**：`library` 走 **IndexedDB**（异步写入不阻塞主线程；structured clone 免 `JSON.stringify`；配合 `partialize` 只存数据字段，避免克隆 action 函数）；写入经微任务级合并节流（无定时 debounce 的丢写窗口）。`player` / `theme` 的 payload 小，仍用 localStorage。library 的 hydration 是**异步**的，`main.tsx` 在首帧前 `await rehydrate()` 以避免空态闪烁（见 ADR-011）。
-- **SW 缓存边界**：Service Worker 按匹配范围互不相交地承担三类职责——(1) `/stream/*` 音频：命中按 `Range` 从 IDB 返回 200/206，未命中单次下载、一路流式返回、一路写 IDB；(2) 封面图片（`destination === 'image'`）：命中即返，未命中以 CORS 拉取可读字节写入**同一** IDB 池，与音频共享 16GB LRU；(3) 应用外壳（仅生产）：Workbox 运行时缓存，7 天过期。音频/封面的容量上限为 `min(16GB, 配额 * 0.9)`，超出按 LRU 淘汰；仅缓存 `200/206` 且 `content-type` 匹配的响应（`403` VIP 未登录 / `502` 不缓存）；封面 CORS 失败时回退直连且不缓存。`/api/*` 及其它请求原样放行（见 ADR-012 / ADR-013）。
+- **客户端持久化边界**：`library` 走 **IndexedDB**（异步写入不阻塞主线程；structured clone 免 `JSON.stringify`；配合 `partialize` 只存数据字段，避免克隆 action 函数）；写入经微任务级合并节流（无定时 debounce 的丢写窗口）。`player` / `theme` / `sync` 的 payload 小，仍用 localStorage（`sync` 仅存开关 / 绑定账号 / `updatedAt`）。library 的 hydration 是**异步**的，`main.tsx` 在首帧前 `await rehydrate()` 以避免空态闪烁（见 ADR-011）。
+- **SW 缓存边界**：Service Worker 按匹配范围互不相交地承担三类职责——(1) `/stream/*` 音频：命中按 `Range` 从 IDB 返回 200/206，未命中单次下载、一路流式返回、一路写 IDB；(2) 封面图片（`destination === 'image'`）：命中即返，未命中以 CORS 拉取可读字节写入**同一** IDB 池，与音频共享 16GB LRU，且封面自写入起 **7 天过期**；(3) 应用外壳（仅生产）：Workbox 运行时缓存，7 天过期。音频/封面的容量上限为 `min(16GB, 配额 * 0.9)`，超出按 LRU 淘汰；仅缓存 `200/206` 且 `content-type` 匹配的响应（`403` VIP 未登录 / `502` 不缓存）；封面 CORS 失败时回退直连且不缓存。`/api/*` 及其它请求原样放行（见 ADR-012 / ADR-013）。

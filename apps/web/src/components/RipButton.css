@@ -1,0 +1,37 @@
+.rip-progress {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 与 icon-btn--lg 同尺寸，翻录进行中就地替换按钮、不引起布局跳动 */
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.rip-progress__svg {
+  display: block;
+}
+
+.rip-progress__track {
+  stroke: var(--separator-strong);
+}
+
+.rip-progress__bar {
+  stroke: var(--accent);
+  transition: stroke-dashoffset var(--dur) var(--ease);
+}
+
+.rip-progress__text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  pointer-events: none;
+}
