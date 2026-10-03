@@ -126,3 +126,19 @@ export const useConfirmDialog = create<ConfirmUiState>()((set, get) => ({
 export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
   return useConfirmDialog.getState().confirm(opts);
 }
+
+/** 设置弹窗（缓存管理 / 检查更新）的开合状态。 */
+interface SettingsDialogState {
+  open: boolean;
+  openSettings: () => void;
+  closeSettings: () => void;
+}
+
+/**
+ * 设置弹窗的 UI 状态（弹窗挂载在 App 顶层，由顶栏齿轮按钮打开）。
+ */
+export const useSettingsDialog = create<SettingsDialogState>()((set) => ({
+  open: false,
+  openSettings: () => set({ open: true }),
+  closeSettings: () => set({ open: false }),
+}));

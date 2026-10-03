@@ -9,11 +9,12 @@ import {
   User,
   LogOut,
   Menu,
+  Settings,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme.js";
 import { useViewNavigate } from "../hooks/useViewNavigate.js";
 import { useAuth } from "../store/auth.js";
-import { useSidebarDrawer } from "../store/ui.js";
+import { useSidebarDrawer, useSettingsDialog } from "../store/ui.js";
 import { Cover } from "./Cover.js";
 import "./Topbar.css";
 
@@ -37,6 +38,7 @@ export function Topbar({ searchRef }: TopbarProps) {
   const logout = useAuth((s) => s.logout);
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleSidebar = useSidebarDrawer((s) => s.toggleSidebar);
+  const openSettings = useSettingsDialog((s) => s.openSettings);
 
   // URL 上的 q 变化时同步输入框（例如从其他页面跳来搜索）
   useEffect(() => {
@@ -124,6 +126,17 @@ export function Topbar({ searchRef }: TopbarProps) {
           ) : (
             <Moon size={17} strokeWidth={2} />
           )}
+        </button>
+
+        <button
+          type="button"
+          className="topbar__round"
+          onClick={openSettings}
+          aria-label="设置"
+          title="设置"
+          data-testid="settings-button"
+        >
+          <Settings size={17} strokeWidth={2} />
         </button>
 
         {status.logged ? (

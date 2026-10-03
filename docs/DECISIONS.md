@@ -127,3 +127,57 @@
 - 决策：抽出 `thumb(url, param)` 辅助函数：地址已含 `?` 时用 `&` 连接，否则用 `?`。`normalizeTrack` / `normalizeArtist` / `normalizeAlbum` / `normalizePlaylist` 及 `playlistTracks` 统一走它。
 - 后果：封面地址不再出现重复 `?`；歌单封面在浏览器中可正常加载。
 - 何时重新审视：不涉及。
+
+## ADR-011：library 持久化从 localStorage 迁到 IndexedDB，并以微任务级写合并节流
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：`store/library.ts` 原用 `persist` + `createJSONStorage(() => localStorage)` 且无 `partialize`。`persist` 在**每次 `set()` 都把整个库 `JSON.stringify` + 同步 `setItem`**，而 `addRecent` 挂在**每次切歌**上（`useAudioEngine.ts`）。两个问题：(1) 主线程同步序列化/写盘，切歌/收藏时掉帧；(2) localStorage ~5MB 配额天花板，`playlists[].tracks` 存完整 `Track` 造成重复存储，重度用户触顶后**静默丢写**。
+- 考虑过的方案：① 维持 localStorage，仅加 `partialize` 裁字段；② 迁 IndexedDB，`createJSONStorage` 存 JSON 串；③ 迁 IndexedDB，自定义 `PersistStorage` 用 structured clone 直接存对象；④ 迁 OPFS / 服务端。写节流上：⑤ 定时 debounce（~300ms）+ `pagehide` flush；⑥ 微任务级合并。
+- 决策：③ + ⑥ + 一次性迁移。新增 `lib/idb.ts`（纯 IDB 封装，主线程与 SW 共用）、`lib/coalesceWrites.ts`（微任务级写合并）、`lib/libraryStorage.ts`（IDB `PersistStorage` + 旧 localStorage 数据惰性迁移）。store 改为 `storage: libraryStorage` + `skipHydration: true` + **`partialize` 只存数据字段**；`main.tsx` 渲染前 `await rehydrate()`。
+- 为什么选这个：IDB 写入**异步、不阻塞主线程**，且配额远大于 localStorage，直接解决两个原问题。用 structured clone 免掉 `JSON.stringify` 的主线程 CPU。列表类数据可被合并，故用微任务级合并（同一 tick 内多次 `setItem` 只落最后一次）—— 保留合并收益而**没有时间窗口**。
+- 为什么不选其他：① 治标不治本（仍受 5MB 限额与同步写）；② 仍要 `JSON.stringify`；④ 过重。**⑤ 被否决**：底层是异步 IDB，浏览器无法在页面卸载时保证事务提交，任何 `delay > 0` 都会让「收藏/建歌单后立刻刷新或硬跳转」丢失最后一次写入（已由 E2E 复现并据此改设计）。**必须**给 library 加 `partialize`：`persist` 默认持久化整个 state（含 action 函数），而 IDB 的 structured clone **无法克隆函数**，直接 `put` 会抛 `DataCloneError`——这是迁到 IDB 后才暴露、localStorage（JSON 静默丢弃函数）时代不存在的约束。
+- 后果 / 已知边界：
+  - `store/library.ts` 新增 `partialize`（仅 favorites/recent/playlists/savedPlaylists/savedAlbums）。
+  - 一次性迁移写在 `libraryStorage.getItem` 内：读到旧 `localStorage['pterosaur-library']` 即写入 IDB 并删除旧键（键存亡即幂等标记）；`getItem` 因此有一次性副作用（读时写），可接受。
+  - 持久化变为异步：`main.tsx` 在 `createRoot().render()` 前 `await rehydrate()`，避免首帧空库闪烁。
+  - **dangling 写入窗口**：写入是异步的，硬导航（刷新 / 输入地址 / 外链）发生在写入提交之前理论上会丢最后一次写；应用内跳转走客户端路由（不重载）不受影响，`pagehide`/`visibilitychange` 有兜底 flush。E2E 中**硬跳转/reload 前用 `waitForLibraryPersisted` 轮询 IDB 落盘**规避竞态。
+  - 测试：`fake-indexeddb` 注入 `test/setup.ts`；E2E 由「写 `localStorage` 封套」改为「在页面上下文写 IDB」。
+- 何时重新审视：若引入 OPFS 或需要跨标签页同步；或 `Track` 体积进一步膨胀需要把 `playlists[].tracks` 归一化为引用。
+
+## ADR-012：播放过的音频用 Service Worker + IndexedDB 缓存（16GB 上限，LRU 淘汰）
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：希望播放过的曲目本地留存，实现即点即播 / 离线。后端 `/stream/:id` 写死 `Cache-Control: no-store` 且无 `ETag`，**浏览器 HTTP 缓存被完全禁用**；因此缓存必须由应用层承担。`/stream/:id` 路径稳定（key = `track.id`），且上游真实 CDN 地址由后端隐藏、对客户端不可见。
+- 考虑过的方案：① 播放前先整文件拉进 IDB 再用 blob 播放（单一流量，但首播要等整首下载完，无渐进播放）；② 播完后另起一次 `fetch` 抠整文件存 IDB（保留流式，但每首首次约 2× 流量）；③ **Service Worker 拦截 `/stream/*`**，单次下载、边流式播放边缓存；存储用 Cache Storage 还是 IDB。
+- 决策：③，且**存 IDB**。新增 `src/sw.ts`（独立 Vite 构建产出单文件 `sw.js`）+ `lib/audioCache.ts`（纯逻辑：缓存 key、Range 切片、LRU 计算 —— 主线程与 SW 共用）。SW 只拦截 `/stream/*`，其余请求原样放行。未命中时 `fetch(url)`（去掉 Range 取整文件）→ `clone()` 一路流式返回给页面播放、一路 `blob()` 写 IDB；命中时按请求 `Range` 返回 200/206。blob 与元数据分存两个 store（`audio` / `audioMeta`），使 LRU 淘汰只遍历轻量元数据、不触碰 blob。容量上限 `min(16GB, navigator.storage.estimate().quota * 0.9)`，超出按 `lastAccess` 升序淘汰；启动时 `navigator.storage.persist()` 申请持久化。
+- 为什么选这个：SW 拦截是唯一能**单次下载 + 保留流式播放 + 透明缓存**的方案；`audio.src` 无需任何改动。存 IDB 而非 Cache Storage 是因为需要按曲目元数据（`lastAccess`）做 **LRU 与用量统计**，Cache Storage 无内建元数据/索引。缓存 key 用 `${id}|${level}`（前端恒用默认 `exhigh`），排除登录态（同一 level 下字节一致，登录只影响能否解析）。
+- 为什么不选其他：①②都要么牺牲首播体验、要么翻倍流量；Cache Storage 不便做 LRU 记账。
+- 后果 / 已知边界：
+  - 新增 `sw.js` 构建步骤：`apps/web/vite.config.sw.ts` 单独构建（IIFE、无 hash、`emptyOutDir: false`），**必须在主构建之后**运行。
+  - SW 只碰 `/stream/*`，对路由、HMR、其它资源零影响；dev 下可选以 module SW 注册（`/src/sw.ts`），prod 用 `/sw.js`。
+  - 仅缓存 `200/206` 且 `content-type` 为 `audio/*` 的响应；`403`（VIP 未登录）/`502` 直接放行不缓存。
+  - IDB 无流式写入：整文件需短暂驻留内存（单曲数 MB~数十 MB）。
+  - 16GB 为**自设上限**，浏览器实际配额可能更低且可能在存储压力下回收，故 UI 应提供「清空缓存」入口（`audioUsage` / `clearAudioCache`）。
+- 何时重新审视：若浏览器对 Cache Storage 的淘汰/配额行为更适合该场景；或需要边下边存（分片写入 IDB）。
+- 后续修订：音频本身仍是手写 IDB 逻辑；但「应用外壳缓存」随后改用 Workbox 运行时缓存，且封面也并入同一 IDB 池 —— 见 ADR-013。
+
+## ADR-013：引入 vite-plugin-pwa（应用外壳 7 天过期）+ 封面经 SW 落 IDB（与音频共用 16GB）
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：应用此前不能安装、不能离线，应用外壳（HTML/JS/CSS）完全依赖网络与浏览器启发式 HTTP 缓存；封面图由 `<img>` 直连网易云 CDN，不经 SW、不落任何应用层缓存。目标：(1) 可安装、离线可用的 PWA，且外壳缓存不能无限陈旧；(2) 封面与音频一样作为非结构化数据落进 IndexedDB，二者共用同一个容量预算。
+- 考虑过的方案：PWA 集成——① `generateSW`（默认）；② `injectManifest` 复用现有 `src/sw.ts`。外壳缓存——③ precache（Workbox 默认）；④ runtime caching + `ExpirationPlugin`。封面获取——⑤ 新增后端 `/img` 同源代理；⑥ SW 以 CORS 重新拉取原 CDN 地址。
+- 决策：② + ④ + ⑥。引入 `vite-plugin-pwa@^1.3.0`，`strategies: 'injectManifest'` 让现有手写 SW 成为**唯一** SW（`rollupFormat: 'iife'` 保持经典非模块 SW；`injectRegister: false`，仍由 `main.tsx` 手工注册）；应用外壳改用 Workbox 运行时缓存（导航 `NetworkFirst`（缓存键归一为 `/index.html`）、同源 script/style `StaleWhileRevalidate`），`ExpirationPlugin({ maxAgeSeconds: 7 * 24 * 3600 })`；precache 收窄到静态图标/manifest。删除独立的 `vite.config.sw.ts` 与第二步构建。封面按 `destination === 'image'` 由 SW 接管，未命中时以 `mode:'cors', credentials:'omit'` 拉取（实测网易云 CDN 无条件返回 `access-control-allow-origin: *`），把**可读**字节写入与音频同一个 IDB 池。IDB 升到 v2：`audio`/`audioMeta` 更名 `media`/`mediaMeta` 并加 `kind: 'audio' | 'image'`。
+- 为什么选这个：单一 SW 才能避免同作用域抢注册；runtime caching 才能表达「7 天有效期」（precache 条目永不过期，与需求直接冲突）；SW 侧 CORS 拉取无需改后端与图片 URL 生成，改动面最小；共用同一 meta store 使 LRU 天然跨音频 / 封面按 `lastAccess` 统一淘汰，正合「共用 16GB」。
+- 为什么不选其他：① 会再生成一个 `sw.js` 与现有注册冲突；③ 与「外壳 7 天过期」矛盾；⑤ 需新增后端路由并改写图片 URL 生成，改动更大（且已明确不改后端）。
+- 后果 / 已知边界：
+  - SW 拦截范围由「仅 `/stream/*`」扩大为「`/stream/*` + 封面图片 + 同源导航 + 同源 script/style」；`/api/*` 与其它请求仍原样放行。
+  - 封面缓存**依赖 CDN 的 CORS 行为**：若其变更，封面回退为「直连不缓存」（功能不受损，仅失去缓存）。
+  - 离线语义：首次访问后外壳 / 封面才有缓存；外壳缓存超过 7 天未用即被清除，此后离线不可用——这是「7 天有效期」的预期行为。
+  - IDB v2 升级会丢弃旧音频缓存（纯缓存，可接受），`library` 原样保留；`e2e` 的 IDB 辅助已同步到 v2。
+  - 设置弹窗「检查更新」= 注销全部 SW 注册 + 清空 Cache Storage + `fetch(href, { cache: 'reload' })` 后 `location.reload()`；**不触碰 IndexedDB**，资料库与媒体缓存保留。
+  - 构建：`apps/web` 的 `build` 回归单条 `vite build`，产出 `sw.js` + `manifest.webmanifest` + 图标；图标提交进仓库（CI 无需浏览器 / sharp）。生成器源为 `apps/web/assets/pwa-icon.svg`（**不放 `public/`**，避免作为站点资源发布、也不再进 precache）；生成器固定会多产出 64px / maskable / `.ico` 等无用文件，**只保留 4 个**：`favicon.svg`（标签页，`index.html` 引用）、`pwa-192x192.png`、`pwa-512x512.png`、`apple-touch-icon-180x180.png`，且 512 那张直接兼作 maskable（全出血红底、图形落在安全区）。重新生成：对源跑 `pnpm dlx @vite-pwa/assets-generator@latest --preset minimal-2023 apps/web/assets/pwa-icon.svg`，再把所需产物移入 `public/`。
+  - **开发态作用域**：dev 下 SW 源码位于 `/src/sw.ts`，其默认作用域会被限制为 `/src/`，SW 便永不控制 `/` 下的页面、缓存恒为空。故 `vite.config.ts` 加了一个 dev 中间件为该响应补 `Service-Worker-Allowed: /`，`main.tsx` 再以 `scope: '/'` 注册；生产由 `/sw.js` 天然位于根作用域，无需此插件。
+- 何时重新审视：若希望离线首帧即用外壳（放弃 7 天过期，改用 precache）；若网易云 CDN 关闭 CORS（需改走后端代理）；若引入 OPFS。

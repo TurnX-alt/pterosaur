@@ -1,0 +1,161 @@
+import { test, expect, type Page } from '@playwright/test'
+
+/**
+ * E2E：顶栏设置弹窗 —— 缓存管理（查看 / 清理）与检查更新。
+ *
+ * 直接向 IndexedDB 的 `media` / `mediaMeta` 种入记录，避免依赖真实网络下载音频，
+ * 从而稳定地验证「查看占用 → 清理 → 归零，且资料库保留」。
+ */
+
+const IDB_DB = 'pterosaur'
+const LIBRARY_KEY = 'pterosaur-library'
+
+interface SeedEntry {
+  key: string
+  kind: 'audio' | 'image'
+  size: number
+  mime: string
+}
+
+/** 向 media / mediaMeta 种入一条记录。 */
+async function seedMedia(page: Page, entry: SeedEntry): Promise<void> {
+  await page.evaluate(
+    ({ db, entry }) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(db, 2)
+        req.onupgradeneeded = () => {
+          const d = req.result
+          if (!d.objectStoreNames.contains('library')) d.createObjectStore('library')
+          if (!d.objectStoreNames.contains('media')) d.createObjectStore('media')
+          if (!d.objectStoreNames.contains('mediaMeta')) {
+            const m = d.createObjectStore('mediaMeta', { keyPath: 'key' })
+            m.createIndex('lastAccess', 'lastAccess')
+          }
+        }
+        req.onsuccess = () => {
+          const d = req.result
+          const tx = d.transaction(['media', 'mediaMeta'], 'readwrite')
+          tx.objectStore('media').put(new Blob([new Uint8Array(entry.size)], { type: entry.mime }), entry.key)
+          tx.objectStore('mediaMeta').put({ ...entry, lastAccess: Date.now() })
+          tx.oncomplete = () => {
+            d.close()
+            resolve()
+          }
+          tx.onerror = () => reject(tx.error)
+        }
+        req.onerror = () => reject(req.error)
+      }),
+    { db: IDB_DB, entry },
+  )
+}
+
+/** 种入一条 library 记录（验证清理缓存不会波及资料库）。 */
+async function seedLibrary(page: Page): Promise<void> {
+  await page.evaluate(
+    ({ db, key }) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(db, 2)
+        req.onsuccess = () => {
+          const d = req.result
+          const tx = d.transaction('library', 'readwrite')
+          tx.objectStore('library').put({ state: { favorites: [{ id: '1' }] }, version: 0 }, key)
+          tx.oncomplete = () => {
+            d.close()
+            resolve()
+          }
+          tx.onerror = () => reject(tx.error)
+        }
+        req.onerror = () => reject(req.error)
+      }),
+    { db: IDB_DB, key: LIBRARY_KEY },
+  )
+}
+
+/** 读取 media / mediaMeta / library 的条目数。 */
+async function storeCounts(page: Page): Promise<{ media: number; meta: number; favorites: number }> {
+  return page.evaluate(
+    (db) =>
+      new Promise((resolve) => {
+        const req = indexedDB.open(db, 2)
+        req.onsuccess = () => {
+          const d = req.result
+          const tx = d.transaction(['media', 'mediaMeta', 'library'], 'readonly')
+          const a = tx.objectStore('media').count()
+          const b = tx.objectStore('mediaMeta').count()
+          const g = tx.objectStore('library').get('pterosaur-library')
+          let favorites = 0
+          g.onsuccess = () => {
+            const v = g.result as { state?: { favorites?: unknown[] } } | undefined
+            favorites = v?.state?.favorites?.length ?? 0
+          }
+          tx.oncomplete = () => {
+            d.close()
+            resolve({ media: a.result, meta: b.result, favorites })
+          }
+          tx.onerror = () => {
+            d.close()
+            resolve({ media: -1, meta: -1, favorites: -1 })
+          }
+        }
+        req.onerror = () => resolve({ media: -1, meta: -1, favorites: -1 })
+      }),
+    IDB_DB,
+  )
+}
+
+test.describe('设置弹窗', () => {
+  test('顶栏齿轮打开设置；Esc 关闭', async ({ page }) => {
+    await page.goto('/')
+    await page.getByTestId('settings-button').click()
+
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await expect(dialog).toBeVisible()
+    await expect(page.getByTestId('cache-total')).toBeVisible()
+    await expect(page.getByTestId('check-update')).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+  })
+
+  test('查看占用并清理缓存，资料库保留', async ({ page }) => {
+    await page.goto('/')
+    await seedMedia(page, { key: 'image|https://example.com/a.jpg', kind: 'image', size: 2048, mime: 'image/jpeg' })
+    await seedMedia(page, { key: '123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
+    await seedLibrary(page)
+
+    await page.getByTestId('settings-button').click()
+    await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible()
+
+    // 总量与分项
+    await expect(page.getByTestId('cache-total')).not.toHaveText('0 B')
+    await expect(page.getByTestId('cache-breakdown')).toContainText('歌曲')
+    await expect(page.getByTestId('cache-breakdown')).toContainText('封面')
+
+    // 清理（经二次确认）
+    await page.getByTestId('clear-cache').click()
+    const confirm = page.getByRole('dialog', { name: '清理缓存？' })
+    await expect(confirm).toBeVisible()
+    await confirm.getByRole('button', { name: '清理', exact: true }).click()
+
+    // 媒体缓存归零，资料库保留
+    await expect.poll(() => storeCounts(page), { timeout: 5000 }).toEqual({ media: 0, meta: 0, favorites: 1 })
+    await expect(page.getByTestId('cache-total')).toHaveText('0 B')
+  })
+
+  test('检查更新触发整页刷新', async ({ page }) => {
+    await page.goto('/')
+    await page.getByTestId('settings-button').click()
+    await page.getByTestId('check-update').click()
+
+    const confirm = page.getByRole('dialog', { name: '检查更新？' })
+    await expect(confirm).toBeVisible()
+
+    await Promise.all([
+      page.waitForEvent('load'),
+      confirm.getByRole('button', { name: '刷新', exact: true }).click(),
+    ])
+
+    const navType = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type ?? '')
+    expect(navType).toBe('reload')
+  })
+})

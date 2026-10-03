@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { persist } from 'zustand/middleware'
 import type { Track, Playlist, Album } from '@pterosaur/shared/types'
+import { libraryStorage } from '../lib/libraryStorage.js'
 
 /** 用户自建歌单（本地存储，不含曲目正文，仅存曲目引用）。 */
 export interface LocalPlaylist {
@@ -12,7 +13,7 @@ export interface LocalPlaylist {
   tracks: Track[]
 }
 
-interface LibraryState {
+export interface LibraryState {
   /** 收藏（我喜欢）的曲目。 */
   favorites: Track[]
   /** 最近播放（去重，最多 100 条）。 */
@@ -123,7 +124,18 @@ export const useLibrary = create<LibraryStore>()(
     }),
     {
       name: 'pterosaur-library',
-      storage: createJSONStorage(() => localStorage),
+      storage: libraryStorage,
+      // 仅持久化数据字段：IDB 的 structured clone 无法克隆 action 函数（会抛 DataCloneError）
+      partialize: (s) => ({
+        favorites: s.favorites,
+        recent: s.recent,
+        playlists: s.playlists,
+        savedPlaylists: s.savedPlaylists,
+        savedAlbums: s.savedAlbums,
+      }),
+      // 迁移到异步 IDB 后，hydration 不再是同步的：由 main.tsx 在首次渲染前手动 rehydrate，
+      // 消除「库为空」的闪烁。
+      skipHydration: true,
     },
   ),
 )

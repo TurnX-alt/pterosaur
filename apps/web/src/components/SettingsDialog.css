@@ -1,0 +1,156 @@
+.settings-dialog {
+  position: fixed;
+  inset: 0;
+  /* 低于 ConfirmDialog(140)：设置里的「清理缓存 / 检查更新」需再弹确认框，确认框须在其之上 */
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-dialog__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: fade-in var(--dur) var(--ease);
+}
+
+.settings-dialog__card {
+  position: relative;
+  z-index: 1;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  padding: 18px 22px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--separator);
+  box-shadow: var(--shadow-lg);
+  animation: settings-in var(--dur-slow) var(--ease);
+  outline: none;
+}
+
+@keyframes settings-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.settings-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.settings-dialog__head h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.settings-dialog__section {
+  padding: 16px 0;
+  border-top: 1px solid var(--separator);
+}
+
+/* 首段紧贴标题，不加分隔线；末段吃掉底部留白，避免按钮下方过空 */
+.settings-dialog__section:first-of-type {
+  border-top: none;
+}
+
+.settings-dialog__section:last-of-type {
+  padding-bottom: 0;
+}
+
+.settings-dialog__section-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.settings-dialog__desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.settings-dialog__stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.settings-dialog__stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.settings-dialog__stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-dialog__breakdown {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-dialog__code {
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.settings-dialog__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  margin-top: 14px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
+}
+
+.settings-dialog__btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.settings-dialog__btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.settings-dialog__btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.settings-dialog__btn--danger {
+  background: var(--danger, #ff453a);
+  color: #fff;
+}
+
+.settings-dialog__btn--danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}

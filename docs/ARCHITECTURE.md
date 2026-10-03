@@ -40,7 +40,15 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `shared/lyric.ts` | LRC 歌词解析：时间戳展开、排序、翻译对齐 |
 | `src/api/client.ts` | 前端 fetch 封装，解析 `ApiResult`，抛带 `needLogin` 的错误 |
 | `src/store/player.ts` | 播放核心状态机：队列、当前曲目、循环/随机、音量、进度；含持久化 |
-| `src/store/library.ts` | 收藏曲目、最近播放、本地自建歌单、收藏的网易云歌单 / 专辑；全量持久化 |
+| `src/store/library.ts` | 收藏曲目、最近播放、本地自建歌单、收藏的网易云歌单 / 专辑；持久化到 **IndexedDB**（见 ADR-011） |
+| `src/lib/idb.ts` | 低层 IndexedDB 封装（主线程与 SW 共用；`indexedDB` 不可用时优雅降级） |
+| `src/lib/coalesceWrites.ts` | 微任务级写合并的 `PersistStorage` 装饰器（同一 tick 内多次写入只落最后一次） |
+| `src/lib/libraryStorage.ts` | library 的 IDB `PersistStorage` + 旧 localStorage 数据一次性迁移 |
+| `src/lib/mediaCache.ts` | 媒体缓存领域逻辑（音频 + 封面：缓存 key / Range 切片 / LRU 计算）+ IDB 存取（主线程与 SW 共用） |
+| `src/lib/shellCache.ts` | 应用外壳（导航 HTML + 同源 script/style）的 Workbox 运行时缓存，**7 天过期**（见 ADR-013） |
+| `src/lib/pwa.ts` | PWA 生命周期操作：注销 SW、清 Cache Storage、硬刷新（设置弹窗「检查更新」） |
+| `src/lib/formatBytes.ts` | 字节数转人类可读字符串（设置弹窗展示缓存用量） |
+| `src/sw.ts` | 应用 Service Worker：`/stream/*` 音频与封面图片（CORS 拉取）写入**同一个** IDB 池（共用 16GB LRU）；生产下另经 Workbox 缓存应用外壳（见 ADR-012 / ADR-013） |
 | `src/store/auth.ts` | 登录态、登录弹窗开合、手机号/扫码登录动作 |
 | `src/store/ui.ts` | 临时 UI 状态（队列面板开合等），不持久化 |
 | `src/hooks/useAudioEngine.ts` | 全局唯一 `<audio>` 的驱动：换源、播放/暂停、事件回写、结束推进、媒体会话 |
@@ -49,7 +57,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `src/hooks/usePresence.ts` | 让浮层在关闭后继续挂载以播放退出动画 |
 | `src/hooks/useViewNavigate.ts` | 包装 `useNavigate`，使路由跳转经内容区转场 |
 | `src/lib/viewTransition.ts` | 内容区转场：自实现 `document.startViewTransition`（含浮层 / 减少动效 / 不支持时的降级判断） |
-| `src/components/*` | UI 组件（Sidebar/Topbar/PlayerBar/NowPlaying/QueuePanel/TrackList/EntityCards/AppLink/LoginModal 等） |
+| `src/components/*` | UI 组件（Sidebar/Topbar/PlayerBar/NowPlaying/QueuePanel/TrackList/EntityCards/AppLink/LoginModal/**SettingsDialog** 等） |
 | `src/pages/*` | 路由页面：Home/Browse/Radio/Search/Playlist/**Artist**/**Album**/**Crate（唱片盒）/Favorites/Recent |
 
 ## 模块关系
@@ -69,8 +77,14 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 **播放一首歌（搜索场景）：**
 1. 用户在搜索结果或任意列表点击曲目行 → `TrackList` 调 `player.playTracks(tracks, i)`，写入队列与当前曲目。
 2. `useAudioEngine` 侦测 `current` 变化 → 设 `audio.src = /stream/:id` → `audio.play()`。
-3. 浏览器请求 `/stream/:id` → 后端解析真实地址（带缓存、https 改写）→ 按 Range 转发网易云 CDN → 回流音频字节。
+3. 浏览器请求 `/stream/:id` → 若已被 **Service Worker** 缓存，则直接由 IDB 按 `Range` 切片返回（离线可播）；否则经后端代理拉取：后端解析真实地址（带缓存、https 改写）按 Range 转发网易云 CDN；SW 同时把整文件写入 IDB 供后续播放（见 ADR-012）。
 4. `audio` 的 timeupdate/ended/error 事件回写 store（进度、自然结束推进、播放受限提示）。
+
+**封面图片（与音频共用缓存）：**
+`<img>` 向网易云 CDN 请求封面 → SW 按 `destination === 'image'` 接管：命中 IDB 直接返回；未命中以 **CORS** 重新拉取（CDN 返回 `access-control-allow-origin: *`）取到**可读**字节，写入与音频**同一个** IDB 池（共用 16GB LRU）；失败则原样放行、不缓存（见 ADR-013）。
+
+**应用外壳（离线可用，7 天过期）：**
+生产下 SW 另经 Workbox 缓存应用外壳——导航 HTML 走 `NetworkFirst`、同源 script/style 走 `StaleWhileRevalidate`，均带 7 天 `ExpirationPlugin`；precache 仅含静态图标与 manifest（见 ADR-013）。
 
 **内容区转场 / 沉浸播放页：**
 1. 导航（`useViewNavigate` / `AppLink`）经 `startRouteTransition`：支持且无浮层时用 `document.startViewTransition` + `flushSync` 提交路由更新，CSS 让 `.app-content` 交叉溶解；否则直接跳转（Firefox 走 `.route-stage` 的 CSS 降级进场）。
@@ -99,3 +113,5 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 - **转场边界**：项目用声明式 `<BrowserRouter>`，react-router 内置 `viewTransition` 在此不生效；内容区转场由 `src/lib/viewTransition.ts` 自实现。只给 `.app-content` 设 `view-transition-name`，`:root` 置 `none`；有浮层打开 / 减少动效 / 不支持 API 时跳过或降级（见 ADR-008）。
 - **毛玻璃前缀顺序边界**：CSS 压缩会丢弃未加前缀的 `backdrop-filter`，所有毛玻璃规则必须 `-webkit-backdrop-filter` 在前、`backdrop-filter` 在后（见 ADR-009）。
 - **缩略参数边界**：给网易云图片追加 `param=WxH` 必须走 `thumb()`，兼容地址已带查询串的情况（见 ADR-010）。
+- **客户端持久化边界**：`library` 走 **IndexedDB**（异步写入不阻塞主线程；structured clone 免 `JSON.stringify`；配合 `partialize` 只存数据字段，避免克隆 action 函数）；写入经微任务级合并节流（无定时 debounce 的丢写窗口）。`player` / `theme` 的 payload 小，仍用 localStorage。library 的 hydration 是**异步**的，`main.tsx` 在首帧前 `await rehydrate()` 以避免空态闪烁（见 ADR-011）。
+- **SW 缓存边界**：Service Worker 按匹配范围互不相交地承担三类职责——(1) `/stream/*` 音频：命中按 `Range` 从 IDB 返回 200/206，未命中单次下载、一路流式返回、一路写 IDB；(2) 封面图片（`destination === 'image'`）：命中即返，未命中以 CORS 拉取可读字节写入**同一** IDB 池，与音频共享 16GB LRU；(3) 应用外壳（仅生产）：Workbox 运行时缓存，7 天过期。音频/封面的容量上限为 `min(16GB, 配额 * 0.9)`，超出按 LRU 淘汰；仅缓存 `200/206` 且 `content-type` 匹配的响应（`403` VIP 未登录 / `502` 不缓存）；封面 CORS 失败时回退直连且不缓存。`/api/*` 及其它请求原样放行（见 ADR-012 / ADR-013）。
