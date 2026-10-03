@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { Route, Routes } from 'react-router-dom'
+import { useEffect, useMemo, useRef } from 'react'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar.js'
 import { Topbar } from './components/Topbar.js'
 import { PlayerBar } from './components/PlayerBar.js'
@@ -14,16 +14,23 @@ import { Browse } from './pages/Browse.js'
 import { Radio } from './pages/Radio.js'
 import { SearchPage } from './pages/Search.js'
 import { PlaylistPage } from './pages/Playlist.js'
-import { LibraryPage } from './pages/Library.js'
+import { ArtistPage } from './pages/Artist.js'
+import { AlbumPage } from './pages/Album.js'
+import { CratePage } from './pages/Crate.js'
 import { FavoritesPage } from './pages/Favorites.js'
 import { RecentPage } from './pages/Recent.js'
 import { useAudioEngine } from './hooks/useAudioEngine.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useApplyTheme } from './hooks/useTheme.js'
+import { usePresence } from './hooks/usePresence.js'
+import { supportsViewTransition } from './lib/viewTransition.js'
 import { audioEl } from './hooks/audioElement.js'
 import { useAuth } from './store/auth.js'
 import { usePlayer } from './store/player.js'
 import './styles/app.css'
+
+/** 沉浸播放页退出动画时长（与 NowPlaying.css 的 np-exit 时长保持一致）。 */
+const NP_EXIT_MS = 420
 
 export default function App() {
   useApplyTheme()
@@ -35,6 +42,16 @@ export default function App() {
 
   const expanded = usePlayer((s) => s.expanded)
   const modalOpen = useAuth((s) => s.modalOpen)
+  const location = useLocation()
+
+  // 沉浸播放页常驻挂载，由 presence 驱动进入 / 退出动画
+  const { mounted: npMounted, exiting: npExiting } = usePresence(expanded, NP_EXIT_MS)
+
+  // 探测 View Transition 能力并写入 <html data-vt>，供 CSS 降级进场动画判断
+  const vt = useMemo(supportsViewTransition, [])
+  useEffect(() => {
+    document.documentElement.dataset.vt = vt ? 'on' : 'off'
+  }, [vt])
 
   // 首次进入查询登录态（用于 VIP 曲目判断与「我的歌单」）
   const refresh = useAuth((s) => s.refresh)
@@ -52,24 +69,33 @@ export default function App() {
       <div className="app-main">
         <Topbar searchRef={searchRef} />
         <main className="app-content">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/browse" element={<Browse />} />
-            <Route path="/radio" element={<Radio />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/library" element={<LibraryPage />} />
-            <Route path="/favorites" element={<FavoritesPage />} />
-            <Route path="/recent" element={<RecentPage />} />
-            <Route path="/playlist/:id" element={<PlaylistPage />} />
-            <Route path="*" element={<Home />} />
-          </Routes>
+          {/*
+            内容区转场：
+            - 支持 View Transition 时 key 固定，路由切换由 .app-content 的交叉溶解完成；
+            - 不支持时按 location.key 强制重挂载，触发 app.css 中的进场动画。
+          */}
+          <div className="route-stage" key={vt ? 'stage' : location.key}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/browse" element={<Browse />} />
+              <Route path="/radio" element={<Radio />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/crate" element={<CratePage />} />
+              <Route path="/favorites" element={<FavoritesPage />} />
+              <Route path="/recent" element={<RecentPage />} />
+              <Route path="/playlist/:id" element={<PlaylistPage />} />
+              <Route path="/artist/:id" element={<ArtistPage />} />
+              <Route path="/album/:id" element={<AlbumPage />} />
+              <Route path="*" element={<Home />} />
+            </Routes>
+          </div>
         </main>
       </div>
 
       <PlayerBar />
 
       {/* 浮层：全屏播放页 / 队列 / 登录 / 新建歌单 / 播放错误 */}
-      {expanded && <NowPlaying />}
+      {npMounted && <NowPlaying open={expanded} exiting={npExiting} />}
       <QueuePanel />
       {modalOpen && <LoginModal />}
       <CreatePlaylistModal />

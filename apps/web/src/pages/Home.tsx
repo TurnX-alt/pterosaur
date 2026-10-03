@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Play, Clock, Heart } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useAuth } from '../store/auth.js'
@@ -13,6 +13,60 @@ import { Cover } from '../components/Cover.js'
 import { Loading, ErrorState } from '../components/States.js'
 import './pages.css'
 
+interface ShortcutProps {
+  /** 图标主题色变体 */
+  variant: 'fav' | 'recent'
+  title: string
+  count: number
+  icon: React.ReactNode
+  /** 点击本体：进入对应页面 */
+  onOpen: () => void
+  /** 点击悬浮播放按钮：直接播放该集合 */
+  onPlay: () => void
+}
+
+/**
+ * 快捷入口磁贴：点击本体进入页面；悬浮浮现的播放按钮直接播放（不跳转）。
+ * 集合为空时播放按钮仍在（保持 hover 反馈一致），但置为禁用态。
+ */
+function Shortcut({ variant, title, count, icon, onOpen, onPlay }: ShortcutProps) {
+  return (
+    <div
+      className="shortcut"
+      role="button"
+      tabIndex={0}
+      aria-label={`${title}，${count} 首`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        // 仅在磁贴本体获得焦点时响应，避免误触内部播放按钮
+        if (e.target !== e.currentTarget) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpen()
+        }
+      }}
+    >
+      <span className={`shortcut__icon shortcut__icon--${variant}`}>{icon}</span>
+      <span className="shortcut__text">
+        <strong>{title}</strong>
+        <small>{count} 首</small>
+      </span>
+      <button
+        type="button"
+        className="shortcut__play"
+        aria-label={`播放${title}`}
+        disabled={count === 0}
+        onClick={(e) => {
+          e.stopPropagation()
+          onPlay()
+        }}
+      >
+        <Play size={18} fill="currentColor" strokeWidth={0} />
+      </button>
+    </div>
+  )
+}
+
 /**
  * 立即收听（首页）。
  *
@@ -21,7 +75,7 @@ import './pages.css'
  * - 「继续收听」最近播放列表。
  */
 export function Home() {
-  const navigate = useNavigate()
+  const navigate = useViewNavigate()
   const recent = useLibrary((s) => s.recent)
   const favorites = useLibrary((s) => s.favorites)
   const playTracks = usePlayer((s) => s.playTracks)
@@ -60,26 +114,24 @@ export function Home() {
         </div>
       </header>
 
-      {/* 快捷入口 */}
+      {/* 快捷入口：点击进入对应页面；悬浮的播放按钮直接播放，不跳转 */}
       <section className="home__shortcuts">
-        <button type="button" className="shortcut" onClick={() => favorites.length && playTracks(favorites, 0)} disabled={!favorites.length}>
-          <span className="shortcut__icon shortcut__icon--fav">
-            <Heart size={20} fill="currentColor" strokeWidth={0} />
-          </span>
-          <span className="shortcut__text">
-            <strong>我喜欢的音乐</strong>
-            <small>{favorites.length} 首</small>
-          </span>
-        </button>
-        <button type="button" className="shortcut" onClick={() => recent.length && playTracks(recent, 0)} disabled={!recent.length}>
-          <span className="shortcut__icon shortcut__icon--recent">
-            <Clock size={20} strokeWidth={2} />
-          </span>
-          <span className="shortcut__text">
-            <strong>最近播放</strong>
-            <small>{recent.length} 首</small>
-          </span>
-        </button>
+        <Shortcut
+          variant="fav"
+          title="我喜欢的音乐"
+          count={favorites.length}
+          icon={<Heart size={20} fill="currentColor" strokeWidth={0} />}
+          onOpen={() => navigate('/favorites')}
+          onPlay={() => playTracks(favorites, 0)}
+        />
+        <Shortcut
+          variant="recent"
+          title="最近播放"
+          count={recent.length}
+          icon={<Clock size={20} strokeWidth={2} />}
+          onOpen={() => navigate('/recent')}
+          onPlay={() => playTracks(recent, 0)}
+        />
       </section>
 
       {/* 为你推荐歌单 */}

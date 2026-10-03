@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
+import type { ReactElement } from 'react'
 import { TrackList } from './TrackList.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
@@ -19,6 +21,21 @@ function track(id: string, title: string, extra: Partial<Track> = {}): Track {
 }
 
 const SONGS = [track('1', '第一首'), track('2', '第二首', { fee: 'vip' }), track('3', '第三首')]
+
+/** 显示当前路径，用于断言导航。 */
+function LocationProbe() {
+  return <div data-testid="loc">{useLocation().pathname}</div>
+}
+
+/** TrackList 现在依赖路由（行内链接），需包一层 Router。 */
+function renderList(ui: ReactElement) {
+  return render(
+    <MemoryRouter>
+      {ui}
+      <LocationProbe />
+    </MemoryRouter>,
+  )
+}
 
 beforeEach(() => {
   usePlayer.setState({
@@ -41,12 +58,12 @@ beforeEach(() => {
 
 describe('TrackList', () => {
   it('空列表显示占位文案', () => {
-    render(<TrackList tracks={[]} emptyText="这里空空如也" />)
+    renderList(<TrackList tracks={[]} emptyText="这里空空如也" />)
     expect(screen.getByText('这里空空如也')).toBeInTheDocument()
   })
 
   it('渲染所有曲目名称与艺人', () => {
-    render(<TrackList tracks={SONGS} />)
+    renderList(<TrackList tracks={SONGS} />)
     for (const s of SONGS) {
       expect(screen.getByText(s.title)).toBeInTheDocument()
       expect(screen.getByText(s.artist)).toBeInTheDocument()
@@ -54,17 +71,17 @@ describe('TrackList', () => {
   })
 
   it('VIP 曲目不再显示徽标（歌单内隐藏 VIP chip）', () => {
-    render(<TrackList tracks={SONGS} />)
+    renderList(<TrackList tracks={SONGS} />)
     expect(screen.queryByText('VIP')).not.toBeInTheDocument()
   })
 
   it('时长格式化显示（200s -> 3:20）', () => {
-    render(<TrackList tracks={[track('1', 'x', { duration: 200 })]} />)
+    renderList(<TrackList tracks={[track('1', 'x', { duration: 200 })]} />)
     expect(screen.getByText('3:20')).toBeInTheDocument()
   })
 
   it('点击行以该列表为队列播放', () => {
-    render(<TrackList tracks={SONGS} />)
+    renderList(<TrackList tracks={SONGS} />)
     fireEvent.click(screen.getByText('第二首'))
     const s = usePlayer.getState()
     expect(s.current?.id).toBe('2')
@@ -74,7 +91,7 @@ describe('TrackList', () => {
   })
 
   it('点击红心收藏曲目', () => {
-    render(<TrackList tracks={SONGS} />)
+    renderList(<TrackList tracks={SONGS} />)
     const hearts = screen.getAllByLabelText('喜欢')
     fireEvent.click(hearts[0])
     expect(useLibrary.getState().favorites).toHaveLength(1)
@@ -83,32 +100,70 @@ describe('TrackList', () => {
 
   it('已收藏的曲目显示「取消喜欢」并可取消', () => {
     useLibrary.setState({ favorites: [SONGS[0]] })
-    render(<TrackList tracks={SONGS} />)
+    renderList(<TrackList tracks={SONGS} />)
     const btn = screen.getByLabelText('取消喜欢')
     fireEvent.click(btn)
     expect(useLibrary.getState().favorites).toHaveLength(0)
   })
 
-  it('当前播放曲目行高亮（aria 上通过 eq 动画体现，这里验证 current 关联）', () => {
+  it('当前播放曲目行高亮', () => {
     usePlayer.setState({ current: SONGS[1], queue: SONGS, index: 1, isPlaying: true })
-    const { container } = render(<TrackList tracks={SONGS} />)
+    const { container } = renderList(<TrackList tracks={SONGS} />)
     const activeRows = container.querySelectorAll('.track-row--current')
     expect(activeRows).toHaveLength(1)
     expect(activeRows[0].textContent).toContain('第二首')
   })
 
   it('showHeader=false 时不渲染表头', () => {
-    const { container } = render(<TrackList tracks={SONGS} showHeader={false} />)
+    const { container } = renderList(<TrackList tracks={SONGS} showHeader={false} />)
     expect(container.querySelector('.track-list__head')).toBeNull()
   })
 
   it('点击当前正在播放的曲目会暂停', () => {
-    // 先播放
-    render(<TrackList tracks={SONGS} />)
+    renderList(<TrackList tracks={SONGS} />)
     fireEvent.click(screen.getByText('第一首'))
     expect(usePlayer.getState().isPlaying).toBe(true)
-    // 再次点击同一首 -> 暂停
     fireEvent.click(screen.getByText('第一首'))
     expect(usePlayer.getState().isPlaying).toBe(false)
+  })
+
+  it('点击艺人名跳转艺人页，且不触发行播放', () => {
+    const t = [track('1', '第一首', { artist: '某艺人', artistRefs: [{ id: '9', name: '某艺人' }] })]
+    renderList(<TrackList tracks={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '某艺人' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/artist/9')
+    expect(usePlayer.getState().current).toBeNull()
+  })
+
+  it('多艺人各自可点击跳转', () => {
+    const t = [
+      track('1', '合唱', {
+        artist: '甲 / 乙',
+        artistRefs: [
+          { id: '1', name: '甲' },
+          { id: '2', name: '乙' },
+        ],
+      }),
+    ]
+    renderList(<TrackList tracks={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '乙' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/artist/2')
+  })
+
+  it('点击专辑名跳转专辑页，且不触发行播放', () => {
+    const t = [track('1', '第一首', { album: '某专辑', albumId: '77' })]
+    renderList(<TrackList tracks={t} />)
+    fireEvent.click(screen.getByRole('button', { name: '某专辑' }))
+    expect(screen.getByTestId('loc')).toHaveTextContent('/album/77')
+    expect(usePlayer.getState().current).toBeNull()
+  })
+
+  it('缺少 id 时艺人 / 专辑降级为纯文本（不可点击）', () => {
+    const t = [track('1', '第一首')]
+    renderList(<TrackList tracks={t} />)
+    expect(screen.queryByRole('button', { name: '艺人1' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '专辑1' })).toBeNull()
+    expect(screen.getByText('艺人1')).toBeInTheDocument()
+    expect(screen.getByText('专辑1')).toBeInTheDocument()
   })
 })

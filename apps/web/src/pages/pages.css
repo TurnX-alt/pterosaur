@@ -33,19 +33,15 @@
   border-radius: var(--radius-lg);
   background: var(--bg-elevated);
   text-align: left;
+  cursor: pointer;
   transition:
     background-color var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
 }
 
-.shortcut:hover:not(:disabled) {
+.shortcut:hover {
   background: var(--bg-elevated-2);
   transform: translateY(-1px);
-}
-
-.shortcut:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .shortcut__icon {
@@ -69,6 +65,7 @@
 }
 
 .shortcut__text {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -83,6 +80,57 @@
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 2px;
+}
+
+/* 悬浮浮现的播放按钮：直接播放，不跳转 */
+.shortcut__play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.shortcut:hover .shortcut__play,
+.shortcut__play:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.shortcut__play:hover {
+  background: var(--accent-hover);
+}
+
+.shortcut__play:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* 空集合：按钮仍随 hover 出现，但呈禁用态（无内容可播） */
+.shortcut__play:disabled {
+  background: var(--bg-elevated-2);
+  color: var(--text-tertiary);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  /* 触屏无 hover：常驻显示播放按钮 */
+  .shortcut__play {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- 精选单曲 ---------- */
@@ -208,9 +256,38 @@
   margin-top: 4px;
 }
 
-/* ============================ 歌单详情 ============================ */
+/* 搜索：分类 tab（复用浏览页胶囊样式）与结果区 */
+.search__tabs {
+  display: flex;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  width: fit-content;
+}
+
+.search__tab-count {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.browse__tab--active .search__tab-count {
+  color: var(--text-secondary);
+}
+
+.search__results {
+  margin-top: 20px;
+}
+
+/* ============================ 歌单 / 艺人 / 专辑详情 ============================ */
 .detail {
   max-width: 1600px;
+  /* 防止内容区交叉溶解转场期间盒子塌陷导致的高度跳变 */
+  min-height: 60vh;
 }
 
 .detail__hero {
@@ -311,48 +388,61 @@
     transform var(--dur-fast) var(--ease);
 }
 
-.detail__play:hover {
+.detail__play:hover:not(:disabled) {
   background: var(--accent-hover);
   transform: scale(1.03);
+}
+
+/* 无内容可播（空歌单 / 空专辑 / 空列表）时置灰 */
+.detail__play:disabled {
+  background: var(--bg-elevated-2);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  transform: none;
 }
 
 .detail__list {
   padding: 0 20px 20px;
 }
 
-/* ============================ 资料库 ============================ */
-.library {
+/* 详情页内的分区块（如艺人页的专辑网格） */
+.detail__section {
+  padding: 0 20px;
+  margin-top: 28px;
+}
+
+/* 专辑页：可点击的艺人链接 */
+.detail__artist-link {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.detail__artist-link:hover,
+.detail__artist-link:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.detail__artist-link:focus-visible {
+  outline: none;
+}
+
+/* ============================ 唱片盒（收藏的专辑） ============================ */
+.crate {
   padding: 0 32px 40px;
   max-width: 1600px;
 }
 
-.library__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.crate__header {
   padding: 32px 0 8px;
 }
 
-.library__title {
+.crate__title {
   font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.02em;
-}
-
-.library__new {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  background: var(--bg-elevated-2);
-  font-size: 13px;
-  font-weight: 600;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.library__new:hover {
-  background: var(--bg-active);
 }
 
 /* ============================ 响应式 ============================ */
@@ -360,7 +450,7 @@
   .home,
   .browse,
   .search,
-  .library {
+  .crate {
     padding-left: 16px;
     padding-right: 16px;
   }
@@ -394,7 +484,7 @@
   .home__greeting,
   .browse__title,
   .search__title,
-  .library__title {
+  .crate__title {
     font-size: 24px;
   }
 }
@@ -450,66 +540,6 @@
     order: 3;
     flex-basis: 100%;
   }
-}
-
-/* ============================ 资料库入口卡片 ============================ */
-.lib-entries {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
-}
-
-.lib-entry {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-elevated);
-  text-align: left;
-  transition:
-    background-color var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
-}
-
-.lib-entry:hover {
-  background: var(--bg-elevated-2);
-  transform: translateY(-1px);
-}
-
-.lib-entry__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-  color: #fff;
-}
-
-.lib-entry__icon--fav {
-  background: linear-gradient(135deg, #fa243c, #ff6a5e);
-}
-
-.lib-entry__icon--recent {
-  background: linear-gradient(135deg, #5e5ce6, #8e8aff);
-}
-
-.lib-entry__text {
-  display: flex;
-  flex-direction: column;
-}
-
-.lib-entry__text strong {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.lib-entry__text small {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  margin-top: 3px;
 }
 
 /* ============================ 我喜欢的音乐封面 ============================ */

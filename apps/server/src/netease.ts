@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import type { LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
+import type { Album, Artist, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
 
 const require = createRequire(import.meta.url)
@@ -59,10 +59,33 @@ interface RawSong {
   fee?: number
   dt?: number
   duration?: number
-  ar?: { name: string }[]
-  artists?: { name: string }[]
-  al?: { name?: string; picUrl?: string; blurPicUrl?: string }
-  album?: { name?: string; picUrl?: string; blurPicUrl?: string }
+  ar?: { id?: number; name: string }[]
+  artists?: { id?: number; name: string }[]
+  al?: { id?: number; name?: string; picUrl?: string; blurPicUrl?: string }
+  album?: { id?: number; name?: string; picUrl?: string; blurPicUrl?: string }
+}
+
+/** 网易云返回的原始艺人结构（部分字段）。 */
+interface RawArtist {
+  id: number
+  name: string
+  picUrl?: string
+  alias?: string[]
+  albumSize?: number
+  musicSize?: number
+  briefDesc?: string
+}
+
+/** 网易云返回的原始专辑结构（部分字段）。 */
+interface RawAlbum {
+  id: number
+  name: string
+  picUrl?: string
+  size?: number
+  trackCount?: number
+  publishTime?: number
+  artist?: { id?: number; name: string }
+  artists?: { id?: number; name: string }[]
 }
 
 /** 网易云返回的原始歌单结构（部分字段）。 */
@@ -83,6 +106,15 @@ function https(url?: string): string {
   return url.replace(/^http:\/\//, 'https://')
 }
 
+/**
+ * 追加网易云缩略参数（`param=WxH`）。
+ * 兼容地址已带查询串的情况——此时用 `&` 连接，避免出现第二个 `?`（歌单封面常见）。
+ */
+function thumb(url: string, param: string): string {
+  if (!url) return ''
+  return url.includes('?') ? `${url}&${param}` : `${url}?${param}`
+}
+
 /** 由 fee 推断版权标记。网易云：0 免费、1/4/8 等通常为 VIP 或付费。 */
 function feeOf(fee?: number): Track['fee'] {
   if (fee === undefined || fee === null) return 'unknown'
@@ -93,7 +125,11 @@ function feeOf(fee?: number): Track['fee'] {
 
 /** 将网易云原始曲目归一化为共享 Track。 */
 export function normalizeTrack(raw: RawSong): Track {
-  const artists = (raw.ar ?? raw.artists ?? []).map((a) => a?.name).filter(Boolean)
+  const rawArtists = raw.ar ?? raw.artists ?? []
+  const artists = rawArtists.map((a) => a?.name).filter(Boolean)
+  const artistRefs = rawArtists
+    .filter((a): a is { id: number; name: string } => a?.id != null && !!a?.name)
+    .map((a) => ({ id: String(a.id), name: a.name }))
   const album = raw.al ?? raw.album
   const coverRaw = album?.picUrl ?? album?.blurPicUrl ?? ''
   return {
@@ -102,19 +138,50 @@ export function normalizeTrack(raw: RawSong): Track {
     artist: artists.join(' / ') || '未知艺人',
     album: album?.name ?? '',
     // 封面按需放大，网易云支持 ?param=WxH 缩略参数
-    cover: https(coverRaw) ? `${https(coverRaw)}?param=600y600` : '',
+    cover: thumb(https(coverRaw), 'param=600y600'),
     duration: Math.round(((raw.dt ?? raw.duration ?? 0) as number) / 1000),
     fee: feeOf(raw.fee),
+    // 供界面跳转艺人页 / 专辑页；缺失时前端降级为纯文本
+    artistRefs: artistRefs.length ? artistRefs : undefined,
+    albumId: album && album.id != null ? String(album.id) : undefined,
+  }
+}
+
+/** 将网易云原始艺人归一化为共享 Artist。 */
+export function normalizeArtist(raw: RawArtist): Artist {
+  return {
+    id: String(raw.id),
+    name: raw.name ?? '未知艺人',
+    avatar: thumb(https(raw.picUrl), 'param=300y300'),
+    alias: raw.alias?.length ? raw.alias : undefined,
+    albumSize: raw.albumSize,
+    musicSize: raw.musicSize,
+    briefDesc: raw.briefDesc || undefined,
+  }
+}
+
+/** 将网易云原始专辑归一化为共享 Album。 */
+export function normalizeAlbum(raw: RawAlbum): Album {
+  const list = raw.artists ?? (raw.artist ? [raw.artist] : [])
+  const names = list.map((a) => a?.name).filter(Boolean)
+  const primaryId = list.find((a) => a && a.id != null)?.id
+  return {
+    id: String(raw.id),
+    name: raw.name ?? '未命名专辑',
+    cover: thumb(https(raw.picUrl), 'param=600y600'),
+    artist: names.join(' / ') || '未知艺人',
+    artistId: primaryId != null ? String(primaryId) : undefined,
+    year: raw.publishTime ? new Date(raw.publishTime).getFullYear() : undefined,
+    trackCount: raw.size ?? raw.trackCount,
   }
 }
 
 /** 将网易云原始歌单归一化为共享 Playlist。 */
 export function normalizePlaylist(raw: RawPlaylist): Playlist {
-  const cover = https(raw.coverImgUrl ?? raw.picUrl ?? '')
   return {
     id: String(raw.id),
     name: raw.name ?? '未命名歌单',
-    cover: cover ? `${cover}?param=600y600` : '',
+    cover: thumb(https(raw.coverImgUrl ?? raw.picUrl ?? ''), 'param=600y600'),
     description: raw.description ?? undefined,
     trackCount: raw.trackCount,
     playCount: raw.playCount,
@@ -133,6 +200,27 @@ export async function searchSongs(keywords: string, limit = 30, cookie?: string)
   const res = await api.cloudsearch({ keywords, limit, cookie })
   const songs: RawSong[] = res?.body?.result?.songs ?? []
   return songs.map(normalizeTrack)
+}
+
+/** 搜索艺人（cloudsearch type=100）。 */
+export async function searchArtists(keywords: string, limit = 30, cookie?: string): Promise<Artist[]> {
+  const res = await api.cloudsearch({ keywords, type: 100, limit, cookie })
+  const list: RawArtist[] = res?.body?.result?.artists ?? []
+  return list.map(normalizeArtist)
+}
+
+/** 搜索专辑（cloudsearch type=10）。 */
+export async function searchAlbums(keywords: string, limit = 30, cookie?: string): Promise<Album[]> {
+  const res = await api.cloudsearch({ keywords, type: 10, limit, cookie })
+  const list: RawAlbum[] = res?.body?.result?.albums ?? []
+  return list.map(normalizeAlbum)
+}
+
+/** 搜索歌单（cloudsearch type=1000）。 */
+export async function searchPlaylists(keywords: string, limit = 30, cookie?: string): Promise<Playlist[]> {
+  const res = await api.cloudsearch({ keywords, type: 1000, limit, cookie })
+  const list: RawPlaylist[] = res?.body?.result?.playlists ?? []
+  return list.map(normalizePlaylist)
 }
 
 /** 首页个性化推荐歌单。 */
@@ -167,7 +255,7 @@ export async function playlistTracks(id: string, cookie?: string): Promise<{ pla
     ? {
         id: String(pl.id),
         name: pl.name ?? '未命名歌单',
-        cover: pl.coverImgUrl ? `${https(pl.coverImgUrl)}?param=600y600` : '',
+        cover: thumb(https(pl.coverImgUrl), 'param=600y600'),
         description: pl.description ?? undefined,
         trackCount: pl.trackCount,
         playCount: pl.playCount,
@@ -176,6 +264,30 @@ export async function playlistTracks(id: string, cookie?: string): Promise<{ pla
     : { id, name: '歌单', cover: '' }
   const tracks: Track[] = ((pl?.tracks ?? []) as RawSong[]).map(normalizeTrack)
   return { playlist, tracks }
+}
+
+/** 艺人详情：档案 + 热门单曲 + 专辑列表。 */
+export async function artistDetail(
+  id: string,
+  cookie?: string,
+): Promise<{ artist: Artist; tracks: Track[]; albums: Album[] }> {
+  const [info, albumRes] = await Promise.all([
+    api.artists({ id, cookie }),
+    api.artist_album({ id, limit: 50, cookie }),
+  ])
+  const artist = normalizeArtist((info?.body?.artist ?? { id, name: '未知艺人' }) as RawArtist)
+  const tracks: Track[] = ((info?.body?.hotSongs ?? []) as RawSong[]).map(normalizeTrack)
+  const rawAlbums: RawAlbum[] = albumRes?.body?.hotAlbums ?? albumRes?.body?.albums ?? []
+  return { artist, tracks, albums: rawAlbums.map(normalizeAlbum) }
+}
+
+/** 专辑详情：档案 + 曲目。 */
+export async function albumDetail(id: string, cookie?: string): Promise<{ album: Album; tracks: Track[] }> {
+  const res = await api.album({ id, cookie })
+  const raw = (res?.body?.album ?? { id, name: '未知专辑' }) as RawAlbum & { size?: number }
+  const album = normalizeAlbum({ ...raw, size: raw.size ?? res?.body?.songs?.length })
+  const tracks: Track[] = ((res?.body?.songs ?? []) as RawSong[]).map(normalizeTrack)
+  return { album, tracks }
 }
 
 /**

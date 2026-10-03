@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import type { Playlist } from '@pterosaur/shared/types'
 import { PlaylistCard } from '../components/PlaylistCard.js'
 import { Loading, ErrorState } from '../components/States.js'
@@ -26,7 +26,7 @@ function fmtCount(n?: number): string | undefined {
  * 浏览页：个性推荐 / 精品歌单 / 排行榜三个分区，卡片网格展示。
  */
 export function Browse() {
-  const navigate = useNavigate()
+  const navigate = useViewNavigate()
   const [tab, setTab] = useState<Tab>('recommend')
 
   const recommend = useAsync<Playlist[]>(() => api.recommend(30), [], [])

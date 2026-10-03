@@ -11,6 +11,12 @@ export type MusicSource = 'netease'
 /** 播放循环模式。 */
 export type RepeatMode = 'off' | 'all' | 'one'
 
+/** 曲目内联的艺人引用（含 id，供跳转艺人页）。 */
+export interface ArtistRef {
+  id: string
+  name: string
+}
+
 /** 精简后的曲目模型，前后端统一使用该结构。 */
 export interface Track {
   /** 曲目在音源内的唯一 ID。 */
@@ -30,6 +36,53 @@ export interface Track {
    * 由后端根据网易云 `fee` 字段推断，仅用于 UI 提示，最终能否播放以实际解析为准。
    */
   fee: 'free' | 'vip' | 'unknown'
+  /**
+   * 该曲目关联的艺人引用（含 id），供界面逐个跳转艺人页。
+   * 旧的持久化数据（收藏 / 最近播放 / 队列）可能缺失，缺失时界面降级为纯文本。
+   */
+  artistRefs?: ArtistRef[]
+  /** 所属专辑 id，供界面跳转专辑页。旧数据可能缺失。 */
+  albumId?: string
+}
+
+/** 艺人模型。 */
+export interface Artist {
+  id: string
+  name: string
+  /** 头像地址（已改写为 https）。 */
+  avatar: string
+  /** 别名列表。 */
+  alias?: string[]
+  /** 专辑数量。 */
+  albumSize?: number
+  /** 单曲数量。 */
+  musicSize?: number
+  /** 简介。 */
+  briefDesc?: string
+}
+
+/** 专辑模型。 */
+export interface Album {
+  id: string
+  name: string
+  /** 封面地址（已改写为 https）。 */
+  cover: string
+  /** 艺人名（多艺人以 `/` 连接）。 */
+  artist: string
+  /** 主艺人 id，供跳转艺人页。 */
+  artistId?: string
+  /** 发行年份。 */
+  year?: number
+  /** 曲目数量。 */
+  trackCount?: number
+}
+
+/** 多类型搜索结果（歌曲 / 艺人 / 专辑 / 歌单）。 */
+export interface SearchResults {
+  songs: Track[]
+  artists: Artist[]
+  albums: Album[]
+  playlists: Playlist[]
 }
 
 /** 歌单 / 排行榜等合集的精简模型。 */

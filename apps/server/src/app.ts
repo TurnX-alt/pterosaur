@@ -4,6 +4,11 @@ import { cors } from 'hono/cors'
 import { LRUCache } from 'lru-cache'
 import {
   searchSongs,
+  searchArtists,
+  searchAlbums,
+  searchPlaylists,
+  artistDetail,
+  albumDetail,
   recommendPlaylists,
   toplists,
   topPlaylists,
@@ -141,6 +146,25 @@ export function createApp() {
     }
   })
 
+  /** 多类型搜索：一次并行返回歌曲 / 艺人 / 专辑 / 歌单。 */
+  app.get('/api/search/all', async (c) => {
+    const keywords = (c.req.query('keywords') ?? '').trim()
+    if (!keywords) return c.json(fail('缺少搜索关键词'), 400)
+    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 50)
+    const cookie = cookieOf(c)
+    try {
+      const [songs, artists, albums, playlists] = await Promise.all([
+        searchSongs(keywords, 50, cookie),
+        searchArtists(keywords, limit, cookie),
+        searchAlbums(keywords, limit, cookie),
+        searchPlaylists(keywords, limit, cookie),
+      ])
+      return c.json(ok({ songs, artists, albums, playlists }))
+    } catch (e) {
+      return c.json(fail(`搜索失败：${(e as Error).message}`), 502)
+    }
+  })
+
   app.get('/api/discover/recommend', async (c) => {
     try {
       const list = await recommendPlaylists(Number(c.req.query('limit') ?? 12), cookieOf(c))
@@ -175,6 +199,24 @@ export function createApp() {
       return c.json(ok({ playlist, tracks }))
     } catch (e) {
       return c.json(fail(`获取歌单详情失败：${(e as Error).message}`), 502)
+    }
+  })
+
+  app.get('/api/artist/:id', async (c) => {
+    const id = c.req.param('id')
+    try {
+      return c.json(ok(await artistDetail(id, cookieOf(c))))
+    } catch (e) {
+      return c.json(fail(`获取艺人详情失败：${(e as Error).message}`), 502)
+    }
+  })
+
+  app.get('/api/album/:id', async (c) => {
+    const id = c.req.param('id')
+    try {
+      return c.json(ok(await albumDetail(id, cookieOf(c))))
+    } catch (e) {
+      return c.json(fail(`获取专辑详情失败：${(e as Error).message}`), 502)
     }
   })
 

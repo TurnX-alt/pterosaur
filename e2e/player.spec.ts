@@ -49,8 +49,100 @@ test.describe('应用外壳', () => {
     await page.getByRole('link', { name: '我喜欢的音乐' }).click()
     await expect(page).toHaveURL(/\/favorites/)
 
+    // 「唱片盒」入口
+    await page.getByRole('link', { name: '唱片盒' }).click()
+    await expect(page).toHaveURL(/\/crate/)
+    await expect(page.locator('.crate__title')).toBeVisible()
+
     await page.getByRole('link', { name: '立即收听' }).click()
     await expect(page).toHaveURL(/\/$/)
+  })
+
+  test('立即收听：点击快捷入口本体进入对应页面（而非播放）', async ({ page }) => {
+    await page.goto('/')
+    // 种入一条收藏与一条最近播放，确认「有内容」时点击本体也走导航而非播放
+    await page.evaluate(() => {
+      const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
+      localStorage.setItem(
+        'pterosaur-library',
+        JSON.stringify({
+          state: { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] },
+          version: 0,
+        }),
+      )
+    })
+    await page.reload()
+    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+
+    await page.locator('.shortcut', { hasText: '我喜欢的音乐' }).click()
+    await expect(page).toHaveURL(/\/favorites/)
+
+    await page.goto('/')
+    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+    await page.locator('.shortcut', { hasText: '最近播放' }).click()
+    await expect(page).toHaveURL(/\/recent/)
+
+    // 全程未触发播放（audio 仍处于暂停）
+    const paused = await page.evaluate(() => (document.querySelector('audio') as HTMLAudioElement).paused)
+    expect(paused).toBe(true)
+  })
+
+  test('立即收听：快捷入口的播放按钮直接播放，不跳转', async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(() => {
+      const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
+      localStorage.setItem(
+        'pterosaur-library',
+        JSON.stringify({
+          state: { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] },
+          version: 0,
+        }),
+      )
+    })
+    await page.reload()
+    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+
+    await page.getByRole('button', { name: '播放我喜欢的音乐', exact: true }).click()
+
+    // 未跳转，且底栏出现曲名（已进入播放态）
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.locator('.playerbar__title')).not.toBeEmpty({ timeout: 8000 })
+  })
+
+  test('立即收听：集合为空时 hover 仍出现播放按钮（禁用态）', async ({ page }) => {
+    await page.goto('/')
+    await page.evaluate(() => localStorage.removeItem('pterosaur-library'))
+    await page.reload()
+    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+
+    const play = page.getByRole('button', { name: '播放我喜欢的音乐', exact: true })
+    // 空集合：按钮存在但禁用
+    await expect(play).toBeDisabled()
+
+    // hover 后浮现（opacity 由 0 变为 1）
+    await page.locator('.shortcut', { hasText: '我喜欢的音乐' }).hover()
+    await expect
+      .poll(async () => Number(await play.evaluate((el) => getComputedStyle(el).opacity)))
+      .toBeGreaterThan(0.5)
+  })
+
+  test('侧边栏标题点击切换 commit 哈希，GitHub 图标指向仓库', async ({ page }) => {
+    await page.goto('/')
+    const brand = page.locator('.sidebar__name')
+    await expect(brand).toHaveText('Pterosaur')
+
+    // 点击一次 → 显示 commit 短哈希（7 位十六进制；非 git 构建回退为 dev）
+    await brand.click()
+    await expect(brand).toHaveText(/^([0-9a-f]{7}|dev)$/)
+
+    // 再点一次 → 恢复品牌名
+    await brand.click()
+    await expect(brand).toHaveText('Pterosaur')
+
+    // GitHub 图标：指向仓库且新窗口打开
+    const gh = page.locator('.sidebar__github')
+    await expect(gh).toHaveAttribute('href', /^https:\/\/github\.com\/.+/)
+    await expect(gh).toHaveAttribute('target', '_blank')
   })
 
   test('主题切换在明暗之间生效', async ({ page }) => {
@@ -165,6 +257,41 @@ test.describe('全屏播放页与歌词', () => {
     await page.keyboard.press('Escape')
     await expect(page.locator('.nowplaying')).toHaveCount(0, { timeout: 3000 })
   })
+
+  test('首行 / 末行歌词同样垂直居中', async ({ page }) => {
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+    await page.locator('.playerbar__cover-btn').click()
+    await expect(page.locator('.nowplaying__lyrics .lyric-line').first()).toBeVisible({ timeout: 15000 })
+
+    // 当前高亮行中心与歌词区中心之差（px）
+    const centerDelta = () =>
+      page.evaluate(() => {
+        const el = document.querySelector('.nowplaying__lyrics')
+        const line = el?.querySelector('.lyric-line--active')
+        if (!el || !line) return 9999
+        const c = el.getBoundingClientRect()
+        const l = line.getBoundingClientRect()
+        return l.top + l.height / 2 - (c.top + c.height / 2)
+      })
+
+    const clickLine = (i: number) =>
+      page.evaluate((idx) => {
+        const lines = document.querySelectorAll('.nowplaying__lyrics .lyric-line')
+        ;(lines[Math.min(Math.max(idx, 0), lines.length - 1)] as HTMLElement).click()
+      }, i)
+
+    const count = await page.locator('.nowplaying__lyrics .lyric-line').count()
+
+    // 首行（无法靠「滚动」贴到中线，需靠容器内边距）
+    await clickLine(0)
+    await expect.poll(async () => Math.abs(await centerDelta()), { timeout: 3000 }).toBeLessThan(3)
+
+    // 末行
+    await clickLine(count - 1)
+    await expect.poll(async () => Math.abs(await centerDelta()), { timeout: 3000 }).toBeLessThan(3)
+  })
 })
 
 test.describe('播放队列', () => {
@@ -173,8 +300,15 @@ test.describe('播放队列', () => {
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
     await page.locator('.track-row').first().click()
 
+    // 关闭态：面板在屏外，不应带可见投影（实心投影会漏进窗口右缘）
+    const closedShadow = await page.locator('.queue-panel').evaluate((el) => getComputedStyle(el).boxShadow)
+    expect(closedShadow).toContain('rgba(0, 0, 0, 0)')
+
     await page.getByRole('button', { name: '播放队列' }).click()
     await expect(page.locator('.queue-panel--open')).toBeVisible({ timeout: 3000 })
+
+    // 关闭按钮已移除（改用遮罩 / 播放队列按钮关闭）
+    await expect(page.getByRole('button', { name: '关闭队列' })).toHaveCount(0)
 
     const items = await page.locator('.queue-item').count()
     expect(items).toBeGreaterThan(0)
@@ -214,6 +348,27 @@ test.describe('资料库与收藏', () => {
     await page.reload()
     await expect(page.getByText('还没有喜欢的音乐')).toBeVisible({ timeout: 8000 })
   })
+
+  test('收藏专辑后出现在唱片盒', async ({ page }) => {
+    // 从搜索的专辑 tab 进入一张专辑
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await page.getByRole('tab', { name: /专辑/ }).click()
+    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
+    const name = ((await page.locator('.card--album .card__title').first().textContent()) ?? '').trim()
+
+    await page.locator('.card--album').first().click()
+    await expect(page).toHaveURL(/\/album\/\d+/, { timeout: 8000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+
+    // 收藏
+    await page.getByRole('button', { name: '收藏到资料库' }).click()
+    await expect(page.getByRole('button', { name: '取消收藏' })).toBeVisible()
+
+    // 唱片盒中出现该专辑
+    await page.goto('/crate')
+    await expect(page.locator('.crate__title')).toHaveText('唱片盒')
+    await expect(page.locator('.crate .card--album').first()).toContainText(name)
+  })
 })
 
 test.describe('歌单详情', () => {
@@ -226,6 +381,126 @@ test.describe('歌单详情', () => {
     await expect(page.locator('.detail__name')).toBeVisible({ timeout: 8000 })
     // 曲目应加载（可能较慢，给足时间）
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+  })
+})
+
+test.describe('卡片播放按钮', () => {
+  test('点击卡片播放按钮立即播放，且不进入详情页', async ({ page }) => {
+    await page.goto('/browse')
+    await expect(page.locator('.card').first()).toBeVisible({ timeout: 15000 })
+
+    const card = page.locator('.card').first()
+    await card.hover()
+    await card.locator('.card__play').click()
+
+    // 仍停留在浏览页（未跳转到歌单详情）
+    await expect(page).toHaveURL(/\/browse/)
+    // 底栏出现曲名 → 已进入播放态
+    await expect(page.locator('.playerbar__title')).not.toBeEmpty({ timeout: 10000 })
+  })
+})
+
+test.describe('搜索分栏与艺人 / 专辑跳转', () => {
+  test('搜索结果分为歌曲 / 艺人 / 专辑 / 歌单四个 tab', async ({ page }) => {
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+
+    const tabs = page.getByRole('tab')
+    await expect(tabs).toHaveCount(4)
+    await expect(page.getByRole('tab', { name: /歌曲/ })).toHaveAttribute('aria-selected', 'true')
+
+    // 默认歌曲 tab：显示曲目行
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+
+    // 切到艺人 tab
+    await page.getByRole('tab', { name: /艺人/ }).click()
+    await expect(page.locator('.card--artist').first()).toBeVisible({ timeout: 8000 })
+
+    // 切到专辑 tab
+    await page.getByRole('tab', { name: /专辑/ }).click()
+    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
+  })
+
+  test('从搜索的艺人卡片进入艺人页', async ({ page }) => {
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await page.getByRole('tab', { name: /艺人/ }).click()
+    await expect(page.locator('.card--artist').first()).toBeVisible({ timeout: 8000 })
+
+    await page.locator('.card--artist').first().click()
+    await expect(page).toHaveURL(/\/artist\/\d+/, { timeout: 8000 })
+    await expect(page.locator('.detail__name')).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+  })
+
+  test('歌单曲目行点击专辑名跳转专辑页', async ({ page }) => {
+    // 从浏览页进入任意歌单
+    await page.goto('/browse')
+    await expect(page.locator('.card').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.card').first().click()
+    await expect(page).toHaveURL(/\/playlist\/\d+/, { timeout: 8000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+
+    // 点击首行的专辑链接
+    await page.locator('.track-row').first().locator('.col-album .track-link').click()
+    await expect(page).toHaveURL(/\/album\/\d+/, { timeout: 8000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+  })
+})
+
+test.describe('队列面板毛玻璃', () => {
+  test('队列面板具备 backdrop-filter 毛玻璃', async ({ page }) => {
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+
+    await page.getByRole('button', { name: '播放队列' }).click()
+    const panel = page.locator('.queue-panel')
+    await expect(panel).toHaveClass(/queue-panel--open/)
+
+    const backdrop = await panel.evaluate((el) => {
+      const cs = getComputedStyle(el)
+      const webkit = (cs as unknown as { webkitBackdropFilter?: string }).webkitBackdropFilter ?? ''
+      return `${cs.backdropFilter ?? ''} ${webkit}`
+    })
+    expect(backdrop).toContain('blur')
+  })
+})
+
+test.describe('移动端', () => {
+  test('输入框字号 ≥ 16px（避免聚焦时页面被放大）', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    const size = await page
+      .getByTestId('search-input')
+      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(size).toBeGreaterThanOrEqual(16)
+  })
+
+  test('抽屉打开时由侧边栏切换内容，转场不得盖住抽屉', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    await page.locator('.topbar__burger').click()
+    await expect(page.locator('.sidebar--drawer-open')).toBeVisible()
+
+    // 由抽屉切换主内容区
+    await page.locator('.sidebar--drawer-open a', { hasText: '浏览' }).click()
+    await expect(page).toHaveURL(/\/browse/)
+
+    // 若 View Transition 生效，转场快照（top layer）会盖住抽屉——此处应为抽屉本身
+    const topClass = await page.evaluate(() => {
+      const el = document.elementFromPoint(140, 400)
+      return el ? el.className || el.tagName : null
+    })
+    expect(String(topClass)).toContain('sidebar--drawer-open')
+  })
+})
+
+test.describe('登录弹窗', () => {
+  test('提示文案为「不受限地播放」，不含 VIP 字样', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: '登录' }).click()
+    const hint = page.locator('.login-modal__hint')
+    await expect(hint).toContainText('登录后即可不受限地播放曲目')
+    await expect(hint).not.toContainText('VIP')
   })
 })
 
@@ -269,5 +544,44 @@ test.describe('后端 API 契约', () => {
     const buf = await res.body()
     expect(buf.byteLength).toBeGreaterThan(0)
     expect(res.headers()['content-type']).toContain('audio')
+  })
+
+  test('多类型搜索接口返回四类结果', async ({ request }) => {
+    const res = await request.get('/api/search/all', { params: { keywords: FREE_SONG_KEYWORD, limit: 3 } })
+    expect(res.ok()).toBe(true)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+    expect(Array.isArray(body.data.songs)).toBe(true)
+    expect(Array.isArray(body.data.artists)).toBe(true)
+    expect(Array.isArray(body.data.albums)).toBe(true)
+    expect(Array.isArray(body.data.playlists)).toBe(true)
+    // 曲目应带艺人引用与专辑 id（供界面跳转）
+    const song = body.data.songs[0]
+    expect(Array.isArray(song.artistRefs)).toBe(true)
+    expect(typeof song.artistRefs[0]?.id).toBe('string')
+  })
+
+  test('艺人 / 专辑详情接口返回契约', async ({ request }) => {
+    const s = await request.get('/api/search/all', { params: { keywords: FREE_SONG_KEYWORD, limit: 3 } })
+    const data = (await s.json()).data
+
+    const artistId = data.artists?.[0]?.id
+    if (artistId) {
+      const ar = await request.get(`/api/artist/${artistId}`)
+      expect(ar.ok()).toBe(true)
+      const b = await ar.json()
+      expect(b.data.artist.id).toBe(String(artistId))
+      expect(Array.isArray(b.data.tracks)).toBe(true)
+      expect(Array.isArray(b.data.albums)).toBe(true)
+    }
+
+    const albumId = data.albums?.[0]?.id
+    if (albumId) {
+      const al = await request.get(`/api/album/${albumId}`)
+      expect(al.ok()).toBe(true)
+      const b = await al.json()
+      expect(b.data.album.id).toBe(String(albumId))
+      expect(Array.isArray(b.data.tracks)).toBe(true)
+    }
   })
 })

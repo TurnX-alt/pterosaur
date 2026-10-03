@@ -128,3 +128,70 @@ ol {
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================ 内容区转场（View Transitions） ============================ */
+/*
+ * 只让内容区（.app-content，见 app.css）参与快照：根元素置为 none，
+ * 否则侧栏 / 顶栏 / 播放条会随根快照一起交叉溶解。
+ */
+:root {
+  view-transition-name: none;
+}
+
+/*
+ * 快照容器持续到「淡出 + 淡入」两段都结束，避免旧快照被提前销毁导致闪断。
+ */
+::view-transition-group(app-content) {
+  animation-duration: calc(var(--dur-page-out) + var(--dur-page-in));
+}
+
+::view-transition-old(app-content) {
+  /* 旧内容：ease-in 加速淡出，结束时 opacity 归零 */
+  animation-name: vt-content-out;
+  animation-duration: var(--dur-page-out);
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
+  animation-fill-mode: both;
+}
+
+::view-transition-new(app-content) {
+  /*
+   * 新内容：延迟「旧内容淡出时长」后才开始，且在延迟期间靠 backwards 填充保持
+   * from 状态（opacity: 0）——确保旧内容完全消失后才开始渲染，杜绝两页重叠。
+   */
+  animation-name: vt-content-in;
+  animation-duration: var(--dur-page-in);
+  animation-timing-function: var(--ease-page);
+  animation-delay: var(--dur-page-out);
+  animation-fill-mode: both;
+}
+
+@keyframes vt-content-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes vt-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 减少动效：::view-transition-* 伪元素不被上面的 * 规则匹配，需显式关闭 */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

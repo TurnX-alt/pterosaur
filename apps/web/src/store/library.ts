@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { Track, Playlist } from '@pterosaur/shared/types'
+import type { Track, Playlist, Album } from '@pterosaur/shared/types'
 
 /** 用户自建歌单（本地存储，不含曲目正文，仅存曲目引用）。 */
 export interface LocalPlaylist {
@@ -21,6 +21,8 @@ interface LibraryState {
   playlists: LocalPlaylist[]
   /** 收藏的网易云歌单引用。 */
   savedPlaylists: Playlist[]
+  /** 收藏的网易云专辑引用。 */
+  savedAlbums: Album[]
 }
 
 interface LibraryActions {
@@ -34,6 +36,7 @@ interface LibraryActions {
   addToPlaylist: (playlistId: string, track: Track) => void
   removeFromPlaylist: (playlistId: string, trackId: string) => void
   toggleSavePlaylist: (playlist: Playlist) => void
+  toggleSaveAlbum: (album: Album) => void
 }
 
 export type LibraryStore = LibraryState & LibraryActions
@@ -51,6 +54,7 @@ export const useLibrary = create<LibraryStore>()(
       recent: [],
       playlists: [],
       savedPlaylists: [],
+      savedAlbums: [],
 
       toggleFavorite: (track) =>
         set((s) => {
@@ -106,6 +110,14 @@ export const useLibrary = create<LibraryStore>()(
             savedPlaylists: exists
               ? s.savedPlaylists.filter((p) => p.id !== playlist.id)
               : [playlist, ...s.savedPlaylists],
+          }
+        }),
+
+      toggleSaveAlbum: (album) =>
+        set((s) => {
+          const exists = s.savedAlbums.some((a) => a.id === album.id)
+          return {
+            savedAlbums: exists ? s.savedAlbums.filter((a) => a.id !== album.id) : [album, ...s.savedAlbums],
           }
         }),
     }),

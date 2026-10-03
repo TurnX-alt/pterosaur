@@ -16,16 +16,24 @@
   max-width: 90vw;
   display: flex;
   flex-direction: column;
-  background: var(--bg-elevated);
-  border-left: 1px solid var(--separator);
-  box-shadow: var(--shadow-lg);
+  /* 毛玻璃：与移动端左侧边栏抽屉一致。
+     -webkit- 在前、标准属性在后：构建期 CSS 压缩会合并这对同义声明并保留最后一条，
+     故把 Firefox 需要的标准属性放在最后，保证 Chromium 与 Firefox 都有毛玻璃。 */
+  background: var(--glass-sidebar);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
+  /* 关闭态用全透明阴影：面板虽在屏外，实心投影仍会漏进窗口右缘 */
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
   transform: translateX(100%);
-  transition: transform var(--dur-slow) var(--ease);
+  transition:
+    transform var(--dur-slow) var(--ease),
+    box-shadow var(--dur-slow) var(--ease);
   pointer-events: none;
 }
 
 .queue-panel--open {
   transform: translateX(0);
+  box-shadow: var(--shadow-lg);
   pointer-events: auto;
 }
 
@@ -44,18 +52,11 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 16px 12px;
-  border-bottom: 1px solid var(--separator);
 }
 
 .queue-panel__head h2 {
   font-size: 17px;
   font-weight: 700;
-}
-
-.queue-panel__head-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .queue-panel__clear {

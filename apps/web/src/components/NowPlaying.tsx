@@ -21,13 +21,20 @@ import { Slider } from './Slider.js'
 import { PLAY_MODE_META } from './playMode.js'
 import './NowPlaying.css'
 
+interface NowPlayingProps {
+  /** 是否处于展开态（退出动画期间为 false）。 */
+  open: boolean
+  /** 是否正在播放退出动画。 */
+  exiting: boolean
+}
+
 /**
  * 全屏播放页（Apple Music「正在播放」）。
  *
  * 左侧封面（带动态模糊背景），右侧上部同步歌词、下部播放控制。
- * 由 store.expanded 控制显隐，Esc 关闭。
+ * 常驻挂载，由 `open`/`exiting` 驱动进入 / 退出动画；Esc 关闭。
  */
-export function NowPlaying() {
+export function NowPlaying({ open, exiting }: NowPlayingProps) {
   const current = usePlayer((s) => s.current)
   const isPlaying = usePlayer((s) => s.isPlaying)
   const position = usePlayer((s) => s.position)
@@ -92,7 +99,17 @@ export function NowPlaying() {
     if (!el || activeIndex < 0) return
     const line = el.querySelector<HTMLElement>(`[data-idx="${activeIndex}"]`)
     if (!line) return
-    // 以容器可视区为基准计算偏移，避免 offsetTop 受定位祖先影响
+
+    // 首行 / 末行也要能居中：滚动范围被钳制在 [0, scrollHeight - clientHeight]，
+    // 贴边的行无法被滚到中线。给容器补上 (可视高 - 行高)/2 的上下内边距，
+    // 使首行在 scrollTop=0、末行在 scrollTop 最大值时正好居中
+    // （clientHeight 由布局高度决定，不随内边距变化，故该值稳定）。
+    const pad = Math.max(0, (el.clientHeight - line.clientHeight) / 2)
+    el.style.paddingTop = `${pad}px`
+    el.style.paddingBottom = `${pad}px`
+
+    // 内边距生效后重新测量（读取布局触发回流），再以容器可视区为基准计算偏移，
+    // 避免 offsetTop 受定位祖先影响。
     const elRect = el.getBoundingClientRect()
     const lineRect = line.getBoundingClientRect()
     const delta = lineRect.top - elRect.top - (el.clientHeight - line.clientHeight) / 2
@@ -106,7 +123,13 @@ export function NowPlaying() {
   if (!current) return null
 
   return (
-    <div className="nowplaying" role="dialog" aria-modal="true" aria-label="正在播放">
+    <div
+      className={`nowplaying${exiting ? ' nowplaying--exit' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label="正在播放"
+      aria-hidden={!open}
+    >
       {/* 动态模糊背景 */}
       <div className="nowplaying__bg" style={{ backgroundImage: `url(${current.cover})` }} aria-hidden />
       <div className="nowplaying__scrim" onClick={() => setExpanded(false)} aria-hidden />

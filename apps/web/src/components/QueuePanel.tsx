@@ -23,16 +23,11 @@ export function QueuePanel() {
       <aside className={`queue-panel${open ? ' queue-panel--open' : ''}`} aria-hidden={!open} aria-label="播放队列">
         <div className="queue-panel__head">
           <h2>播放队列</h2>
-          <div className="queue-panel__head-actions">
-            {queue.length > 0 && (
-              <button type="button" className="queue-panel__clear" onClick={clearQueue}>
-                <Trash2 size={14} /> 清空
-              </button>
-            )}
-            <IconButton label="关闭队列" size="sm" onClick={() => setOpen(false)}>
-              <X size={18} />
-            </IconButton>
-          </div>
+          {queue.length > 0 && (
+            <button type="button" className="queue-panel__clear" onClick={clearQueue}>
+              <Trash2 size={14} /> 清空
+            </button>
+          )}
         </div>
 
         <div className="queue-panel__count">{queue.length} 首曲目</div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   Search,
   ChevronLeft,
@@ -11,6 +11,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme.js";
+import { useViewNavigate } from "../hooks/useViewNavigate.js";
 import { useAuth } from "../store/auth.js";
 import { useSidebarDrawer } from "../store/ui.js";
 import { Cover } from "./Cover.js";
@@ -26,7 +27,7 @@ interface TopbarProps {
  * 采用半透明毛玻璃 + sticky，滚动时内容从其下方穿过。
  */
 export function Topbar({ searchRef }: TopbarProps) {
-  const navigate = useNavigate();
+  const navigate = useViewNavigate();
   const [params] = useSearchParams();
   const [keyword, setKeyword] = useState(params.get("q") ?? "");
   const mode = useTheme((s) => s.mode);
@@ -153,9 +154,7 @@ export function Topbar({ searchRef }: TopbarProps) {
                   <Cover src={status.avatarUrl} alt="" rounded size={36} />
                   <div>
                     <div className="topbar__menu-name">{status.nickname}</div>
-                    {status.vip && (
-                      <div className="topbar__menu-vip">VIP 会员</div>
-                    )}
+                    {status.vip && <div className="topbar__menu-plan">Pterosaur+</div>}
                   </div>
                 </div>
                 <button

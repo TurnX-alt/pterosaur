@@ -80,3 +80,50 @@
 - 为什么选这个：`commit-tree` 能逐字控制 message 与四个时间戳（author date / commit date 各自保留），比重放 patch 更精确；bundle 备份保证可回退。
 - 后果：三条历史提交的 SHA 全部改变（tree 内容逐字节不变，已校验）；本地历史与 `origin` 分叉，推送需 `--force-with-lease`（尚未推送，留待用户决定）。
 - 何时重新审视：不涉及。若需恢复原历史，从 bundle 重新 clone 即可。
+
+## ADR-007：搜索分为歌曲 / 艺人 / 专辑 / 歌单四类，并新增艺人页、专辑页
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：原搜索只返回单曲（`cloudsearch type=1`）。需求要把结果分为四类 tab；同时歌单内的艺人名 / 专辑名要能点击跳转到详情页——而原 `Track` 模型只有艺人名与专辑名的字符串，没有 id，也**没有**艺人页 / 专辑页。
+- 考虑过的方案：① 前端对 `cloudsearch` 做四次调用；② 后端合并为一个 `/api/search/all` 端点；③ 只做歌曲 + 前端过滤（无法得到艺人/专辑实体）。艺人/专辑详情：复用 `artists`（档案 + 热门单曲）与 `artist_album`、`album`（档案 + 曲目）。
+- 决策：后端新增 `/api/search/all`（内部 `Promise.all` 四次 `cloudsearch`，类型码 1/10/100/1000）、`/api/artist/:id`、`/api/album/:id`；`Track` **增量**新增 `artistRefs?: {id,name}[]` 与 `albumId?: string`，并新增共享 `Artist` / `Album` / `SearchResults`。前端新增艺人页 / 专辑页与曲目行内可点击链接。
+- 为什么选这个：`cloudsearch` 单次请求只返回一种类型，并行四次是最直接的实现；把四次放后端可让前端一次请求拿到全部，切 tab 瞬时；`Track` 只做**增量**字段扩展，既有展示逻辑（`artist` / `album` 字符串）与持久化数据不受影响，缺失 id 的旧数据（收藏 / 最近 / 队列）自动降级为纯文本。
+- 为什么不选其他：方案③ 拿不到艺人 / 专辑实体；把四次调用放前端会让四个组件的加载态各自为政，且要处理并发。
+- 后果：每次搜索产生 4 个上游请求（艺人 / 专辑 / 歌单限额较小）；`useAsync` 增加可选 `cacheKey`（模块级内存缓存，命中即同步返回），使切换歌单 / 专辑时免于加载态、转场更顺滑。
+- 何时重新审视：若网易云提供一次返回多类型的搜索接口。
+
+## ADR-008：内容区转场自实现 View Transition，沉浸播放页用 presence + CSS 动画
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：需求要求主内容区切换（如切换歌单）与进入 / 退出沉浸播放页达到 Apple Music / iOS 级观感。最初设想用 react-router v7 内置的 `viewTransition` 选项。
+- 考虑过的方案：① RR7 内置 `viewTransition: true` / `<Link viewTransition>`；② 迁移到数据路由（`createBrowserRouter` + `RouterProvider`）后使用内置能力；③ 自实现 `document.startViewTransition`；④ 引入动画库（framer-motion）。
+- 决策：②被排除后采用③——新增 `lib/viewTransition.ts` 的 `startRouteTransition(update)`：在支持该 API、未命中 `prefers-reduced-motion`、且无浮层打开时，`startViewTransition(() => { flushSync(update); resetContentScroll() })`；CSS 只给 `.app-content` 一个 `view-transition-name` 并置 `:root { view-transition-name: none }`，使**只有内容区**做交叉溶解（侧栏 / 顶栏 / 播放条静止）。导航统一走 `hooks/useViewNavigate` 与 `components/AppLink`。沉浸播放页改为**常驻挂载** + `hooks/usePresence`，用 CSS `np-enter` / `np-exit` 做上推进入、下滑退出。
+- 为什么选这个：本项目用的是**声明式 `<BrowserRouter>`**，经核验 RR7 源码，该模式下 `useNavigate` 走 `useNavigateUnstable`，其 `navigator.push(path, state, options)` 会**忽略 `options`**，`startViewTransition` 只存在于 `RouterProvider` 路径——即内置 `viewTransition` 在本项目中是空操作（无转场、无告警）。自实现可绕开这一限制，且能精确控制「只动内容区」「浮层打开时跳过」等条件。
+- 为什么不选其他：方案① 无效；方案② 改动面更大且每个调用点仍需逐个加选项；方案④ 为一个转场引入重依赖不值得。
+- 后果 / 已知边界：
+  - 浏览器前进 / 后退（`popstate`）与 Topbar 的前进后退按钮不参与转场（无法被同步包裹）。
+  - Firefox 暂无原生支持 → 走 CSS 降级（`<html data-vt="off">` 时对 `.route-stage` 播放进场动画）。
+  - 有浮层（队列 / 沉浸页 / 弹窗）打开时跳过转场——`::view-transition` 伪树绘制在 top layer，否则会盖住这些 `position: fixed` 浮层。
+  - `view-transition-name` 必须文档内唯一——只给 `.app-content` 命名，绝不给列表行 / 卡片命名（否则整段转场被跳过）。
+- 何时重新审视：若把路由迁移到数据路由，可回退到内置 `viewTransition`。
+
+## ADR-009：CSS 压缩会合并 `backdrop-filter` 前缀对，标准属性须写在最后
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：给队列面板加毛玻璃时发现，构建产物中**未加前缀的 `backdrop-filter` 被丢弃**、只剩 `-webkit-backdrop-filter`（源码里两条都在、值相同）。Firefox 支持未加前缀的 `backdrop-filter` 而不支持 `-webkit-` 前缀，因此毛玻璃在 Firefox 会失效——侧栏 / 顶栏 / 播放条等既有毛玻璃其实早就受影响，只是不明显。
+- 决策：把所有毛玻璃规则统一改为 `-webkit-backdrop-filter` 在前、`backdrop-filter` 在后的顺序（`Sidebar` / `Topbar` / `PlayerBar` / `QueuePanel` / `NowPlaying` / 各弹窗）。这样压缩后两条都会保留。
+- 为什么选这个：实测交换顺序后构建产物同时保留两个属性，Chromium（两条都支持）、Firefox（标准属性）、旧 Safari（前缀属性）都能得到毛玻璃；无需引入额外的 `@supports` 或构建插件。
+- 后果：源码中该前缀对的顺序成为**有意义**的约束，后续新增毛玻璃样式需遵循。
+- 何时重新审视：若更换 CSS 压缩器 / 配置其 targets，使未加前缀属性不再被丢弃。
+
+## ADR-010：`normalizePlaylist` 等拼接触摸参数时兼容已有查询串
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：封面 / 头像需要追加网易云缩略参数 `?param=WxH`。部分歌单封面（`coverImgUrl`）本身已带查询串，用 `?` 直接拼接会得到第二个 `?`，破坏地址。此前只在歌单封面出现、不易察觉；搜索页新增歌单 tab 后变得更明显。
+- 决策：抽出 `thumb(url, param)` 辅助函数：地址已含 `?` 时用 `&` 连接，否则用 `?`。`normalizeTrack` / `normalizeArtist` / `normalizeAlbum` / `normalizePlaylist` 及 `playlistTracks` 统一走它。
+- 后果：封面地址不再出现重复 `?`；歌单封面在浏览器中可正常加载。
+- 何时重新审视：不涉及。

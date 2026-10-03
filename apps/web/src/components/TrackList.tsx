@@ -3,6 +3,7 @@ import type { Track } from '@pterosaur/shared/types'
 import { formatTime } from '@pterosaur/shared/types'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
 import { AddToPlaylistMenu } from './AddToPlaylistMenu.js'
@@ -25,6 +26,7 @@ interface TrackListProps {
  *
  * - 单击行：以该列表为队列播放；
  * - 播放中且为当前曲目：显示跳动音柱 + 高亮；
+ * - 行内艺人名 / 专辑名可点击，跳转到对应的艺人页 / 专辑页（缺 id 时降级为纯文本）；
  * - 行内提供喜欢、添加到歌单操作。
  */
 export function TrackList({ tracks, showHeader = true, showIndex = true, emptyText = '暂无曲目', className }: TrackListProps) {
@@ -36,6 +38,16 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
 
   const favorites = useLibrary((s) => s.favorites)
   const toggleFavorite = useLibrary((s) => s.toggleFavorite)
+  const navigate = useViewNavigate()
+
+  // 链接点击不应触发行播放：阻止冒泡 + 阻止键盘事件冒泡到行
+  const openEntity = (e: React.SyntheticEvent, to: string) => {
+    e.stopPropagation()
+    navigate(to)
+  }
+  const stopKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') e.stopPropagation()
+  }
 
   if (!tracks.length) {
     return (
@@ -90,7 +102,8 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
             onClick={() => handleRowPlay(i)}
             tabIndex={0}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleRowPlay(i)
+              // 仅在行本身获得焦点时响应键盘，避免行内链接触发播放
+              if (e.key === 'Enter' && e.target === e.currentTarget) handleRowPlay(i)
             }}
           >
             {showIndex && (
@@ -114,11 +127,42 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
               <Cover src={t.cover} alt={t.title} radius="sm" size={40} />
               <span className="col-title__text">
                 <span className="col-title__name ellipsis">{t.title}</span>
-                <span className="col-title__artist ellipsis">{t.artist}</span>
+                <span className="col-title__artist ellipsis">
+                  {t.artistRefs?.length ? (
+                    t.artistRefs.map((a, ai) => (
+                      <span key={`${a.id}-${ai}`}>
+                        {ai > 0 && ' / '}
+                        <button
+                          type="button"
+                          className="track-link"
+                          onClick={(e) => openEntity(e, `/artist/${a.id}`)}
+                          onKeyDown={stopKey}
+                        >
+                          {a.name}
+                        </button>
+                      </span>
+                    ))
+                  ) : (
+                    t.artist
+                  )}
+                </span>
               </span>
             </span>
 
-            <span className="col-album ellipsis">{t.album}</span>
+            <span className="col-album ellipsis">
+              {t.albumId && t.album ? (
+                <button
+                  type="button"
+                  className="track-link"
+                  onClick={(e) => openEntity(e, `/album/${t.albumId}`)}
+                  onKeyDown={stopKey}
+                >
+                  {t.album}
+                </button>
+              ) : (
+                t.album
+              )}
+            </span>
 
             <span className="col-duration">{t.duration ? formatTime(t.duration) : '--:--'}</span>
 

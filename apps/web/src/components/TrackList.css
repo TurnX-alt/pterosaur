@@ -185,6 +185,30 @@
   color: var(--text-secondary);
 }
 
+/* 行内实体链接（艺人 / 专辑）：点击跳转详情页 */
+.track-link {
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.track-link:hover,
+.track-link:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.track-link:focus-visible {
+  outline: none;
+}
+
+.track-row--current .track-link:hover {
+  color: var(--accent-hover);
+}
+
 .col-duration {
   font-size: 13px;
   color: var(--text-secondary);

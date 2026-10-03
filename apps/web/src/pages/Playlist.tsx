@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Play, Shuffle, Trash2, Heart } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { confirmDialog } from '../store/ui.js'
@@ -29,7 +30,7 @@ function fmtCount(n?: number): string {
  */
 export function PlaylistPage() {
   const { id = '' } = useParams()
-  const navigate = useNavigate()
+  const navigate = useViewNavigate()
   const isLocal = id.startsWith('pl-')
 
   const playlists = useLibrary((s) => s.playlists)
@@ -48,11 +49,12 @@ export function PlaylistPage() {
   // 本地歌单：直接从 store 取
   const local = useMemo(() => (isLocal ? playlists.find((p) => p.id === id) : undefined), [isLocal, playlists, id])
 
-  // 远程歌单：通过 API 拉取
+  // 远程歌单：通过 API 拉取（带缓存键，参数切换时命中缓存可免于加载态，转场更顺滑）
   const remote = useAsync<{ playlist: Playlist; tracks: Track[] }>(
     () => (isLocal ? Promise.resolve({ playlist: { id, name: '', cover: '' }, tracks: [] }) : api.playlist(id)),
     [id, isLocal],
     null,
+    isLocal ? undefined : `playlist:${id}`,
   )
 
   const playlist = isLocal

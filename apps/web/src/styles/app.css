@@ -40,6 +40,8 @@
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  /* 内容区是唯一的 View Transition 快照目标（侧栏/顶栏/播放条保持静止） */
+  view-transition-name: app-content;
 }
 
 /* 内容区顶部留白，避免被半透明 Topbar 遮挡（Topbar 在 main 内 sticky） */
@@ -146,4 +148,26 @@
 
 .error-retry:hover {
   background: var(--accent-hover);
+}
+
+/* ============================ 内容区转场 ============================ */
+/*
+ * 支持 View Transitions 的浏览器：由 `.app-content` 的快照做交叉溶解
+ * （见 global.css 中的 ::view-transition-* 规则）。
+ * 不支持的浏览器（如 Firefox）：App 在 <html> 写入 data-vt="off"，
+ * 改用下面这段「进场」动画，保证参数切换 / 路由切换仍有动效。
+ */
+:root[data-vt='off'] .route-stage {
+  animation: content-enter var(--dur-page-in) var(--ease-page) both;
+}
+
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

@@ -1,0 +1,112 @@
+import { useParams } from 'react-router-dom'
+import { Play, Shuffle, Heart } from 'lucide-react'
+import { api } from '../api/client.js'
+import { useAsync } from '../hooks/useAsync.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
+import { usePlayer } from '../store/player.js'
+import { useLibrary } from '../store/library.js'
+import type { Album, Track } from '@pterosaur/shared/types'
+import { TrackList } from '../components/TrackList.js'
+import { Cover } from '../components/Cover.js'
+import { IconButton } from '../components/IconButton.js'
+import { Loading, ErrorState } from '../components/States.js'
+
+interface AlbumDetail {
+  album: Album
+  tracks: Track[]
+}
+
+/**
+ * 专辑详情页：封面 + 档案（含可点击的艺人）+ 曲目列表。
+ */
+export function AlbumPage() {
+  const { id = '' } = useParams()
+  const navigate = useViewNavigate()
+  const playTracks = usePlayer((s) => s.playTracks)
+  const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const savedAlbums = useLibrary((s) => s.savedAlbums)
+  const toggleSaveAlbum = useLibrary((s) => s.toggleSaveAlbum)
+  const isSaved = savedAlbums.some((a) => a.id === id)
+
+  const { data, loading, error, reload } = useAsync<AlbumDetail>(
+    () => api.album(id),
+    [id],
+    null,
+    id ? `album:${id}` : undefined,
+  )
+
+  const album = data?.album
+  const tracks = data?.tracks ?? []
+
+  const handlePlay = (shuffle = false) => {
+    if (!tracks.length) return
+    if (shuffle && !usePlayer.getState().shuffle) toggleShuffle()
+    playTracks(tracks, shuffle ? Math.floor(Math.random() * tracks.length) : 0)
+  }
+
+  if (loading && !album) {
+    return (
+      <div className="detail">
+        <Loading text="加载专辑…" />
+      </div>
+    )
+  }
+
+  if (error || !album) {
+    return (
+      <div className="detail">
+        <ErrorState message={error ?? '专辑不存在'} onRetry={reload} />
+      </div>
+    )
+  }
+
+  const meta = [album.year ? String(album.year) : '', tracks.length ? `${tracks.length} 首` : ''].filter(Boolean).join(' · ')
+
+  return (
+    <div className="detail" aria-busy={loading}>
+      <header className="detail__hero">
+        <Cover src={album.cover} alt={album.name} radius="lg" className="detail__cover" />
+        <div className="detail__info">
+          <span className="detail__type">专辑</span>
+          <h1 className="detail__name">{album.name}</h1>
+          <p className="detail__meta">
+            {album.artistId ? (
+              <button
+                type="button"
+                className="detail__artist-link"
+                onClick={() => navigate(`/artist/${album.artistId}`)}
+              >
+                {album.artist}
+              </button>
+            ) : (
+              <span>{album.artist}</span>
+            )}
+            {meta && <span> · {meta}</span>}
+          </p>
+        </div>
+      </header>
+
+      <div className="detail__actions">
+        <button type="button" className="detail__play" onClick={() => handlePlay(false)} disabled={!tracks.length}>
+          <Play size={18} fill="currentColor" strokeWidth={0} />
+          播放
+        </button>
+        <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!tracks.length}>
+          <Shuffle size={20} strokeWidth={2} />
+        </IconButton>
+        <IconButton
+          label={isSaved ? '取消收藏' : '收藏到资料库'}
+          size="lg"
+          active={isSaved}
+          onClick={() => toggleSaveAlbum(album)}
+        >
+          <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+        </IconButton>
+      </div>
+
+      <div className="detail__list">
+        <TrackList tracks={tracks} emptyText="这张专辑还没有曲目" />
+      </div>
+    </div>
+  )
+}

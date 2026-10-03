@@ -8,8 +8,8 @@
   height: var(--topbar-height);
   padding: 0 24px;
   background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
   border-bottom: 1px solid var(--separator);
 }
 
@@ -172,7 +172,7 @@
   font-weight: 600;
 }
 
-.topbar__menu-vip {
+.topbar__menu-plan {
   font-size: 11px;
   color: var(--accent);
   font-weight: 600;
@@ -240,5 +240,10 @@
 
   .topbar__login span {
     display: none;
+  }
+
+  /* 输入框字号 ≥16px：否则 iOS 聚焦输入时会把整页放大 */
+  .topbar__search input {
+    font-size: 16px;
   }
 }

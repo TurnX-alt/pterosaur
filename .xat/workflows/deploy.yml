@@ -1,5 +1,9 @@
 requires: |
-  nginx.has('music.xrl.im -> localhost:8788').uses('acme.sh')
+  if server.provider == 'aliyun'
+    return nginx.has('music.xrl.im -> localhost:8788').uses(
+      acme_sh.uses(cloudflare.dns_01)
+    )
+  return nothing
 
 steps:
   - name: Check mem

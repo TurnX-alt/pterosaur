@@ -131,7 +131,7 @@ export function LoginModal() {
           </IconButton>
         </header>
 
-        <p className="login-modal__hint">登录后即可播放 VIP 曲目。会话仅保存在本机浏览器。</p>
+        <p className="login-modal__hint">登录后即可不受限地播放曲目。会话仅保存在本机浏览器。</p>
 
         <div className="login-modal__tabs" role="tablist">
           <button

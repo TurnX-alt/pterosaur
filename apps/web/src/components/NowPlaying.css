@@ -3,15 +3,60 @@
   inset: 0;
   z-index: 100;
   display: flex;
-  animation: np-fade var(--dur-slow) var(--ease);
+  /* 进场：自底部滑入 + 渐显（iOS 风格「正在播放」上推） */
+  animation: np-enter var(--dur-slow) var(--ease-ios) both;
+  will-change: transform, opacity;
 }
 
-@keyframes np-fade {
+@keyframes np-enter {
   from {
     opacity: 0;
+    transform: translateY(100%);
   }
   to {
     opacity: 1;
+    transform: none;
+  }
+}
+
+/* 退场：向下滑出 + 渐隐；期间不接收指针事件 */
+.nowplaying--exit {
+  animation: np-exit var(--dur-slow) var(--ease-ios) both;
+  pointer-events: none;
+}
+
+@keyframes np-exit {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+/* 内部元素错峰上浮，增强层次感 */
+.nowplaying__inner > * {
+  animation: np-rise var(--dur-slow) var(--ease-ios) both;
+}
+
+.nowplaying__header {
+  animation-delay: 40ms;
+}
+
+.nowplaying__body {
+  animation-delay: 90ms;
+}
+
+@keyframes np-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -30,8 +75,8 @@
   position: absolute;
   inset: 0;
   background: var(--glass-overlay);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   z-index: 1;
 }
 
@@ -178,7 +223,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 0;
+  /* 上下内边距由 JS 按当前行高动态设置，使首/末行也能居中 */
+  padding: 0;
   scroll-behavior: smooth;
   mask-image: linear-gradient(
     to bottom,

@@ -18,6 +18,7 @@
   padding: 10px;
   border-radius: var(--radius-lg);
   text-align: left;
+  cursor: pointer;
   transition: background-color var(--dur) var(--ease);
 }
 
@@ -42,6 +43,20 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
 
+/* 艺人卡片：圆形头像 */
+.card__art--circle {
+  border-radius: 50%;
+}
+
+.card__title--center,
+.card__subtitle--center {
+  text-align: center;
+}
+
+.card__title--center {
+  display: block;
+}
+
 /* 播放按钮：悬浮时浮现 */
 .card__play {
   position: absolute;
@@ -64,14 +79,29 @@
     background-color var(--dur-fast) var(--ease);
 }
 
-.card:hover .card__play {
+.card:hover .card__play,
+.card__play:focus-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.card__play:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 .card__play:hover {
   background: var(--accent-hover);
   transform: scale(1.06);
+}
+
+/* 空白集合：按钮仍随 hover 出现，但呈禁用态（无内容可播） */
+.card__play:disabled {
+  background: var(--bg-elevated-2);
+  color: var(--text-tertiary);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: translateY(0);
 }
 
 .card__body {

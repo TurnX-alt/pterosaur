@@ -1,8 +1,11 @@
 import type {
+  Album,
   ApiResult,
+  Artist,
   LoginStatus,
   Lyric,
   Playlist,
+  SearchResults,
   Track,
 } from '@pterosaur/shared/types'
 import { API_BASE } from '@pterosaur/shared/types'
@@ -47,6 +50,16 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 
 export const api = {
   search: (keywords: string, limit = 30) => get<Track[]>(`${API_BASE}/search`, { keywords, limit }),
+
+  /** 多类型搜索：一次并行返回歌曲 / 艺人 / 专辑 / 歌单。 */
+  searchAll: (keywords: string, limit = 20) => get<SearchResults>(`${API_BASE}/search/all`, { keywords, limit }),
+
+  /** 艺人详情：档案 + 热门单曲 + 专辑列表。 */
+  artist: (id: string) =>
+    get<{ artist: Artist; tracks: Track[]; albums: Album[] }>(`${API_BASE}/artist/${encodeURIComponent(id)}`),
+
+  /** 专辑详情：档案 + 曲目。 */
+  album: (id: string) => get<{ album: Album; tracks: Track[] }>(`${API_BASE}/album/${encodeURIComponent(id)}`),
 
   recommend: (limit = 12) => get<Playlist[]>(`${API_BASE}/discover/recommend`, { limit }),
 
