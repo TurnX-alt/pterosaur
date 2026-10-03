@@ -121,10 +121,14 @@ describe('usePlayer.next / prev', () => {
     expect(usePlayer.getState().index).toBe(0)
   })
 
-  it('repeat=off 时末尾 next 停在末尾', () => {
+  it('repeat=off 时末尾 next 停止并标记已结束', () => {
     usePlayer.setState({ index: 4, current: SONGS[4], repeat: 'off' })
     usePlayer.getState().next()
-    expect(usePlayer.getState().index).toBe(4)
+    const s = usePlayer.getState()
+    expect(s.index).toBe(4)
+    expect(s.isPlaying).toBe(false)
+    expect(s.position).toBe(0)
+    expect(s.playbackEnded).toBe(true)
   })
 
   it('prev 回到上一首', () => {
@@ -341,12 +345,24 @@ describe('usePlayer toggle', () => {
     expect(s.isPlaying).toBe(true)
   })
 
-  it('有当前曲目时 toggle 切换播放/暂停', () => {
+  it('playbackEnded 时 toggle 从第一首重新开始', () => {
+    usePlayer.getState().playTracks(SONGS, 4)
+    usePlayer.setState({ isPlaying: false, playbackEnded: true })
+    usePlayer.getState().toggle()
+    const s = usePlayer.getState()
+    expect(s.index).toBe(0)
+    expect(s.current?.id).toBe('1')
+    expect(s.isPlaying).toBe(true)
+    expect(s.playbackEnded).toBe(false)
+  })
+
+  it('playbackEnded 仅影响顺序播放结束态，手动暂停不受影响', () => {
     usePlayer.getState().playTracks(SONGS, 0)
-    expect(usePlayer.getState().isPlaying).toBe(true)
-    usePlayer.getState().toggle()
+    usePlayer.getState().toggle() // pause
     expect(usePlayer.getState().isPlaying).toBe(false)
+    // 再 toggle 应该恢复播放，而不是跳回第一首
     usePlayer.getState().toggle()
     expect(usePlayer.getState().isPlaying).toBe(true)
+    expect(usePlayer.getState().index).toBe(0)
   })
 })

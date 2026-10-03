@@ -178,6 +178,10 @@ export function Sidebar() {
             ))}
           </nav>
         )}
+
+        {!hasPlaylists && (
+          <div className="sidebar__empty">空空如也</div>
+        )}
       </aside>
     </>
   );

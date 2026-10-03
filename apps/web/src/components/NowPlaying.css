@@ -261,7 +261,7 @@
 .lyric-line {
   padding: 7px 0;
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.45;
   color: var(--text-tertiary);
   cursor: pointer;
@@ -283,6 +283,7 @@
 
 .lyric-line--active {
   color: var(--text);
+  font-weight: 600;
   transform: scale(1.04);
   opacity: 1;
 }

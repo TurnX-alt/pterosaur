@@ -92,29 +92,30 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
     return idx
   }, [lyric, position])
 
-  // 自动滚动到当前行（居中）
+  // 自动滚动到当前行（居中）；首句未到时也保证第一行居中而非挤在顶部
   const listRef = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     const el = listRef.current
-    if (!el || activeIndex < 0) return
-    const line = el.querySelector<HTMLElement>(`[data-idx="${activeIndex}"]`)
+    if (!el || !lyric?.timed || !lyric.lines.length) return
+    // activeIndex 为 -1 表示播放位置尚未到达第一句：用第一行作为居中参照
+    const targetIdx = activeIndex < 0 ? 0 : activeIndex
+    const line = el.querySelector<HTMLElement>(`[data-idx="${targetIdx}"]`)
     if (!line) return
 
-    // 首行 / 末行也要能居中：滚动范围被钳制在 [0, scrollHeight - clientHeight]，
-    // 贴边的行无法被滚到中线。给容器补上 (可视高 - 行高)/2 的上下内边距，
-    // 使首行在 scrollTop=0、末行在 scrollTop 最大值时正好居中
-    // （clientHeight 由布局高度决定，不随内边距变化，故该值稳定）。
     const pad = Math.max(0, (el.clientHeight - line.clientHeight) / 2)
     el.style.paddingTop = `${pad}px`
     el.style.paddingBottom = `${pad}px`
 
-    // 内边距生效后重新测量（读取布局触发回流），再以容器可视区为基准计算偏移，
-    // 避免 offsetTop 受定位祖先影响。
-    const elRect = el.getBoundingClientRect()
-    const lineRect = line.getBoundingClientRect()
-    const delta = lineRect.top - elRect.top - (el.clientHeight - line.clientHeight) / 2
-    el.scrollTo({ top: el.scrollTop + delta, behavior: 'smooth' })
-  }, [activeIndex])
+    if (activeIndex < 0) {
+      // 第一句还没到时静默滚到顶部——padding 已使第一行居中
+      el.scrollTo({ top: 0, behavior: 'instant' })
+    } else {
+      const elRect = el.getBoundingClientRect()
+      const lineRect = line.getBoundingClientRect()
+      const delta = lineRect.top - elRect.top - (el.clientHeight - line.clientHeight) / 2
+      el.scrollTo({ top: el.scrollTop + delta, behavior: 'smooth' })
+    }
+  }, [activeIndex, lyric])
 
   const mode = currentPlayMode(shuffle, repeat)
   const modeMeta = PLAY_MODE_META[mode]

@@ -63,6 +63,8 @@ interface PlaybackState {
   playError: string | null
   /** 是否展开全屏播放页。 */
   expanded: boolean
+  /** 顺序播放模式下最后一首自然结束标记（用于 toggle 区分「结束停止」和「手动暂停」）。 */
+  playbackEnded: boolean
 }
 
 interface PlaybackActions {
@@ -91,6 +93,7 @@ interface PlaybackActions {
   removeAt: (index: number) => void
   setExpanded: (v: boolean) => void
   setPlayError: (msg: string | null) => void
+  setPlaybackEnded: (v: boolean) => void
 }
 
 export type PlayerStore = PlaybackState & PlaybackActions
@@ -136,6 +139,7 @@ export const usePlayer = create<PlayerStore>()(
       shuffle: false,
       playError: null,
       expanded: false,
+      playbackEnded: false,
 
       playTracks: (tracks, startIndex = 0) => {
         if (!tracks.length) return
@@ -158,6 +162,7 @@ export const usePlayer = create<PlayerStore>()(
           position: 0,
           duration: 0,
           playError: null,
+          playbackEnded: false,
         })
       },
 
@@ -189,10 +194,14 @@ export const usePlayer = create<PlayerStore>()(
           nextIndex = index + 1
           if (nextIndex >= queue.length) {
             if (repeat === 'all') nextIndex = 0
-            else nextIndex = queue.length - 1
+            else {
+              // 顺序播放到尾 → 停止，标记已结束
+              set({ position: 0, isPlaying: false, playbackEnded: true })
+              return
+            }
           }
         }
-        set({ index: nextIndex, current: queue[nextIndex] ?? null, position: 0, isPlaying: true, playError: null })
+        set({ index: nextIndex, current: queue[nextIndex] ?? null, position: 0, isPlaying: true, playError: null, playbackEnded: false })
       },
 
       prev: () => {
@@ -210,18 +219,23 @@ export const usePlayer = create<PlayerStore>()(
           prevIndex = index - 1
           if (prevIndex < 0) prevIndex = queue.length - 1
         }
-        set({ index: prevIndex, current: queue[prevIndex] ?? null, position: 0, isPlaying: true, playError: null })
+        set({ index: prevIndex, current: queue[prevIndex] ?? null, position: 0, isPlaying: true, playError: null, playbackEnded: false })
       },
 
       playIndex: (index) => {
         const { queue } = get()
         if (index < 0 || index >= queue.length) return
-        set({ index, current: queue[index], position: 0, isPlaying: true, playError: null })
+        set({ index, current: queue[index], position: 0, isPlaying: true, playError: null, playbackEnded: false })
       },
 
       setPlaying: (v) => set({ isPlaying: v }),
       toggle: () => {
-        const { current, queue, index } = get()
+        const { current, queue, index, isPlaying, playbackEnded } = get()
+        // 顺序播放自然结束后点击播放 → 从第一首重新开始
+        if (playbackEnded && !isPlaying && queue.length) {
+          set({ index: 0, current: queue[0], position: 0, isPlaying: true, playbackEnded: false, playError: null })
+          return
+        }
         if (!current && queue.length) {
           set({ index: index < 0 ? 0 : index, current: queue[index < 0 ? 0 : index], isPlaying: true })
           return
@@ -299,6 +313,7 @@ export const usePlayer = create<PlayerStore>()(
       },
       setExpanded: (v) => set({ expanded: v }),
       setPlayError: (msg) => set({ playError: msg }),
+      setPlaybackEnded: (v) => set({ playbackEnded: v }),
     }),
     {
       name: 'pterosaur-player',
@@ -318,6 +333,7 @@ export const usePlayer = create<PlayerStore>()(
         duration: 0,
         playError: null,
         expanded: false,
+        playbackEnded: false,
       }),
     },
   ),

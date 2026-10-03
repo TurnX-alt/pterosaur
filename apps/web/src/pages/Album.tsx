@@ -1,15 +1,18 @@
 import { useParams } from 'react-router-dom'
-import { Play, Shuffle, Heart } from 'lucide-react'
+import { Play, Shuffle, Heart, DiscAlbum } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
+import { confirmDialog } from '../store/ui.js'
 import type { Album, Track } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
 import { Loading, ErrorState } from '../components/States.js'
+import { downloadPlaylist } from '../lib/downloadPlaylist.js'
+import { useState } from 'react'
 
 interface AlbumDetail {
   album: Album
@@ -28,6 +31,9 @@ export function AlbumPage() {
   const toggleSaveAlbum = useLibrary((s) => s.toggleSaveAlbum)
   const isSaved = savedAlbums.some((a) => a.id === id)
 
+  const [downloading, setDownloading] = useState(false)
+  const [downloadLabel, setDownloadLabel] = useState<string | null>(null)
+
   const { data, loading, error, reload } = useAsync<AlbumDetail>(
     () => api.album(id),
     [id],
@@ -42,6 +48,28 @@ export function AlbumPage() {
     if (!tracks.length) return
     if (shuffle && !usePlayer.getState().shuffle) toggleShuffle()
     playTracks(tracks, shuffle ? Math.floor(Math.random() * tracks.length) : 0)
+  }
+
+  const handleDownloadPlaylist = async () => {
+    if (!album || !tracks.length || downloading) return
+    const dur = tracks.reduce((sum, t) => sum + (t.duration || 0), 0)
+    const durStr = dur > 0 ? `，总时长约 ${Math.round(dur / 60)} 分钟` : ''
+    const ok = await confirmDialog({
+      title: '翻录专辑？',
+      message: `将打包下载 ${tracks.length} 首曲目${durStr}。`,
+      confirmText: '开始翻录',
+    })
+    if (!ok) return
+    setDownloading(true)
+    setDownloadLabel('正在打包 0 / ' + tracks.length)
+    try {
+      await downloadPlaylist(tracks, `${album.name} - ${album.artist}`, (p) => {
+        setDownloadLabel(`正在打包 ${p.current} / ${p.total}`)
+      })
+    } finally {
+      setDownloading(false)
+      setDownloadLabel(null)
+    }
   }
 
   if (loading && !album) {
@@ -101,6 +129,14 @@ export function AlbumPage() {
           onClick={() => toggleSaveAlbum(album)}
         >
           <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+        </IconButton>
+        <IconButton
+          label={downloadLabel ?? '翻录'}
+          size="lg"
+          onClick={handleDownloadPlaylist}
+          disabled={!tracks.length || downloading}
+        >
+          <DiscAlbum size={19} strokeWidth={2} />
         </IconButton>
       </div>
 

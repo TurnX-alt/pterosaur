@@ -10,6 +10,7 @@ import {
   Heart,
   ListMusic,
   MoreHorizontal,
+  Disc3,
 } from "lucide-react";
 import { usePlayer, currentPlayMode } from "../store/player.js";
 import { useLibrary } from "../store/library.js";
@@ -100,7 +101,14 @@ export function PlayerBar() {
             </IconButton>
           </>
         ) : (
-          <div className="playerbar__empty">未在播放</div>
+          <div className="playerbar__empty">
+            <div className="playerbar__empty-cover">
+              <Disc3 size={28} strokeWidth={1.5} />
+            </div>
+            <div className="playerbar__meta">
+              <div className="playerbar__title">空空如也</div>
+            </div>
+          </div>
         )}
       </div>
 

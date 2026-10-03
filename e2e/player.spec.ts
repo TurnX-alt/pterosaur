@@ -25,6 +25,103 @@ async function audioState(page: Page) {
   })
 }
 
+// —— IndexedDB 辅助：library 已从 localStorage 迁到 IDB，种入/清理/等待都走 IDB ——
+
+const IDB_DB = 'pterosaur'
+const IDB_STORE = 'library'
+const LIBRARY_KEY = 'pterosaur-library'
+
+/** 种入 library 状态（等待事务完成，规避异步竞态）。 */
+async function seedLibrary(page: Page, state: Record<string, unknown>): Promise<void> {
+  await page.evaluate(
+    ({ db, store, key, value }) =>
+      new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open(db, 2)
+        req.onupgradeneeded = () => {
+          const d = req.result
+          if (!d.objectStoreNames.contains('library')) d.createObjectStore('library')
+          if (!d.objectStoreNames.contains('media')) d.createObjectStore('media')
+          if (!d.objectStoreNames.contains('mediaMeta')) {
+            const m = d.createObjectStore('mediaMeta', { keyPath: 'key' })
+            m.createIndex('lastAccess', 'lastAccess')
+          }
+        }
+        req.onsuccess = () => {
+          const d = req.result
+          const tx = d.transaction(store, 'readwrite')
+          tx.objectStore(store).put(value, key)
+          tx.oncomplete = () => {
+            d.close()
+            resolve()
+          }
+          tx.onerror = () => reject(tx.error)
+        }
+        req.onerror = () => reject(req.error)
+      }),
+    { db: IDB_DB, store: IDB_STORE, key: LIBRARY_KEY, value: { state, version: 0 } },
+  )
+}
+
+/** 清空 library 记录（保证空态）。 */
+async function clearLibrary(page: Page): Promise<void> {
+  await page.evaluate(
+    ({ db, store, key }) =>
+      new Promise<void>((resolve) => {
+        const req = indexedDB.open(db, 2)
+        req.onsuccess = () => {
+          const d = req.result
+          const tx = d.transaction(store, 'readwrite')
+          tx.objectStore(store).delete(key)
+          tx.oncomplete = () => {
+            d.close()
+            resolve()
+          }
+          tx.onerror = () => {
+            d.close()
+            resolve()
+          }
+        }
+        req.onerror = () => resolve()
+      }),
+    { db: IDB_DB, store: IDB_STORE, key: LIBRARY_KEY },
+  )
+}
+
+/** 轮询等待 library 的某个字段已落盘（异步 IDB 持久化，硬跳转/reload 前需确定性等待）。 */
+async function waitForLibraryPersisted(
+  page: Page,
+  field: 'favorites' | 'savedAlbums' = 'favorites',
+): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          ({ db, store, key, field }) =>
+            new Promise<number>((resolve) => {
+              const req = indexedDB.open(db, 2)
+              req.onsuccess = () => {
+                const d = req.result
+                const tx = d.transaction(store, 'readonly')
+                const g = tx.objectStore(store).get(key)
+                g.onsuccess = () => {
+                  d.close()
+                  const v = g.result as { state?: Record<string, unknown[]> } | undefined
+                  resolve(v?.state?.[field]?.length ?? 0)
+                }
+                g.onerror = () => {
+                  d.close()
+                  resolve(0)
+                }
+              }
+              req.onerror = () => resolve(0)
+            }),
+          { db: IDB_DB, store: IDB_STORE, key: LIBRARY_KEY, field },
+        ),
+      { timeout: 5000 },
+    )
+    .toBeGreaterThan(0)
+}
+
 test.describe('应用外壳', () => {
   test('首页加载并渲染侧栏、问候与推荐歌单', async ({ page }) => {
     await page.goto('/')
@@ -61,16 +158,8 @@ test.describe('应用外壳', () => {
   test('立即收听：点击快捷入口本体进入对应页面（而非播放）', async ({ page }) => {
     await page.goto('/')
     // 种入一条收藏与一条最近播放，确认「有内容」时点击本体也走导航而非播放
-    await page.evaluate(() => {
-      const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
-      localStorage.setItem(
-        'pterosaur-library',
-        JSON.stringify({
-          state: { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] },
-          version: 0,
-        }),
-      )
-    })
+    const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
+    await seedLibrary(page, { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] })
     await page.reload()
     await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
 
@@ -89,16 +178,8 @@ test.describe('应用外壳', () => {
 
   test('立即收听：快捷入口的播放按钮直接播放，不跳转', async ({ page }) => {
     await page.goto('/')
-    await page.evaluate(() => {
-      const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
-      localStorage.setItem(
-        'pterosaur-library',
-        JSON.stringify({
-          state: { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] },
-          version: 0,
-        }),
-      )
-    })
+    const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
+    await seedLibrary(page, { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] })
     await page.reload()
     await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
 
@@ -111,7 +192,7 @@ test.describe('应用外壳', () => {
 
   test('立即收听：集合为空时 hover 仍出现播放按钮（禁用态）', async ({ page }) => {
     await page.goto('/')
-    await page.evaluate(() => localStorage.removeItem('pterosaur-library'))
+    await clearLibrary(page)
     await page.reload()
     await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
 
@@ -328,13 +409,15 @@ test.describe('资料库与收藏', () => {
     const firstRow = page.locator('.track-row').first()
     await firstRow.hover()
     await firstRow.getByRole('button', { name: '喜欢' }).first().click()
+    // 持久化是异步的（IndexedDB）：硬跳转前先等写入落盘，避免与导航竞态
+    await waitForLibraryPersisted(page)
 
     // 进入收藏页
     await page.goto('/favorites')
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 8000 })
     await expect(page.locator('.track-row').first()).toContainText((firstTitle ?? '').trim())
 
-    // 刷新后仍在（localStorage 持久化）
+    // 刷新后仍在（IndexedDB 持久化）
     await page.reload()
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 8000 })
     await expect(page.locator('.track-row').first()).toContainText((firstTitle ?? '').trim())
@@ -343,8 +426,8 @@ test.describe('资料库与收藏', () => {
   test('空收藏时显示空状态', async ({ page, context }) => {
     await context.clearCookies()
     await page.goto('/favorites')
-    // 清空 localStorage 以确保空态（可能因上一用例留有数据）
-    await page.evaluate(() => localStorage.removeItem('pterosaur-library'))
+    // 清空 IndexedDB 中的 library 以确保空态（可能因上一用例留有数据）
+    await clearLibrary(page)
     await page.reload()
     await expect(page.getByText('还没有喜欢的音乐')).toBeVisible({ timeout: 8000 })
   })
@@ -363,6 +446,7 @@ test.describe('资料库与收藏', () => {
     // 收藏
     await page.getByRole('button', { name: '收藏到资料库' }).click()
     await expect(page.getByRole('button', { name: '取消收藏' })).toBeVisible()
+    await waitForLibraryPersisted(page, 'savedAlbums')
 
     // 唱片盒中出现该专辑
     await page.goto('/crate')
@@ -583,5 +667,97 @@ test.describe('后端 API 契约', () => {
       expect(b.data.album.id).toBe(String(albumId))
       expect(Array.isArray(b.data.tracks)).toBe(true)
     }
+  })
+})
+
+test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
+  test('播放后音频被缓存进 IndexedDB', async ({ page }) => {
+    await page.goto('/')
+    // 等 SW 就绪并 reload，确保页面自首次音频请求起即受 SW 控制
+    await page.evaluate(() => navigator.serviceWorker?.ready)
+    await page.reload()
+
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+
+    // 缓存发生在整文件下载完成时，故轮询 audioMeta 表直至出现记录
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            ({ db }) =>
+              new Promise<number>((resolve) => {
+                const req = indexedDB.open(db, 2)
+                req.onupgradeneeded = () => resolve(0)
+                req.onsuccess = () => {
+                  const d = req.result
+                  if (!d.objectStoreNames.contains('mediaMeta')) {
+                    d.close()
+                    resolve(0)
+                    return
+                  }
+                  const c = d.transaction('mediaMeta', 'readonly').objectStore('mediaMeta').count()
+                  c.onsuccess = () => {
+                    d.close()
+                    resolve(c.result)
+                  }
+                  c.onerror = () => {
+                    d.close()
+                    resolve(0)
+                  }
+                }
+                req.onerror = () => resolve(0)
+              }),
+            { db: IDB_DB },
+          ),
+        { timeout: 30000, intervals: [1000] },
+      )
+      .toBeGreaterThan(0)
+  })
+
+  test('封面图片经 SW 缓存进 IndexedDB（与音频共用存储）', async ({ page }) => {
+    await page.goto('/')
+    // 等 SW 就绪并 reload，确保图片请求自始即受 SW 控制
+    await page.evaluate(() => navigator.serviceWorker?.ready)
+    await page.reload()
+
+    // 搜索结果行带封面，触发对网易云 CDN 的图片请求
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+
+    // SW 以 CORS 拉取图片字节后写入 mediaMeta，轮询直至出现 image 条目
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            ({ db }) =>
+              new Promise<number>((resolve) => {
+                const req = indexedDB.open(db, 2)
+                req.onsuccess = () => {
+                  const d = req.result
+                  if (!d.objectStoreNames.contains('mediaMeta')) {
+                    d.close()
+                    resolve(0)
+                    return
+                  }
+                  const g = d.transaction('mediaMeta', 'readonly').objectStore('mediaMeta').getAll()
+                  g.onsuccess = () => {
+                    d.close()
+                    const rows = g.result as { kind?: string }[]
+                    resolve(rows.filter((r) => r.kind === 'image').length)
+                  }
+                  g.onerror = () => {
+                    d.close()
+                    resolve(0)
+                  }
+                }
+                req.onerror = () => resolve(0)
+              }),
+            { db: IDB_DB },
+          ),
+        { timeout: 30000, intervals: [1000] },
+      )
+      .toBeGreaterThan(0)
   })
 })

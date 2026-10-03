@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { usePlayer, audioSrc } from '../store/player.js'
+import { usePlayer, audioSrc, advanceOnEnd } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { audioEl } from './audioElement.js'
 
@@ -88,13 +88,20 @@ export function useAudioEngine(): void {
       if (disposed) return
       const s = getState()
       const { index, queue, repeat } = s
-      if (repeat === 'one') {
+      const nextIndex = advanceOnEnd(index, queue.length, repeat)
+      if (nextIndex === null) {
+        // 顺序播放到尾 → 停止并标记结束
+        audio.currentTime = 0
+        s.setPosition(0)
+        s.setPlaying(false)
+        s.setPlaybackEnded(true)
+      } else if (nextIndex === index) {
+        // repeat='one'：循环当前曲目
         audio.currentTime = 0
         void audio.play().catch(() => {})
-        return
+      } else {
+        s.playIndex(nextIndex)
       }
-      if (queue.length && index >= 0) s.next()
-      else s.setPlaying(false)
     }
 
     const onError = () => {
