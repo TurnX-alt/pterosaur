@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 
 vi.mock('./netease.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./netease.js')>()
@@ -6,11 +6,12 @@ vi.mock('./netease.js', async (importOriginal) => {
     ...actual,
     qrCheck: vi.fn(),
     loginStatus: vi.fn(),
+    searchSongs: vi.fn(),
   }
 })
 
 import { createApp } from './app.js'
-import { qrCheck, loginStatus } from './netease.js'
+import { qrCheck, loginStatus, searchSongs } from './netease.js'
 
 const app = createApp()
 
@@ -98,5 +99,40 @@ describe('扫码登录 803 响应', () => {
     expect(body.ok).toBe(true)
     expect(body.data.code).toBe(801)
     expect(res.headers.getSetCookie()).toEqual([])
+  })
+})
+
+describe('服务端缺省凭证（NETEASE_COOKIE）', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('未登录访客的内容请求透传缺省凭证', async () => {
+    vi.stubEnv('NETEASE_COOKIE', 'MUSIC_U=default; __csrf=d')
+    vi.mocked(searchSongs).mockResolvedValue([])
+
+    const res = await app.request('/api/search?keywords=test')
+    expect(res.status).toBe(200)
+    expect(vi.mocked(searchSongs).mock.calls.at(-1)?.[2]).toBe('MUSIC_U=default; __csrf=d')
+  })
+
+  it('访客本人会话优先于缺省凭证', async () => {
+    vi.stubEnv('NETEASE_COOKIE', 'MUSIC_U=default')
+    vi.mocked(searchSongs).mockResolvedValue([])
+
+    await app.request('/api/search?keywords=test', {
+      headers: { cookie: 'MUSIC_U=mine; __csrf=m' },
+    })
+    expect(vi.mocked(searchSongs).mock.calls.at(-1)?.[2]).toBe('MUSIC_U=mine; __csrf=m')
+  })
+
+  it('缺省凭证不影响身份：auth/status 仍为未登录', async () => {
+    vi.stubEnv('NETEASE_COOKIE', 'MUSIC_U=default')
+    vi.mocked(loginStatus).mockResolvedValue({ logged: false })
+
+    const res = await app.request('/api/auth/status')
+    expect(await res.json()).toEqual({ ok: true, data: { logged: false } })
+    // 身份判断没有把缺省凭证透传进去
+    expect(vi.mocked(loginStatus).mock.calls.at(-1)?.[0]).toBeUndefined()
   })
 })

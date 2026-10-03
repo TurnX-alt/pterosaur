@@ -96,6 +96,25 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 3. 状态 803（成功）时，后端从网易云返回的 Set-Cookie 中挑出会话必需的几项（`MUSIC_U`、`__csrf`、`MUSIC_A`、`NMTID`）下发浏览器，并返回登录档案；网易云会附带数十条无关 cookie，全量下发会撑大响应头（网关缓冲超限时被 502 截断）。
 4. 此后浏览器请求自动带 cookie，后端 `cookieOf()` 提取并透传给网易云，VIP 曲目即可解析出音频地址。
 
+**缺省凭证（未登录访客）：**
+1. 部署者运行 `pnpm log-in`：终端直接打印二维码，用网易云音乐 App 扫码；成功后把会话 cookie 写入仓库根 `.env` 的 `NETEASE_COOKIE`。
+2. 服务启动时 `loadEnv()` 注入 `process.env`；内容接口取 `credentialOf(c) = 访客 cookie ?? NETEASE_COOKIE`，故匿名访客也能解析 VIP（见 ADR-014）。
+3. 身份接口（`/api/auth/status`、`/api/user/playlists`）仍只用访客 cookie——匿名访客依旧显示「未登录」，登录后以本人凭证优先。
+
+## 配置（环境变量）
+
+- 读取点全在服务端与构建脚本；前端源码不含自定义变量（仅 Vite 内置 `import.meta.env.PROD`）。
+- 服务端启动时先 `loadEnv()` 读取**仓库根 `.env`**（存在才读），为下列变量提供值；注意 **同名环境变量优先于 `.env`**（`process.loadEnvFile` 不覆盖已有的 `process.env`）。变量一览：
+
+| 变量 | 默认值 | 用途 |
+| --- | --- | --- |
+| `NETEASE_COOKIE` | 空 | 缺省网易云会话，由 `pnpm log-in` 写入；为空则无缺省凭证（见 ADR-014）。 |
+| `NETEASE_COOKIE_UPDATED_AT` | 空 | 上述凭证的写入时间（ISO），仅供人读。 |
+| `PORT` | `8788` | 后端监听端口（`API_PORT` 可作次选回退）。 |
+| `HOST` | `0.0.0.0` | 后端监听地址。 |
+| `API_PORT` / `API_TARGET` | `8788` / `http://127.0.0.1:8788` | 仅开发期 Vite 代理目标。 |
+| `NODE_ENV` | — | `production` 时同源托管 SPA 静态资源。 |
+
 ## 外部系统
 
 - **NeteaseCloudMusicApi（npm 依赖）**：在 Node 进程内以函数形式调用网易云加密接口，是本后端的上游能力来源。
@@ -105,7 +124,8 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 
 - **同源边界**：前端只访问本域 `/api`、`/stream`；绝不出现网易云域名。这是规避 CORS/混合内容的根本手段。
 - **https 边界**：网易云音频/封面返回 `http://`，后端统一改写为 `https://`（`netease.ts` 的 `https()`），保证在 https 站点上可用。
-- **会话边界**：登录态是用户本人的网易云 cookie，仅存于其浏览器；后端无状态，不持久化任何用户凭证。
+- **会话边界**：登录态是用户本人的网易云 cookie，仅存于其浏览器；后端无状态，不持久化任何**用户**凭证（唯一例外是运营者可选持久化的缺省凭证，见下条与 ADR-014）。
+- **缺省凭证边界**：服务端可用 `.env` 的 `NETEASE_COOKIE` 作为未登录访客的缺省凭证，**仅用于内容解析**（搜索 / 播放 / 歌词等），绝不参与身份判断（见 ADR-014）。
 - **无状态后端**：除音频地址的短期 LRU 缓存外，后端不保存业务状态；重启即恢复，天然可水平扩展。
 - **共享类型边界**：`shared/` 不得引入 DOM 或 Node 专有 API，确保浏览器与 Node 两侧都能编译。
 - **静态托管边界**：生产必须运行 Node 后端（`pnpm start`），不能当纯静态站点部署——音频代理与登录都依赖它。

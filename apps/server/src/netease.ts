@@ -340,6 +340,15 @@ export async function qrCreate(key: string, cookie?: string): Promise<string> {
 }
 
 /**
+ * 生成二维码**内容 URL**（形如 `https://music.163.com/login?codekey=<key>`）。
+ * 网易云 `login_qr_create` 为本地构造、不请求上游，故可直接用于终端自行渲染二维码。
+ */
+export async function qrLoginUrl(key: string, cookie?: string): Promise<string> {
+  const res = await api.login_qr_create({ key, cookie })
+  return res?.body?.data?.qrurl ?? ''
+}
+
+/**
  * 检查扫码登录状态。
  * @returns code: 800 过期 / 801 等待扫码 / 802 待确认 / 803 成功（附带原始 Set-Cookie 数组）
  */

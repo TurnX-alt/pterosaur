@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { cors } from 'hono/cors'
@@ -27,7 +28,7 @@ import {
 } from './netease.js'
 import type { ApiResult, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
 
-/** 音频地址缓存：id|level|hasCookie -> https url。网易云地址有时效，TTL 设短一些。 */
+/** 音频地址缓存：id|level|凭证指纹 -> https url。网易云地址有时效，TTL 设短一些。 */
 const urlCache = new LRUCache<string, string>({ max: 2000, ttl: 15 * 60 * 1000 })
 
 const UA =
@@ -43,7 +44,7 @@ function fail(error: string, needLogin = false): ApiResult<never> {
   return { ok: false, error, needLogin: needLogin || undefined }
 }
 
-/** 从请求头中取出浏览器回传的网易云会话 cookie 字符串。 */
+/** 从请求头中取出浏览器回传的网易云会话 cookie 字符串（**仅访客本人会话**，用于身份判断）。 */
 function cookieOf(c: Context): string | undefined {
   const raw = c.req.header('cookie')
   if (!raw) return undefined
@@ -53,6 +54,29 @@ function cookieOf(c: Context): string | undefined {
     .filter(Boolean)
     .filter((kv) => SESSION_COOKIE_NAMES.includes(kv.slice(0, kv.indexOf('='))))
   return parts.length ? parts.join('; ') : undefined
+}
+
+/**
+ * 服务端缺省凭证：由 `pnpm log-in` 写入仓库根 `.env` 的 `NETEASE_COOKIE`。
+ * 供**未登录访客**解析 VIP 资源，不代表访客身份。
+ */
+function defaultCredential(): string | undefined {
+  const v = process.env.NETEASE_COOKIE?.trim()
+  return v || undefined
+}
+
+/**
+ * **内容接口**所用凭证：优先访客本人会话，回退到服务端缺省凭证。
+ * 只用于搜索 / 播放 / 歌词等内容解析，绝不用于身份判断。
+ */
+function credentialOf(c: Context): string | undefined {
+  return cookieOf(c) ?? defaultCredential()
+}
+
+/** 音频地址缓存键里的凭证指纹：区分匿名 / 不同账号，避免串用解析出的 CDN 地址。 */
+function credentialKey(cookie?: string): string {
+  if (!cookie) return 'anon'
+  return createHash('sha1').update(cookie).digest('hex').slice(0, 12)
 }
 
 /**
@@ -78,9 +102,9 @@ function forwardSessionCookies(c: Context, cookies?: string[]) {
 async function streamHandler(c: Context): Promise<Response> {
   const id = c.req.param('id') ?? ''
   const level = c.req.query('level') ?? 'exhigh'
-  const cookie = cookieOf(c)
+  const cookie = credentialOf(c)
 
-  const cacheKey = `${id}|${level}|${cookie ? '1' : '0'}`
+  const cacheKey = `${id}|${level}|${credentialKey(cookie)}`
   let url = urlCache.get(cacheKey)
   if (!url) {
     const resolved = await songUrl(id, cookie, level)
@@ -139,7 +163,7 @@ export function createApp() {
     const limit = Number(c.req.query('limit') ?? 30)
     if (!keywords) return c.json(fail('缺少搜索关键词'), 400)
     try {
-      const tracks = await searchSongs(keywords, Math.min(limit, 60), cookieOf(c))
+      const tracks = await searchSongs(keywords, Math.min(limit, 60), credentialOf(c))
       return c.json(ok<Track[]>(tracks))
     } catch (e) {
       return c.json(fail(`搜索失败：${(e as Error).message}`), 502)
@@ -151,7 +175,7 @@ export function createApp() {
     const keywords = (c.req.query('keywords') ?? '').trim()
     if (!keywords) return c.json(fail('缺少搜索关键词'), 400)
     const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 50)
-    const cookie = cookieOf(c)
+    const cookie = credentialOf(c)
     try {
       const [songs, artists, albums, playlists] = await Promise.all([
         searchSongs(keywords, 50, cookie),
@@ -167,7 +191,7 @@ export function createApp() {
 
   app.get('/api/discover/recommend', async (c) => {
     try {
-      const list = await recommendPlaylists(Number(c.req.query('limit') ?? 12), cookieOf(c))
+      const list = await recommendPlaylists(Number(c.req.query('limit') ?? 12), credentialOf(c))
       return c.json(ok<Playlist[]>(list))
     } catch (e) {
       return c.json(fail(`获取推荐失败：${(e as Error).message}`), 502)
@@ -195,7 +219,7 @@ export function createApp() {
   app.get('/api/playlist/:id', async (c) => {
     const id = c.req.param('id')
     try {
-      const { playlist, tracks } = await playlistTracks(id, cookieOf(c))
+      const { playlist, tracks } = await playlistTracks(id, credentialOf(c))
       return c.json(ok({ playlist, tracks }))
     } catch (e) {
       return c.json(fail(`获取歌单详情失败：${(e as Error).message}`), 502)
@@ -205,7 +229,7 @@ export function createApp() {
   app.get('/api/artist/:id', async (c) => {
     const id = c.req.param('id')
     try {
-      return c.json(ok(await artistDetail(id, cookieOf(c))))
+      return c.json(ok(await artistDetail(id, credentialOf(c))))
     } catch (e) {
       return c.json(fail(`获取艺人详情失败：${(e as Error).message}`), 502)
     }
@@ -214,7 +238,7 @@ export function createApp() {
   app.get('/api/album/:id', async (c) => {
     const id = c.req.param('id')
     try {
-      return c.json(ok(await albumDetail(id, cookieOf(c))))
+      return c.json(ok(await albumDetail(id, credentialOf(c))))
     } catch (e) {
       return c.json(fail(`获取专辑详情失败：${(e as Error).message}`), 502)
     }
@@ -227,7 +251,7 @@ export function createApp() {
       .filter(Boolean)
     if (!ids.length) return c.json(fail('缺少 ids'), 400)
     try {
-      const tracks = await songDetail(ids.slice(0, 200), cookieOf(c))
+      const tracks = await songDetail(ids.slice(0, 200), credentialOf(c))
       return c.json(ok<Track[]>(tracks))
     } catch (e) {
       return c.json(fail(`获取曲目详情失败：${(e as Error).message}`), 502)
@@ -237,7 +261,7 @@ export function createApp() {
   app.get('/api/lyric/:id', async (c) => {
     const id = c.req.param('id')
     try {
-      return c.json(ok<Lyric>(await getLyric(id, cookieOf(c))))
+      return c.json(ok<Lyric>(await getLyric(id, credentialOf(c))))
     } catch (e) {
       return c.json(fail(`获取歌词失败：${(e as Error).message}`), 502)
     }

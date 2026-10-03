@@ -1,6 +1,11 @@
 import { serve } from '@hono/node-server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { createApp } from './app.js'
+import { loadEnv } from './env.js'
+
+// 先加载仓库根 .env（缺省凭证 NETEASE_COOKIE，以及可选的 PORT / HOST 等），
+// 必须在读取 process.env 之前调用。
+loadEnv()
 
 const app = createApp()
 

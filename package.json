@@ -8,6 +8,7 @@
     "build": "pnpm --filter @pterosaur/server build && pnpm --filter @pterosaur/web build",
     "typecheck": "pnpm -r typecheck",
     "start": "pnpm --filter @pterosaur/server start",
+    "log-in": "pnpm --filter @pterosaur/server log-in",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

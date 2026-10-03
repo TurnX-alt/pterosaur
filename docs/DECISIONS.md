@@ -35,6 +35,7 @@
   - 登录态是用户本人网易云 cookie，仅存其浏览器，后端不持久化凭证。
   - 依赖 `NeteaseCloudMusicApi` 的接口形态：参数扁平（`{keywords, limit}`）、返回 `cookie` 为 Set-Cookie 字符串数组——已在 `server/netease.ts` 收敛。
 - 何时重新审视：`NeteaseCloudMusicApi` 停止维护或网易云大改加密协议时。
+- 后续修订：「后端不持久化凭证」已被 ADR-014 打破——服务端为未登录访客新增了一份**可选的缺省凭证**（`.env` 中的 `NETEASE_COOKIE`）。
 
 ## ADR-003：前端用 React 19 + Vite 8 + Zustand，状态按领域拆分
 
@@ -181,3 +182,20 @@
   - 构建：`apps/web` 的 `build` 回归单条 `vite build`，产出 `sw.js` + `manifest.webmanifest` + 图标；图标提交进仓库（CI 无需浏览器 / sharp）。生成器源为 `apps/web/assets/pwa-icon.svg`（**不放 `public/`**，避免作为站点资源发布、也不再进 precache）；生成器固定会多产出 64px / maskable / `.ico` 等无用文件，**只保留 4 个**：`favicon.svg`（标签页，`index.html` 引用）、`pwa-192x192.png`、`pwa-512x512.png`、`apple-touch-icon-180x180.png`，且 512 那张直接兼作 maskable（全出血红底、图形落在安全区）。重新生成：对源跑 `pnpm dlx @vite-pwa/assets-generator@latest --preset minimal-2023 apps/web/assets/pwa-icon.svg`，再把所需产物移入 `public/`。
   - **开发态作用域**：dev 下 SW 源码位于 `/src/sw.ts`，其默认作用域会被限制为 `/src/`，SW 便永不控制 `/` 下的页面、缓存恒为空。故 `vite.config.ts` 加了一个 dev 中间件为该响应补 `Service-Worker-Allowed: /`，`main.tsx` 再以 `scope: '/'` 注册；生产由 `/sw.js` 天然位于根作用域，无需此插件。
 - 何时重新审视：若希望离线首帧即用外壳（放弃 7 天过期，改用 precache）；若网易云 CDN 关闭 CORS（需改走后端代理）；若引入 OPFS。
+
+## ADR-014：服务端缺省凭证（`pnpm log-in`）——未登录访客共享运营者账号解锁 VIP
+
+- 日期：2026-10-03
+- 状态：已采纳
+- 背景：此前 VIP 曲目只有「登录了本人网易云账号」的访客才能播放（见 ADR-002），匿名访客只能听免费曲目——与产品定位「无需登录、随意畅听」（ADR-001）相矛盾。需要一份「缺省账号」在访客未登录时代为解析 VIP 资源，且不得影响访客自身身份与其后续登录。
+- 考虑过的方案：① 前端内置一份 cookie——随前端产物暴露给所有访客，泄露面最大，否决；② 把 cookie 写死后端源码——同样入库即泄、难以轮换；③ **CLI 扫码登录 → 落盘 `.env` → 服务端按需读取**；④ 硬编码「公开共享账号」——无法轮换与审计。
+- 决策：方案 ③。新增 `pnpm log-in`：起一个**仅监听回环地址**的本地网页，扫码成功后把会话 cookie 写入**仓库根 `.env`** 的 `NETEASE_COOKIE`（并记 `NETEASE_COOKIE_UPDATED_AT`）。服务端启动时 `loadEnv()`；请求处理时以 `credentialOf(c) = cookieOf(c) ?? process.env.NETEASE_COOKIE` 提供**内容接口**（搜索 / 歌单 / 艺人 / 专辑 / 歌曲详情 / 歌词 / `/stream`）所需凭证；**身份接口**（`/api/auth/status`、`/api/user/playlists` 等）仍只看访客本人 cookie。`.env` 不入库（`.gitignore` 已忽略），另提供可入库的 `.env.example`。
+- 为什么选这个：扫码只做一次、凭证落在部署者自己的机器上而不经过源码；`.env` 与既有的 NODE_ENV/PORT/HOST 约定一致；`credentialOf` 单点回退让「匿名可听 VIP、登录仍以本人为准」的语义清晰；前端零改动（同源铁律不变）。
+- 为什么不选其他：①/②/④ 都会把长期凭证写进仓库或前端产物，泄露面最大且难以轮换。
+- 后果 / 已知边界：
+  - **这是 ADR-002「后端不持久化凭证」的例外**：服务端会持久化一份**缺省**凭证——它属于运营者，不属于任何访客。建议使用**专用账号**，并评估网易云对异地 / 多端登录的风控。
+  - 缺省凭证同样作用于 `/api/discover/recommend`，故匿名首页的个性化推荐来自该账号。
+  - 音频地址缓存键由「有无 cookie」布尔改为**凭证指纹**（cookie 的短哈希），避免不同账号串用解析出的 CDN 地址。
+  - `.env` 变更**需重启服务**生效（`process.env` 不在运行期热更新）；`pnpm log-in` 结束时会打印该提示。
+  - 未配置 `NETEASE_COOKIE` 时，行为与改动前完全一致（访客仍凭本人登录）。
+- 何时重新审视：若引入多缺省账号 / 凭证自动轮换；若网易云风控使共享账号不可用；若产品改为「必须登录才能播放」。
