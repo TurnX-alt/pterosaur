@@ -133,8 +133,16 @@ ol {
 /*
  * 只让内容区（.app-content，见 app.css）参与快照：根元素置为 none，
  * 否则侧栏 / 顶栏 / 播放条会随根快照一起交叉溶解。
+ *
+ * 例外——主题转场（见 lib/themeTransition.ts）需要**整页**参与：转场期间给 <html> 打
+ * `data-theme-vt`，本规则不再命中，根恢复默认捕获；同时把 `.app-content` 的命名摘掉，
+ * 免得它被从根快照里挖掉。
  */
-:root {
+:root:not([data-theme-vt]) {
+  view-transition-name: none;
+}
+
+:root[data-theme-vt] .app-content {
   view-transition-name: none;
 }
 
@@ -165,6 +173,21 @@ ol {
   animation-fill-mode: both;
 }
 
+/*
+ * 沉浸播放页转场（见 lib/nowPlayingTransition.ts）：转场期间给 <html> 打 data-np-vt，
+ * 据此摘掉 .app-content 的命名。它是全站唯一的命名元素，若保留，其新旧快照内容相同 →
+ * UA 注入 plus-lighter 混合，在顶层（伪树）闪出白块并盖住 z-index 更高的沉浸页。
+ */
+:root[data-np-vt] .app-content {
+  view-transition-name: none;
+}
+
+/* 共享封面（小封面 ↔ 大封面）：几何 morph 用 iOS 缓动，时长与 live 动画保持一致 */
+::view-transition-group(np-cover) {
+  animation-duration: var(--dur-slow);
+  animation-timing-function: var(--ease-ios);
+}
+
 @keyframes vt-content-out {
   from {
     opacity: 1;
@@ -184,6 +207,31 @@ ol {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/* ---------- 主题转场：新主题自按钮圆形揭示（clip-path circle） ---------- */
+/*
+ * 圆心与半径由 lib/themeTransition.ts 注入为 `--theme-vt-x/-y/-r`（写在 <html> 上，
+ * 伪元素继承得到）。旧层保持铺满不动，新层用 clip-path 由小圆扩散到覆盖视口。
+ */
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  /* 覆盖 UA 的同源交叉淡入（含 plus-lighter），改由 clip-path 揭示；
+     ease-in-out 让圆的扩散过程可见（--ease-ios 前段过猛，几乎瞬铺满） */
+  animation: theme-reveal var(--dur-slow) ease-in-out both;
+  mix-blend-mode: normal;
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0px at var(--theme-vt-x) var(--theme-vt-y));
+  }
+  to {
+    clip-path: circle(var(--theme-vt-r) at var(--theme-vt-x) var(--theme-vt-y));
   }
 }
 

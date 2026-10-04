@@ -90,7 +90,7 @@ async function clearLibrary(page: Page): Promise<void> {
 /** 轮询等待 library 的某个字段已落盘（异步 IDB 持久化，硬跳转/reload 前需确定性等待）。 */
 async function waitForLibraryPersisted(
   page: Page,
-  field: 'favorites' | 'savedAlbums' = 'favorites',
+  field: 'favorites' | 'savedAlbums' | 'savedArtists' = 'favorites',
 ): Promise<void> {
   await expect
     .poll(
@@ -237,6 +237,23 @@ test.describe('应用外壳', () => {
     await expect
       .poll(async () => root.getAttribute('data-theme'), { timeout: 3000 })
       .not.toBe(before === null ? 'system' : before)
+    // 主题转场的根标记最终应清除（不残留，否则会一直开着根快照）
+    await expect(root).not.toHaveAttribute('data-theme-vt', 'on')
+  })
+
+  test('减少动效下主题切换仍生效且不走转场', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/')
+    const root = page.locator('html')
+
+    const toggle = page.locator('button[aria-label="切换到浅色"], button[aria-label="切换到深色"]').first()
+    const before = await root.getAttribute('data-theme')
+    await toggle.click()
+    await expect
+      .poll(async () => root.getAttribute('data-theme'), { timeout: 3000 })
+      .not.toBe(before === null ? 'system' : before)
+    // 减少动效：直连切换，不应设转场标记
+    await expect(root).not.toHaveAttribute('data-theme-vt', 'on')
   })
 })
 
@@ -396,6 +413,53 @@ test.describe('全屏播放页与歌词', () => {
     await clickLine(count - 1)
     await expect.poll(async () => Math.abs(await centerDelta()), { timeout: 3000 }).toBeLessThan(3)
   })
+
+  test('共享元素：展开 / 收起时封面持名互斥', async ({ page }) => {
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+    await expect(page.locator('.nowplaying')).toHaveCount(0)
+
+    // 读取两侧封面的 view-transition-name（大封面 / 底部小封面）
+    const names = () =>
+      page.evaluate(() => {
+        const np = document.querySelector('.nowplaying__cover')
+        const pb = document.querySelector('.playerbar__cover-btn .cover')
+        return {
+          np: np ? getComputedStyle(np).viewTransitionName : null,
+          pb: pb ? getComputedStyle(pb).viewTransitionName : null,
+        }
+      })
+
+    await page.locator('.playerbar__cover-btn').click()
+    await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
+
+    // 展开后：大封面持 np-cover，底部小封面让名（二者绝不同时持名）
+    await expect.poll(async () => (await names()).np, { timeout: 3000 }).toBe('np-cover')
+    expect((await names()).pb).not.toBe('np-cover')
+
+    // 收起（Esc）后：小封面重新持名
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.nowplaying')).toHaveCount(0, { timeout: 3000 })
+    await expect.poll(async () => (await names()).pb, { timeout: 3000 }).toBe('np-cover')
+  })
+
+  test('减少动效下开合仍然可用且无报错', async ({ page }) => {
+    const errors: string[] = []
+    page.on('pageerror', (e) => errors.push(e.message))
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+
+    await page.locator('.playerbar__cover-btn').click()
+    await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.nowplaying')).toHaveCount(0, { timeout: 3000 })
+
+    expect(errors, errors.join('\n')).toHaveLength(0)
+  })
 })
 
 test.describe('播放队列', () => {
@@ -475,6 +539,72 @@ test.describe('资料库与收藏', () => {
     await page.goto('/crate')
     await expect(page.locator('.crate__title')).toHaveText('唱片盒')
     await expect(page.locator('.crate .card--album').first()).toContainText(name)
+  })
+
+  test('唱片盒：艺人 / 专辑上下两区；取消收藏后卡片不立即消失', async ({ page }) => {
+    // 本地种入，零联网（规避网易云限流抖动）
+    await page.goto('/')
+    await seedLibrary(page, {
+      favorites: [],
+      recent: [],
+      playlists: [],
+      savedPlaylists: [],
+      savedArtists: [{ id: 'ar1', name: '测试艺人', avatar: '' }],
+      savedAlbums: [{ id: 'a1', name: '测试专辑', cover: '', artist: '甲' }],
+    })
+    await page.goto('/crate')
+
+    // 上下两个分区
+    await expect(page.locator('.crate .section-title', { hasText: '艺人' })).toBeVisible()
+    await expect(page.locator('.crate .section-title', { hasText: '专辑' })).toBeVisible()
+    await expect(page.locator('.crate .card--artist').first()).toContainText('测试艺人')
+    await expect(page.locator('.crate .card--album').first()).toContainText('测试专辑')
+
+    // 悬浮艺人卡片 → 取消收藏：红心转为未收藏态，但卡片**不立即消失**（防误触）
+    const artistCard = page.locator('.crate .card--artist').first()
+    await artistCard.hover()
+    await artistCard.getByRole('button', { name: '取消收藏' }).click()
+    await expect(page.locator('.crate .card--artist')).toHaveCount(1)
+    await expect(artistCard.getByRole('button', { name: '收藏到资料库' })).toBeVisible()
+
+    // 离开再进入（页内跳转，不刷新）→ 才消失；专辑分区不受影响
+    await page.getByRole('link', { name: '我喜欢的音乐' }).click()
+    await expect(page).toHaveURL(/\/favorites/)
+    await page.getByRole('link', { name: '唱片盒' }).click()
+    await expect(page).toHaveURL(/\/crate/)
+    await expect(page.locator('.crate .card--artist')).toHaveCount(0)
+    await expect(page.locator('.crate .card--album').first()).toContainText('测试专辑')
+  })
+
+  test('唱片盒空态：未收藏任何艺人 / 专辑时提示去收藏', async ({ page }) => {
+    await page.goto('/')
+    await clearLibrary(page)
+    await page.goto('/crate')
+    await expect(page.getByText('唱片盒还空着')).toBeVisible({ timeout: 8000 })
+  })
+
+  test('收藏艺人后出现在唱片盒', async ({ page }) => {
+    // 借专辑页的艺人链接进入艺人页（复用较稳定的搜索路径）
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await page.getByRole('tab', { name: /专辑/ }).click()
+    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
+    await page.locator('.card--album').first().click()
+    await expect(page).toHaveURL(/\/album\/\d+/, { timeout: 8000 })
+
+    const artistLink = page.locator('.detail__artist-link').first()
+    await expect(artistLink).toBeVisible({ timeout: 8000 })
+    await artistLink.click()
+    await expect(page).toHaveURL(/\/artist\/\d+/, { timeout: 8000 })
+
+    // 收藏
+    await page.getByRole('button', { name: '收藏到资料库' }).click()
+    await expect(page.getByRole('button', { name: '取消收藏' })).toBeVisible()
+    await waitForLibraryPersisted(page, 'savedArtists')
+
+    // 唱片盒的艺人分区出现该艺人
+    await page.goto('/crate')
+    await expect(page.locator('.crate .section-title', { hasText: '艺人' })).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.crate .card--artist').first()).toBeVisible({ timeout: 8000 })
   })
 })
 
@@ -602,11 +732,11 @@ test.describe('移动端', () => {
 })
 
 test.describe('登录弹窗', () => {
-  test('提示文案为「不受限地播放」，不含 VIP 字样', async ({ page }) => {
+  test('提示文案为云同步说明，不含 VIP 字样', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: '登录' }).click()
     const hint = page.locator('.login-modal__hint')
-    await expect(hint).toContainText('登录后即可不受限地播放曲目')
+    await expect(hint).toContainText('登录后可享用免费云同步服务')
     await expect(hint).not.toContainText('VIP')
   })
 })

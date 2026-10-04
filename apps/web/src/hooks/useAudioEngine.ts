@@ -44,7 +44,7 @@ export function useAudioEngine(): void {
         getState().setPlaying(false)
         // 浏览器自动播放策略：静默暂停，等待用户手势，不报错
         if (!/NotAllowedError|user didn't interact|play\(\) failed/i.test(msg)) {
-          getState().setPlayError('该曲目暂不可播放，可能需要登录 VIP')
+          getState().setPlayError('该曲目暂不可播放')
         }
       })
     } else {
@@ -110,7 +110,7 @@ export function useAudioEngine(): void {
       const err = audio.error
       if (err) {
         s.setPlaying(false)
-        s.setPlayError(err.code === 2 ? '该曲目暂不可播放，可能需要登录 VIP' : `播放出错（code ${err.code}）`)
+        s.setPlayError(err.code === 2 ? '该曲目暂不可播放' : `播放出错（code ${err.code}）`)
       }
     }
 

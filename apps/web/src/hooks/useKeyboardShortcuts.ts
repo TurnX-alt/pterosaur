@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { usePlayer } from '../store/player.js'
 import { seekTo } from './audioElement.js'
+import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
 
 /**
  * 全局键盘快捷键（参考 Apple Music / Spotify 网页版习惯）：
@@ -28,7 +29,8 @@ export function useKeyboardShortcuts(onFocusSearch?: () => void): void {
       if (e.key === 'Escape') {
         const s = usePlayer.getState()
         if (s.expanded) {
-          s.setExpanded(false)
+          // 与点击关闭一致：走共享元素转场（不支持时内部自动降级）
+          startNowPlayingTransition(false)
           return
         }
       }

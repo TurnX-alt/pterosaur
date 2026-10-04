@@ -13,6 +13,7 @@ import {
   Cloud,
 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme.js";
+import { startThemeTransition } from "../lib/themeTransition.js";
 import { useViewNavigate } from "../hooks/useViewNavigate.js";
 import { useAuth } from "../store/auth.js";
 import { useSync } from "../store/sync.js";
@@ -81,7 +82,12 @@ export function Topbar({ searchRef }: TopbarProps) {
       ? (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true)
       : mode === "dark";
 
-  const toggleTheme = () => setMode(prefersDark ? "light" : "dark");
+  // 切换主题：自按钮中心做圆形揭示转场（不支持 VT / 减少动效时内部自动降级为直连）
+  const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const origin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    startThemeTransition(origin, () => setMode(prefersDark ? "light" : "dark"));
+  };
 
   return (
     <header className="topbar">

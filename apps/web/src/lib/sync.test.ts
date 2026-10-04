@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { SyncEnvelope } from '@pterosaur/shared/types'
-import { decideSync, emptyLibrary, snapshotLibrary } from './sync.js'
+import type { LibraryData, SyncEnvelope } from '@pterosaur/shared/types'
+import { applyPayload, decideSync, emptyLibrary, snapshotLibrary } from './sync.js'
 import { useLibrary } from '../store/library.js'
 
 const envelope = (updatedAt: number): SyncEnvelope => ({ state: emptyLibrary(), updatedAt })
@@ -22,18 +22,61 @@ describe('decideSync（LWW）', () => {
 
 describe('snapshotLibrary / emptyLibrary', () => {
   beforeEach(() => {
-    useLibrary.setState({ favorites: [], recent: [], playlists: [], savedPlaylists: [], savedAlbums: [] })
+    useLibrary.setState({
+      favorites: [],
+      recent: [],
+      playlists: [],
+      savedPlaylists: [],
+      savedArtists: [],
+      savedAlbums: [],
+    })
   })
 
   it('快照只含可同步的数据字段', () => {
     useLibrary.getState().toggleFavorite({ id: '1', title: 't', artist: 'a', album: '', cover: '', duration: 0, fee: 'free' })
     expect(snapshotLibrary().favorites.map((t) => t.id)).toEqual(['1'])
     expect(Object.keys(snapshotLibrary()).sort()).toEqual(
-      ['favorites', 'playlists', 'recent', 'savedAlbums', 'savedPlaylists'].sort(),
+      ['favorites', 'playlists', 'recent', 'savedAlbums', 'savedArtists', 'savedPlaylists'].sort(),
     )
   })
 
-  it('emptyLibrary 为五个空数组', () => {
-    expect(emptyLibrary()).toEqual({ favorites: [], recent: [], playlists: [], savedPlaylists: [], savedAlbums: [] })
+  it('emptyLibrary 为六个空数组', () => {
+    expect(emptyLibrary()).toEqual({
+      favorites: [],
+      recent: [],
+      playlists: [],
+      savedPlaylists: [],
+      savedArtists: [],
+      savedAlbums: [],
+    })
+  })
+})
+
+describe('applyPayload 归一化', () => {
+  beforeEach(() => {
+    useLibrary.setState({
+      favorites: [],
+      recent: [],
+      playlists: [],
+      savedPlaylists: [],
+      savedArtists: [],
+      savedAlbums: [],
+    })
+  })
+
+  it('旧云端载荷缺 savedArtists 时补齐为 []，不残留 undefined', () => {
+    // 模拟 savedArtists 引入前写入的旧载荷
+    const legacy: Partial<LibraryData> = {
+      favorites: [],
+      recent: [],
+      playlists: [],
+      savedPlaylists: [],
+      savedAlbums: [],
+    }
+    applyPayload(legacy, 123)
+    const s = useLibrary.getState()
+    expect(s.savedArtists).toEqual([])
+    expect(s.savedAlbums).toEqual([])
+    expect(Array.isArray(s.savedArtists)).toBe(true)
   })
 })

@@ -14,6 +14,8 @@ import { useQueuePanel } from '../store/ui.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { seekTo } from '../hooks/audioElement.js'
 import { api } from '../api/client.js'
+import { getCachedLyric, putCachedLyric } from '../lib/lyricCache.js'
+import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
 import { formatTime } from '@pterosaur/shared/types'
 import type { Lyric } from '@pterosaur/shared/types'
 import { Cover } from './Cover.js'
@@ -71,12 +73,21 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
       setLyric(null)
       return
     }
+    // 命中预载缓存：直接显示，无「歌词加载中」停留
+    const cached = getCachedLyric(current.id)
+    if (cached) {
+      setLyric(cached)
+      setLyricLoading(false)
+      return
+    }
     setLyricLoading(true)
     setLyric(null)
     api
       .lyric(current.id)
       .then((l) => {
-        if (!cancelled) setLyric(l)
+        if (cancelled) return
+        putCachedLyric(current.id, l)
+        setLyric(l)
       })
       .catch(() => {
         if (!cancelled) setLyric({ lines: [], timed: false })
@@ -141,11 +152,11 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
     >
       {/* 动态模糊背景 */}
       <div className="nowplaying__bg" style={{ backgroundImage: `url(${current.cover})` }} aria-hidden />
-      <div className="nowplaying__scrim" onClick={() => setExpanded(false)} aria-hidden />
+      <div className="nowplaying__scrim" onClick={() => startNowPlayingTransition(false)} aria-hidden />
 
       <div className="nowplaying__inner">
         <header className="nowplaying__header">
-          <IconButton label="收起播放页" size="md" onClick={() => setExpanded(false)}>
+          <IconButton label="收起播放页" size="md" onClick={() => startNowPlayingTransition(false)}>
             <ChevronDown size={24} strokeWidth={2.2} />
           </IconButton>
           <div className="nowplaying__header-title">

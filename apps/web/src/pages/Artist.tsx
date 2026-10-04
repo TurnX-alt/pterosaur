@@ -1,9 +1,10 @@
 import { useParams } from 'react-router-dom'
-import { Play, Shuffle } from 'lucide-react'
+import { Play, Shuffle, Heart } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
+import { useLibrary } from '../store/library.js'
 import type { Album, Artist, Track } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { AlbumCard } from '../components/EntityCards.js'
@@ -25,6 +26,9 @@ export function ArtistPage() {
   const navigate = useViewNavigate()
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const savedArtists = useLibrary((s) => s.savedArtists)
+  const toggleSaveArtist = useLibrary((s) => s.toggleSaveArtist)
+  const isSaved = savedArtists.some((a) => a.id === id)
 
   const { data, loading, error, reload } = useAsync<ArtistDetail>(
     () => api.artist(id),
@@ -86,6 +90,14 @@ export function ArtistPage() {
         </button>
         <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!tracks.length}>
           <Shuffle size={20} strokeWidth={2} />
+        </IconButton>
+        <IconButton
+          label={isSaved ? '取消收藏' : '收藏到资料库'}
+          size="lg"
+          active={isSaved}
+          onClick={() => toggleSaveArtist(artist)}
+        >
+          <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
         </IconButton>
       </div>
 

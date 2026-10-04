@@ -15,6 +15,7 @@ import {
 import { usePlayer, currentPlayMode } from "../store/player.js";
 import { useLibrary } from "../store/library.js";
 import { useQueuePanel } from "../store/ui.js";
+import { startNowPlayingTransition } from "../lib/nowPlayingTransition.js";
 import { seekTo } from "../hooks/audioElement.js";
 import { formatTime } from '@pterosaur/shared/types'
 import { Cover } from "./Cover.js";
@@ -39,7 +40,8 @@ export function PlayerBar() {
   const setVolume = usePlayer((s) => s.setVolume);
   const toggleMute = usePlayer((s) => s.toggleMute);
   const cyclePlayMode = usePlayer((s) => s.cyclePlayMode);
-  const setExpanded = usePlayer((s) => s.setExpanded);
+  // 订阅 expanded：展开态下需让本侧封面让出 `view-transition-name: np-cover`（见 PlayerBar.css）
+  const expanded = usePlayer((s) => s.expanded);
 
   const favorites = useLibrary((s) => s.favorites);
   const toggleFavorite = useLibrary((s) => s.toggleFavorite);
@@ -71,8 +73,8 @@ export function PlayerBar() {
           <>
             <button
               type="button"
-              className="playerbar__cover-btn"
-              onClick={() => setExpanded(true)}
+              className={`playerbar__cover-btn${expanded ? " playerbar__cover-btn--vt-hidden" : ""}`}
+              onClick={() => startNowPlayingTransition(true)}
               aria-label="展开播放页"
             >
               <Cover

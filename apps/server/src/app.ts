@@ -126,7 +126,7 @@ async function streamHandler(c: Context): Promise<Response> {
 
   if (!url) {
     // VIP 曲目未登录 / 版权受限：返回 403 并置 needLogin
-    return c.json(fail('该曲目暂不可播放（可能需要登录 VIP）', true), 403)
+    return c.json(fail('该曲目暂不可播放', true), 403)
   }
 
   const range = c.req.header('range')

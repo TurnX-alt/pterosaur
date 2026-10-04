@@ -59,13 +59,6 @@
   margin-top: 2px;
 }
 
-/* 歌单列表为空时的提示。 */
-.sidebar__empty {
-  padding: 10px 10px;
-  font-size: 13px;
-  color: var(--text-tertiary);
-}
-
 /* 歌单分组：自建歌单与收藏的歌单之间用浅虚线分隔（不加文字） */
 .sidebar__playlist-divider {
   margin: 6px 10px;

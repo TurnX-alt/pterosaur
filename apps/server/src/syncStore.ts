@@ -35,15 +35,25 @@ function sanitizeId(userId: string): string {
   return safe
 }
 
+/** 形状校验要求的基础集合字段（自首个版本即存在，缺失即视为非法载荷）。 */
 const COLLECTIONS = ['favorites', 'recent', 'playlists', 'savedPlaylists', 'savedAlbums'] as const
 
-/** 形状校验：`{ state: LibraryData, updatedAt: number }`。 */
+/**
+ * 形状校验：`{ state: LibraryData, updatedAt: number }`。
+ *
+ * **只校验基础字段，有意不枚举后续新增字段**：library 未来还会扩展更多内容，为每个字段
+ * 单独判定「必填 / 可选」属于污染型设计，也会让缺新字段的旧云端载荷被判非法——
+ * 那会使 `readLibrary` 返回 `null`、被当成「云端无数据」，进而被空库覆盖。
+ * 因此这里保持宽容：只要基础形状成立、那几项基础集合为数组即可，**其余字段一概放行**；
+ * 新增字段一律由客户端 `applyPayload` 归一化兜底（见 `web/lib/sync.ts`）。
+ */
 export function isSyncEnvelope(v: unknown): v is SyncEnvelope {
   if (!v || typeof v !== 'object') return false
   const { state, updatedAt } = v as { state?: unknown; updatedAt?: unknown }
   if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt)) return false
   if (!state || typeof state !== 'object') return false
-  return COLLECTIONS.every((k) => Array.isArray((state as Record<string, unknown>)[k]))
+  const s = state as Record<string, unknown>
+  return COLLECTIONS.every((k) => Array.isArray(s[k]))
 }
 
 /** 读取某用户的 library；不存在或损坏时返回 `null`。 */

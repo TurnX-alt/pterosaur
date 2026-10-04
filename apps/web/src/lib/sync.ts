@@ -27,13 +27,14 @@ export function snapshotLibrary(): LibraryData {
     recent: s.recent,
     playlists: s.playlists,
     savedPlaylists: s.savedPlaylists,
+    savedArtists: s.savedArtists,
     savedAlbums: s.savedAlbums,
   }
 }
 
 /** 空 library（重置时用于清空云端副本）。 */
 export function emptyLibrary(): LibraryData {
-  return { favorites: [], recent: [], playlists: [], savedPlaylists: [], savedAlbums: [] }
+  return { favorites: [], recent: [], playlists: [], savedPlaylists: [], savedArtists: [], savedAlbums: [] }
 }
 
 /**
@@ -43,10 +44,12 @@ export function emptyLibrary(): LibraryData {
 let applying = false
 
 /** 把云端载荷写入本地 library（随 persist 落盘），期间抑制变更回推。 */
-export function applyPayload(state: LibraryData, updatedAt: number): void {
+export function applyPayload(state: Partial<LibraryData>, updatedAt: number): void {
   applying = true
   try {
-    useLibrary.setState(state)
+    // 以空库为底、用云端载荷覆盖：云端可能来自旧版本、缺后续新增字段，缺省处即回落空值。
+    // 不逐字段枚举——新增字段随 `emptyLibrary()` 自动获得默认值，避免校验逻辑随字段增长而污染。
+    useLibrary.setState({ ...emptyLibrary(), ...state })
     useSync.getState().touch(updatedAt)
   } finally {
     applying = false

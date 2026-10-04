@@ -35,6 +35,15 @@
   transform: scale(1.04);
 }
 
+/*
+ * 共享元素转场：展开沉浸页时，小封面与大封面共享 `np-cover` 之名以做几何 morph。
+ * 同一时刻只能有一个元素持名——展开态下本侧按钮加 `--vt-hidden` 让出此名（见 PlayerBar.tsx）。
+ * `:not([data-theme-vt])`：主题转场期间只让根参与快照，封面让名、随整页一起被揭示。
+ */
+:root[data-vt='on']:not([data-theme-vt]) .playerbar__cover-btn:not(.playerbar__cover-btn--vt-hidden) .cover {
+  view-transition-name: np-cover;
+}
+
 .playerbar__meta {
   min-width: 0;
   flex: 1;

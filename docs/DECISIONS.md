@@ -108,6 +108,7 @@
   - Firefox 暂无原生支持 → 走 CSS 降级（`<html data-vt="off">` 时对 `.route-stage` 播放进场动画）。
   - 有浮层（队列 / 沉浸页 / 弹窗）打开时跳过转场——`::view-transition` 伪树绘制在 top layer，否则会盖住这些 `position: fixed` 浮层。
   - `view-transition-name` 必须文档内唯一——只给 `.app-content` 命名，绝不给列表行 / 卡片命名（否则整段转场被跳过）。
+- 后续修订：沉浸播放页的转场已由 **ADR-018** 升级为 View Transitions **共享元素**（封面 morph）；本条中的 `usePresence` + `np-enter`/`np-exit` 上滑仅作**无 VT 时**的降级。
 - 何时重新审视：若把路由迁移到数据路由，可回退到内置 `viewTransition`。
 
 ## ADR-009：CSS 压缩会合并 `backdrop-filter` 前缀对，标准属性须写在最后
@@ -139,7 +140,7 @@
 - 为什么选这个：IDB 写入**异步、不阻塞主线程**，且配额远大于 localStorage，直接解决两个原问题。用 structured clone 免掉 `JSON.stringify` 的主线程 CPU。列表类数据可被合并，故用微任务级合并（同一 tick 内多次 `setItem` 只落最后一次）—— 保留合并收益而**没有时间窗口**。
 - 为什么不选其他：① 治标不治本（仍受 5MB 限额与同步写）；② 仍要 `JSON.stringify`；④ 过重。**⑤ 被否决**：底层是异步 IDB，浏览器无法在页面卸载时保证事务提交，任何 `delay > 0` 都会让「收藏/建歌单后立刻刷新或硬跳转」丢失最后一次写入（已由 E2E 复现并据此改设计）。**必须**给 library 加 `partialize`：`persist` 默认持久化整个 state（含 action 函数），而 IDB 的 structured clone **无法克隆函数**，直接 `put` 会抛 `DataCloneError`——这是迁到 IDB 后才暴露、localStorage（JSON 静默丢弃函数）时代不存在的约束。
 - 后果 / 已知边界：
-  - `store/library.ts` 新增 `partialize`（仅 favorites/recent/playlists/savedPlaylists/savedAlbums）。
+  - `store/library.ts` 新增 `partialize`（仅 favorites/recent/playlists/savedPlaylists/savedAlbums；**后续修订**：ADR-017 增加 `savedArtists`）。
   - 一次性迁移写在 `libraryStorage.getItem` 内：读到旧 `localStorage['pterosaur-library']` 即写入 IDB 并删除旧键（键存亡即幂等标记）；`getItem` 因此有一次性副作用（读时写），可接受。
   - 持久化变为异步：`main.tsx` 在 `createRoot().render()` 前 `await rehydrate()`，避免首帧空库闪烁。
   - **dangling 写入窗口**：写入是异步的，硬导航（刷新 / 输入地址 / 外链）发生在写入提交之前理论上会丢最后一次写；应用内跳转走客户端路由（不重载）不受影响，`pagehide`/`visibilitychange` 有兜底 flush。E2E 中**硬跳转/reload 前用 `waitForLibraryPersisted` 轮询 IDB 落盘**规避竞态。
@@ -232,3 +233,63 @@
   - **设置「重置」联动**：已开启云同步时，先推送一份空 library 清空云端副本，再清本机（顺序不可颠倒）——见 ADR-015 同期改动的 `lib/reset.ts`。
   - 云同步 E2E 依赖真实扫码登录（无法自动化），以单测（`syncStore.test.ts`、`lib/sync.test.ts`）+ 手动验证覆盖。
 - 何时重新审视：若需记录级 / 字段级合并与冲突保留；若引入多实例或数据库；若需要同步 `player` 播放态。
+
+## ADR-017：艺人亦可收藏；唱片盒改为「艺人 + 专辑」双分区；同步校验只校验基础字段（宽容解析）
+
+- 日期：2026-10-04
+- 状态：已采纳
+- 背景：此前收藏能力覆盖曲目 / 歌单 / 专辑，「唱片盒」（`/crate`）**只**展示收藏的专辑。需求：**艺人也可收藏**，且唱片盒同时容纳收藏的**艺人 + 专辑**。
+- 考虑过的方案：收藏入口——① 仅艺人详情页红心；② 详情页红心 + 艺人卡片悬浮红心。唱片盒布局——③ 一页上下两分区；④ 顶部 tab 切换。同步校验——⑤ 把 `savedArtists` 并入必填集合；⑥ 只校验基础字段、对其余字段一概放行（宽容解析）。
+- 决策：② + ③ + ⑥。`LibraryData` 增加 `savedArtists`（`store/library.ts` 增 `toggleSaveArtist` 并同步 `partialize` / `snapshotLibrary` / `emptyLibrary`）；`ArtistCard` 由 `<button>` 改写为 `div[role=button]` 并内嵌 `.card__fav` 红心（`<button>` 不能嵌套按钮，对齐 `AlbumCard` 范式）；艺人详情页红心照搬 `AlbumPage`；服务端 `isSyncEnvelope` 采用⑥（只校验基础集合，**不枚举后续新增字段**）。
+- 为什么选这个：②「搜索到即收藏」，与专辑卡片的悬浮播放按钮范式一致；③ 一页看过全部收藏，契合「唱片盒」语义；⑥ **数据安全 + 抗污染**——若把 `savedArtists` 设为必填，旧云端文件（缺该字段）会被判为非法 → `readLibrary` 返回 `null` → 被当成「云端无数据」→ 新设备首开同步会用空库覆盖，**造成不可逆数据丢失**；而若为每个新增字段单开「必填 / 可选」判断，校验逻辑会随字段增长而污染，故只校验基础形状、其余字段一概放行。
+- 为什么不选其他：① 少一个顺手入口；④ tab 每次只看一类、不如分区一目了然；⑤ 有数据丢失风险，且每加一个字段都要改校验（污染型）。
+- 后果 / 已知边界：
+  - 前端 `applyPayload` 以空库为底、用云端载荷覆盖（`{ ...emptyLibrary(), ...state }`），缺省处回落空值，**不逐字段枚举**；参数类型放宽为 `Partial<LibraryData>`。
+  - 服务端 `isSyncEnvelope` 只校验基础形状、对新字段宽容：**不枚举后续字段**，避免校验逻辑随 library 扩展而污染。
+  - LWW 整份覆盖的既有语义不变：旧云端载荷（无 `savedArtists`）被拉取时按 `[]` 处理；新客户端任何一次 push 都会把云端文档升级为 6 字段。
+  - 卡片为 `div[role=button]` 内嵌红心按钮：键盘激活仅响应卡片本体（`e.target === e.currentTarget` 守卫），红心 `stopPropagation` 不进入详情页；`.card__fav--active` 常显强调色。
+  - 唱片盒列表在**进入时冻结**（读一次 store 快照）：在页内取消收藏后卡片**不立即消失**（防误触），下次进入唱片盒才刷新。
+  - 测试：`library.test.ts` / `sync.test.ts` / `syncStore.test.ts` 覆盖新字段与旧载荷兼容；E2E 新增唱片盒双分区 / 空态 / 艺人收藏（前两者走**本地种入、零联网**，规避网易云限流抖动）。
+- 何时重新审视：若卡片需承载更多操作（播放 / 更多菜单）以至需要专门的操作栏。
+
+## ADR-018：沉浸播放页改用 View Transitions 共享元素（封面放大）+ 当前曲目预载
+
+- 日期：2026-10-04
+- 状态：已采纳（**部分修订 ADR-008**：沉浸播放页的「presence + 上滑」降级为无 VT 时的兜底）
+- 背景：ADR-008 中沉浸播放页只是「`usePresence` 延迟挂卸 + 整页 `translateY(100%)` 上滑（`np-enter`/`np-exit`）」，与封面本身**没有空间关联**，观感廉价；且首次打开有抖动——大封面重挂载闪占位、歌词现拉、大半径模糊背景首次栅格化。
+- 考虑过的方案：① 纯 CSS 增强（更丰富的上滑 / 缩放）；② JS FLIP 手写封面位移；③ 复用 View Transitions 做**共享元素**（小封面 morph 成大封面）。
+- 决策：③ + 预载。
+  - 新增 `lib/nowPlayingTransition.ts` 的 `startNowPlayingTransition(next)`：支持 VT 且非 reduced-motion 时 `startViewTransition(() => flushSync(setExpanded(next)))`，否则直接 `flushSync`。
+  - 封面命名 `np-cover`：PlayerBar 小封面在 `!expanded` 时持名（`PlayerBar.css`），NowPlaying 大封面在 `open` 时持名（`NowPlaying.css`，`data-vt='on'` 门控），**同一时刻仅一个元素持名**。
+  - 背景 / 面板的入场交给 `.nowplaying` 上的 **live CSS 动画**（`np-vt-rise` / `np-vt-fade`，仅 `data-vt='on'`）；`np-enter`/`np-exit`/`np-rise` 收进 `:root[data-vt='off']` 降级分支。
+  - `App.tsx` 的 `NowPlayingLayer`：VT 能力存在时**同步挂卸**（`show = expanded`，含 reduced-motion），仅在完全不支持 VT 时退回 `usePresence`。
+  - 预载：`hooks/useNowPlayingPrefetch`（`current` 变化时 `preloadCover` + decode、`prefetchLyric`）；`lib/lyricCache.ts`（内存歌词缓存 + in-flight 去重）、`lib/imageCache.ts`（已解码封面 URL 表）；`Cover` 首帧按登记表显色。
+- 为什么选这个：与 ADR-008 已建成的 VT 基建同构，是顺路径；封面 morph 正是 Apple Music 该转场的灵魂；预载让「点击即瞬时」。
+- 为什么不选其他：① 仍缺与封面的空间关联，逃不出「简陋」；② 跨组件树手写 FLIP 需测矩形 + 临时浮层 + 处理挂载时序，代码量高一个数量级，还要复刻内部入场。
+- 后果 / 已知边界：
+  - **VT 的 DOM 更新回调必须同步**：回调里 `await rAF`（本想等新封面绘制）会**死锁**——转场期间浏览器暂停渲染，回调等 rAF、rAF 等回调结束 → 触发 UA 的「DOM update 超时」中止，并**连带破坏控件**（实测：歌词点击后容器 `scrollTop` 不再生效）。故回调只 `flushSync`，不 await。
+  - **同步快照拍到的封面必须已可见**：因回调不能 await，改用 `lib/imageCache.ts` 的「已解码 URL 表」，`Cover` 首帧即按它就绪显色，避免快照拍到 `--bg-elevated-2` 占位底色。
+  - **转场期必须摘掉 `.app-content` 的命名**：它是全站唯一命名元素，新旧快照内容相同 → UA 注入 plus-lighter 混合、伪树在 top layer 会**闪白并盖住沉浸页**；`data-np-vt` 于 `startViewTransition` **之前**设置、`finished` 后清除（resolve / reject 两分支都要清）。
+  - **`openEntity` 不带走转场的收起**：否则与随后的路由转场重入（一个 VT 活跃期再起一个）。保持不转场的 `setExpanded(false)` —— 与 ADR-008 的路由转场衔接。
+  - **只命名封面一个元素**：panel / bg / scrim 用 live 动画——避免命名导致的「live 内容被快照挖空」、歌词滚动冻结与额外全屏快照。
+  - Esc / scrim / header 收起键统一走 `startNowPlayingTransition(false)`（`hooks/useKeyboardShortcuts.ts` 同步改）。
+  - 完全不支持 VT 的浏览器：退回 presence + `np-enter`/`np-exit` 上滑（见 ADR-008）。
+  - **模糊背景半径压到 40px**：全屏 + `scale(1.1)` 的 `blur(80px)` 光栅化偏贵，Chrome 会推迟其首次绘制——表现为「封面 / 歌词 / 控制都就位后，唯独模糊背景约一秒才补上」，重则整层空白、把后面的页面透出来（此前被 `scrim` 的 `backdrop-filter` 糊成「假背景」而掩盖，故长期未被察觉）。降到 40px 后绘制在 300ms 内稳定就位。
+- 何时重新审视：若需 panel 入场曲线与封面严格同源（可改命名 panel/bg），或浏览器对「live 动画 + VT 并存」的处理有变。
+
+## ADR-019：主题切换用 View Transitions 做「自按钮圆形揭示」
+
+- 日期：2026-10-04
+- 状态：已采纳
+- 背景：切换明暗主题原本是**瞬时**的（改 store → 写 `<html data-theme>` → `tokens.css` 的 CSS 变量即刻换色），没有任何过渡。需求：切换时有观感更好的动画，而非单纯的配色渐变。
+- 考虑过的方案：① 给颜色加 `transition`（配色渐变）；② 手写 CSS 圆 / 缩放动画；③ View Transitions 的 `clip-path: circle()` 圆形揭示。
+- 决策：③。新增 `lib/themeTransition.ts` 的 `startThemeTransition(origin, apply)`：`startViewTransition(() => flushSync(apply))`，圆心取主题按钮中心、半径 `hypot(到最远角)`，经 `--theme-vt-x/-y/-r` 注入 `<html>`；`::view-transition-new(root)` 播放 `theme-reveal`（`circle(0px at …)` → `circle(r at …)`）。`components/Topbar.tsx` 的切换按钮改走此 helper。
+- 为什么选这个：与既有 VT 基建（ADR-008 / ADR-018）同构；圆形揭示是 Chrome / Apple 熟悉的高级观感，且天然「从你点的位置展开」。
+- 为什么不选其他：① 只是配色渐变，正是要避免的；② 手写圆 / 缩放动画难以覆盖侧栏 / 顶栏 / 播放条等 `position: fixed` 区域。
+- 后果 / 已知边界：
+  - **根快照的开关**：全站默认 `:root { view-transition-name: none }`（只让 `.app-content` 参与路由转场）；主题转场需**整页**参与，故改为 `:root:not([data-theme-vt]) { view-transition-name: none }`——转场期间给 `<html>` 打 `data-theme-vt` 即恢复根捕获，同时 `:root[data-theme-vt] .app-content { view-transition-name: none }` 摘掉内容区命名（免得它被从根快照挖掉）。标记在 `finished` 后清除（resolve / reject 两分支）。
+  - **`useApplyTheme` 必须用 `useLayoutEffect`**：VT 新快照在 `flushSync` 返回后**同步**拍摄，`useEffect` 要到 paint 之后才跑，会把旧主题拍进新快照、令揭示失效。
+  - **`mix-blend-mode: normal`** 覆盖 UA 对同源 old/new 层注入的 `plus-lighter`，避免中段提亮。
+  - 揭示缓动用 `ease-in-out`（`--ease-ios` 前段过猛，圆几乎瞬铺满、过程不可见）。
+  - reduced-motion / 不支持 VT：直连切换（保持原行为）。
+- 何时重新审视：若想换揭示形态（斜切 / 缩放），或把该转场扩展到其它「全局换肤」场景。

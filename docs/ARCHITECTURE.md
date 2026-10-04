@@ -41,7 +41,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `shared/lyric.ts` | LRC 歌词解析：时间戳展开、排序、翻译对齐 |
 | `src/api/client.ts` | 前端 fetch 封装，解析 `ApiResult`，抛带 `needLogin` 的错误 |
 | `src/store/player.ts` | 播放核心状态机：队列、当前曲目、循环/随机、音量、进度；含持久化 |
-| `src/store/library.ts` | 收藏曲目、最近播放、本地自建歌单、收藏的网易云歌单 / 专辑；持久化到 **IndexedDB**（见 ADR-011） |
+| `src/store/library.ts` | 收藏曲目、最近播放、本地自建歌单、收藏的网易云歌单 / 艺人 / 专辑；持久化到 **IndexedDB**（见 ADR-011） |
 | `src/lib/idb.ts` | 低层 IndexedDB 封装（主线程与 SW 共用；`indexedDB` 不可用时优雅降级） |
 | `src/lib/coalesceWrites.ts` | 微任务级写合并的 `PersistStorage` 装饰器（同一 tick 内多次写入只落最后一次） |
 | `src/lib/libraryStorage.ts` | library 的 IDB `PersistStorage` + 旧 localStorage 数据一次性迁移 |
@@ -67,7 +67,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `src/lib/viewTransition.ts` | 内容区转场：自实现 `document.startViewTransition`（含浮层 / 减少动效 / 不支持时的降级判断） |
 | `src/lib/scrollMemory.ts` | 内容区滚动位置记忆：以 `location.key` 为键（前进新 key 归零、后退恢复） |
 | `src/components/*` | UI 组件（Sidebar/Topbar/PlayerBar/NowPlaying/QueuePanel/TrackList/EntityCards/AppLink/LoginModal/**SettingsDialog** 等） |
-| `src/pages/*` | 路由页面：Home/Browse/Radio/Search/Playlist/**Artist**/**Album**/**Crate（唱片盒）/Favorites/Recent |
+| `src/pages/*` | 路由页面：Home/Browse/Radio/Search/Playlist/**Artist**/**Album**/**Crate（唱片盒：收藏的艺人 + 专辑）/Favorites/Recent |
 
 ## 模块关系
 
@@ -97,7 +97,8 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 
 **内容区转场 / 沉浸播放页：**
 1. 导航（`useViewNavigate` / `AppLink`）经 `startRouteTransition`：支持且无浮层时用 `document.startViewTransition` + `flushSync` 提交路由更新，CSS 让 `.app-content` 交叉溶解；否则直接跳转（Firefox 走 `.route-stage` 的 CSS 降级进场）。
-2. 进入 / 退出沉浸播放页由 `player.expanded` 驱动；`NowPlaying` 常驻挂载，`usePresence` 在退出时保留挂载以播放下滑动画，动画结束后卸载。
+2. 进入 / 退出沉浸播放页由 `player.expanded` 驱动，走 `lib/nowPlayingTransition.ts` 的 `startNowPlayingTransition`：支持 View Transitions 时以**共享元素**方式让小封面（`np-cover`）morph 成大封面，背景 / 面板用 live CSS 动画淡入上浮；转场期间 `<html>` 打 `data-np-vt` 摘掉 `.app-content` 的命名（避免闪白 + 盖层）。`NowPlayingLayer`（`App.tsx`）在 VT 能力存在时**同步挂卸**（`show = expanded`），仅在完全不支持 VT 时退回 `usePresence` 延迟挂卸 + `np-enter`/`np-exit` 上滑。详见 ADR-018。
+3. 预载：`hooks/useNowPlayingPrefetch` 在当前曲目变化时预热封面（decode，`lib/imageCache.ts` 登记就绪 URL）与歌词（`lib/lyricCache.ts` 内存缓存），使打开瞬时、无占位闪、无「歌词加载中」停留。
 
 **登录解锁 VIP：**
 1. 打开 `LoginModal` → `api.qrCreate` 取 key + 二维码图片。
@@ -156,7 +157,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 - **数据契约兼容边界**：`Track.artistRefs` / `albumId` 为可选字段，旧的持久化数据（收藏 / 最近播放 / 队列）可能缺失，界面须降级为纯文本，不得假定其存在。
 - **转场边界**：项目用声明式 `<BrowserRouter>`，react-router 内置 `viewTransition` 在此不生效；内容区转场由 `src/lib/viewTransition.ts` 自实现。只给 `.app-content` 设 `view-transition-name`，`:root` 置 `none`；有浮层打开 / 减少动效 / 不支持 API 时跳过或降级（见 ADR-008）。
 - **滚动恢复边界**：内容区滚动位置以 `location.key` 为键记忆（`lib/scrollMemory.ts` + `hooks/useContentScrollRestoration.ts`）。**前进**（下钻 / 侧边栏 / 新开链接）得到新 key → 回到顶部；**后退 / 前进**（POP）复用旧 key → 恢复原位置。故「同页下钻再返回」回到原处，而「从侧边栏新开」从头开始。容器为内部滚动的 `.app-content`（不受浏览器窗口滚动恢复影响）；新增可滚动区域须沿用该容器或为其补对应恢复逻辑。
-- **浮层订阅边界**：高频 / 开合型状态（如 `player.expanded`）**不要**在 `App` 顶层订阅——`App` 一重渲染会带整棵应用树（含当前路由页）一起重渲染，移动端开合有可感卡顿。沉浸播放页的开合由独立的 `NowPlayingLayer` 订阅 `expanded` 并驱动 presence。
+- **浮层订阅边界**：高频 / 开合型状态（如 `player.expanded`）**不要**在 `App` 顶层订阅——`App` 一重渲染会带整棵应用树（含当前路由页）一起重渲染，移动端开合有可感卡顿。沉浸播放页的开合由独立的 `NowPlayingLayer` 订阅 `expanded` 驱动。
 - **移动端沉浸页性能边界**：`.nowplaying` 整块上推滑入期间，全屏 `backdrop-filter` 会逐帧重采样背景、背景层 `blur(80px)` 栅格化偏重；移动端（≤860px）降档为「scrim 纯色叠层 + 背景 `blur(40px)`」。改动这两处需回归移动端开合流畅度。
 - **毛玻璃前缀顺序边界**：CSS 压缩会丢弃未加前缀的 `backdrop-filter`，所有毛玻璃规则必须 `-webkit-backdrop-filter` 在前、`backdrop-filter` 在后（见 ADR-009）。
 - **缩略参数边界**：给网易云图片追加 `param=WxH` 必须走 `thumb()`，兼容地址已带查询串的情况（见 ADR-010）。

@@ -104,6 +104,54 @@
   transform: translateY(0);
 }
 
+/* 收藏按钮：与播放按钮同几何、不同配色；已收藏时转为强调色并常显 */
+.card__fav {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.card:hover .card__fav,
+.card__fav:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.card__fav:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.card__fav:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* 已收藏：常显 + 强调色（选择器与 `.card__fav:hover` 同权重、靠后生效，避免被中性 hover 盖掉） */
+.card__fav.card__fav--active {
+  opacity: 1;
+  transform: translateY(0);
+  background: var(--accent);
+}
+
+.card__fav.card__fav--active:hover {
+  background: var(--accent-hover);
+}
+
 .card__body {
   min-width: 0;
   padding: 0 2px;
@@ -141,5 +189,13 @@
     transform: translateY(0);
     width: 38px;
     height: 38px;
+  }
+
+  /* 触屏设备常驻显示收藏按钮 */
+  .card__fav {
+    opacity: 1;
+    transform: translateY(0);
+    width: 36px;
+    height: 36px;
   }
 }

@@ -22,7 +22,6 @@ const NAV: NavEntry[] = [
   { to: "/browse", label: "浏览", icon: Compass },
   { to: "/radio", label: "电台", icon: Radio },
   { to: "/crate", label: "唱片盒", icon: Disc3 },
-  { to: "/favorites", label: "我喜欢的音乐", icon: Heart },
   { to: "/recent", label: "最近播放", icon: Clock },
 ];
 
@@ -42,8 +41,8 @@ function GitHubMark() {
  * 侧边栏。
  *
  * 功能保持单一、避免多入口：
- * - 「唱片盒」只展示收藏的专辑；
- * - 「歌单」同时列出我自建的歌单与收藏的歌单（两类之间以浅虚线分隔，不加文字）。
+ * - 「唱片盒」展示收藏的艺人 + 专辑（上下两分区）；
+ * - 「歌单」区**固定以「我喜欢的音乐」开头**，其后为我自建歌单与收藏的歌单（两类之间以浅虚线分隔，不加文字）。
  */
 export function Sidebar() {
   const playlists = useLibrary((s) => s.playlists);
@@ -59,8 +58,6 @@ export function Sidebar() {
   const handleCreate = () => {
     openCreate({ onDone: (id) => navigate(`/playlist/${id}`) });
   };
-
-  const hasPlaylists = playlists.length > 0 || savedPlaylists.length > 0;
 
   return (
     <>
@@ -121,48 +118,53 @@ export function Sidebar() {
           </button>
         </div>
 
-        {hasPlaylists && (
-          <nav className="sidebar__nav sidebar__playlists" aria-label="歌单">
-            {playlists.map((p) => (
-              <AppLink
-                key={p.id}
-                to={`/playlist/${p.id}`}
-                className={({ isActive }) =>
-                  `nav-item${isActive ? " nav-item--active" : ""}`
-                }
-              >
-                <Cover
-                  src={p.tracks[0]?.cover}
-                  alt={p.name}
-                  radius="sm"
-                  size={19}
-                />
-                <span className="nav-item__label">{p.name}</span>
-              </AppLink>
-            ))}
+        <nav className="sidebar__nav sidebar__playlists" aria-label="歌单">
+          {/* 「我喜欢的音乐」固定为歌单区第一项 */}
+          <AppLink
+            to="/favorites"
+            className={({ isActive }) =>
+              `nav-item${isActive ? " nav-item--active" : ""}`
+            }
+          >
+            <Heart size={19} strokeWidth={1.9} />
+            <span className="nav-item__label">我喜欢的音乐</span>
+          </AppLink>
 
-            {playlists.length > 0 && savedPlaylists.length > 0 && (
-              <div className="sidebar__playlist-divider" aria-hidden />
-            )}
+          {playlists.map((p) => (
+            <AppLink
+              key={p.id}
+              to={`/playlist/${p.id}`}
+              className={({ isActive }) =>
+                `nav-item${isActive ? " nav-item--active" : ""}`
+              }
+            >
+              <Cover
+                src={p.tracks[0]?.cover}
+                alt={p.name}
+                radius="sm"
+                size={19}
+              />
+              <span className="nav-item__label">{p.name}</span>
+            </AppLink>
+          ))}
 
-            {savedPlaylists.map((p) => (
-              <AppLink
-                key={p.id}
-                to={`/playlist/${p.id}`}
-                className={({ isActive }) =>
-                  `nav-item${isActive ? " nav-item--active" : ""}`
-                }
-              >
-                <Cover src={p.cover} alt={p.name} radius="sm" size={19} />
-                <span className="nav-item__label">{p.name}</span>
-              </AppLink>
-            ))}
-          </nav>
-        )}
+          {playlists.length > 0 && savedPlaylists.length > 0 && (
+            <div className="sidebar__playlist-divider" aria-hidden />
+          )}
 
-        {!hasPlaylists && (
-          <div className="sidebar__empty">空空如也</div>
-        )}
+          {savedPlaylists.map((p) => (
+            <AppLink
+              key={p.id}
+              to={`/playlist/${p.id}`}
+              className={({ isActive }) =>
+                `nav-item${isActive ? " nav-item--active" : ""}`
+              }
+            >
+              <Cover src={p.cover} alt={p.name} radius="sm" size={19} />
+              <span className="nav-item__label">{p.name}</span>
+            </AppLink>
+          ))}
+        </nav>
       </aside>
     </>
   );

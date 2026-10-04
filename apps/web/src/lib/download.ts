@@ -30,7 +30,7 @@ export async function downloadTrack(track: Track): Promise<void> {
   const res = await fetch(streamUrl(track.id), { credentials: 'include' })
   if (!res.ok) {
     const needLogin = res.status === 403
-    throw new Error(needLogin ? '该曲目需要登录 VIP 才能下载' : `下载失败（${res.status}）`)
+    throw new Error(needLogin ? '该曲目暂不可下载' : `下载失败（${res.status}）`)
   }
   const blob = await res.blob()
   const ext = extFromMime(res.headers.get('content-type'))

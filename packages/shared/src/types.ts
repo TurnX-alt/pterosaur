@@ -111,7 +111,7 @@ export interface LocalPlaylist {
 }
 
 /**
- * 资料库的可同步数据（收藏 / 最近 / 自建歌单 / 收藏的网易云歌单 · 专辑）。
+ * 资料库的可同步数据（收藏 / 最近 / 自建歌单 / 收藏的网易云歌单 · 艺人 · 专辑）。
  * 与前端 `store/library.ts` 的持久化字段一一对应，也是云同步的载荷。
  */
 export interface LibraryData {
@@ -123,6 +123,8 @@ export interface LibraryData {
   playlists: LocalPlaylist[]
   /** 收藏的网易云歌单引用。 */
   savedPlaylists: Playlist[]
+  /** 收藏的网易云艺人引用。 */
+  savedArtists: Artist[]
   /** 收藏的网易云专辑引用。 */
   savedAlbums: Album[]
 }

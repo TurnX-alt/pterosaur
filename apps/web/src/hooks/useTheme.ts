@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
@@ -33,7 +33,9 @@ export const useTheme = create<ThemeState>()(
 export function useApplyTheme(): void {
   const mode = useTheme((s) => s.mode)
 
-  useEffect(() => {
+  // 用 useLayoutEffect 而非 useEffect：主题转场的新快照在 flushSync 返回后**同步**拍摄，
+  // useEffect 要到 paint 之后才跑，会把旧主题拍进新快照、令圆形揭示失效。
+  useLayoutEffect(() => {
     const root = document.documentElement
     if (mode === 'system') {
       root.removeAttribute('data-theme')

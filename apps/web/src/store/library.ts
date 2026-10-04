@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Track, Playlist, Album, LibraryData, LocalPlaylist } from '@pterosaur/shared/types'
+import type { Track, Playlist, Album, Artist, LibraryData, LocalPlaylist } from '@pterosaur/shared/types'
 import { libraryStorage } from '../lib/libraryStorage.js'
 
 export type { LocalPlaylist }
@@ -19,6 +19,7 @@ interface LibraryActions {
   addToPlaylist: (playlistId: string, track: Track) => void
   removeFromPlaylist: (playlistId: string, trackId: string) => void
   toggleSavePlaylist: (playlist: Playlist) => void
+  toggleSaveArtist: (artist: Artist) => void
   toggleSaveAlbum: (album: Album) => void
 }
 
@@ -37,6 +38,7 @@ export const useLibrary = create<LibraryStore>()(
       recent: [],
       playlists: [],
       savedPlaylists: [],
+      savedArtists: [],
       savedAlbums: [],
 
       toggleFavorite: (track) =>
@@ -96,6 +98,14 @@ export const useLibrary = create<LibraryStore>()(
           }
         }),
 
+      toggleSaveArtist: (artist) =>
+        set((s) => {
+          const exists = s.savedArtists.some((a) => a.id === artist.id)
+          return {
+            savedArtists: exists ? s.savedArtists.filter((a) => a.id !== artist.id) : [artist, ...s.savedArtists],
+          }
+        }),
+
       toggleSaveAlbum: (album) =>
         set((s) => {
           const exists = s.savedAlbums.some((a) => a.id === album.id)
@@ -113,6 +123,7 @@ export const useLibrary = create<LibraryStore>()(
         recent: s.recent,
         playlists: s.playlists,
         savedPlaylists: s.savedPlaylists,
+        savedArtists: s.savedArtists,
         savedAlbums: s.savedAlbums,
       }),
       // 迁移到异步 IDB 后，hydration 不再是同步的：由 main.tsx 在首次渲染前手动 rehydrate，

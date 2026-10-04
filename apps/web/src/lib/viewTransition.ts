@@ -51,7 +51,7 @@ export function supportsViewTransition(): boolean {
 }
 
 /** 用户是否偏好减少动效。 */
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 }
 

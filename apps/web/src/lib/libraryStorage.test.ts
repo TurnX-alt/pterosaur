@@ -21,6 +21,7 @@ const emptyState = (): LibraryState => ({
   recent: [],
   playlists: [],
   savedPlaylists: [],
+  savedArtists: [],
   savedAlbums: [],
 })
 

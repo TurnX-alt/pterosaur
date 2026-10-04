@@ -1,6 +1,7 @@
-import { Play } from 'lucide-react'
+import { Play, Heart } from 'lucide-react'
 import type { Album, Artist } from '@pterosaur/shared/types'
 import { usePlayCollection } from '../hooks/usePlayCollection.js'
+import { useLibrary } from '../store/library.js'
 import { Cover } from './Cover.js'
 import './Cards.css'
 
@@ -9,8 +10,20 @@ interface ArtistCardProps {
   onClick: () => void
 }
 
-/** 艺人卡片：圆形头像 + 名称 + 单曲/专辑数。 */
+/**
+ * 艺人卡片：圆形头像 + 名称 + 单曲/专辑数。
+ *
+ * - 点击卡片本体：进入艺人详情页；
+ * - 悬浮浮现的红心：收藏 / 取消收藏该艺人（`stopPropagation`，不进入详情页）。
+ *
+ * 因内部要嵌一个红心 `<button>`（按钮不能嵌套按钮），外层改用 `div[role=button]`，
+ * 与 {@link AlbumCard} 保持一致。
+ */
 export function ArtistCard({ artist, onClick }: ArtistCardProps) {
+  const savedArtists = useLibrary((s) => s.savedArtists)
+  const toggleSaveArtist = useLibrary((s) => s.toggleSaveArtist)
+  const isSaved = savedArtists.some((a) => a.id === artist.id)
+
   const meta =
     artist.musicSize || artist.albumSize
       ? [artist.musicSize ? `${artist.musicSize} 首单曲` : '', artist.albumSize ? `${artist.albumSize} 张专辑` : '']
@@ -18,15 +31,39 @@ export function ArtistCard({ artist, onClick }: ArtistCardProps) {
           .join(' · ')
       : (artist.alias?.[0] ?? '')
   return (
-    <button type="button" className="card card--artist" onClick={onClick}>
+    <div
+      className="card card--artist"
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        // 仅在卡片本体获得焦点时响应，避免误触内部红心按钮
+        if (e.target !== e.currentTarget) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
+    >
       <div className="card__art card__art--circle">
         <Cover src={artist.avatar} alt={artist.name} rounded className="card__cover" />
+        <button
+          type="button"
+          className={`card__fav${isSaved ? ' card__fav--active' : ''}`}
+          aria-label={isSaved ? '取消收藏' : '收藏到资料库'}
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleSaveArtist(artist)
+          }}
+        >
+          <Heart size={18} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+        </button>
       </div>
       <div className="card__body">
         <div className="card__title card__title--center ellipsis">{artist.name}</div>
-        {meta && <div className="card__subtitle card__subtitle--center ellipsis">{meta}</div>}
+        {meta && <div className="card__subtitle ellipsis">{meta}</div>}
       </div>
-    </button>
+    </div>
   )
 }
 

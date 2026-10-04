@@ -11,7 +11,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
+  // 本套 E2E 依赖实时网易云：偶发限流（405「操作频繁」）会让搜索类用例抖动，故本地与 CI 均开启重试。
+  retries: 2,
   workers: 1,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
   timeout: 60_000,

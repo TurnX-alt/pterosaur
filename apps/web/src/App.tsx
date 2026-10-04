@@ -23,6 +23,7 @@ import { RecentPage } from './pages/Recent.js'
 import { useAudioEngine } from './hooks/useAudioEngine.js'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useLibrarySync } from './hooks/useLibrarySync.js'
+import { useNowPlayingPrefetch } from './hooks/useNowPlayingPrefetch.js'
 import { useContentScrollRestoration } from './hooks/useContentScrollRestoration.js'
 import { useApplyTheme } from './hooks/useTheme.js'
 import { usePresence } from './hooks/usePresence.js'
@@ -42,15 +43,23 @@ const NP_EXIT_MS = 420
  * 让整棵应用树（含当前路由页）重渲染，移动端点击封面进入时有可感卡顿。
  */
 function NowPlayingLayer() {
+  // VT 能力在组件内自算（supportsViewTransition 是纯读函数，无副作用）
+  const vt = useMemo(supportsViewTransition, [])
   const expanded = usePlayer((s) => s.expanded)
-  const { mounted, exiting } = usePresence(expanded, NP_EXIT_MS)
-  return mounted ? <NowPlaying open={expanded} exiting={exiting} /> : null
+  // hooks 规则：无条件调用；仅在无 VT 时取用其字段
+  const presence = usePresence(expanded, NP_EXIT_MS)
+  // VT 路径下同步挂载/卸载（含 reduced-motion），使其进入 View Transition 快照；
+  // 完全不支持 VT 时才退回 presence 的延迟挂卸 + 整页上滑降级动画（见 NowPlaying.css）。
+  const show = vt ? expanded : presence.mounted
+  const exiting = vt ? false : presence.exiting
+  return show ? <NowPlaying open={expanded} exiting={exiting} /> : null
 }
 
 export default function App() {
   useApplyTheme()
   useAudioEngine()
   useLibrarySync()
+  useNowPlayingPrefetch()
   useContentScrollRestoration()
 
   const searchRef = useRef<HTMLInputElement | null>(null)
