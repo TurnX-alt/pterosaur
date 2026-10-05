@@ -87,4 +87,19 @@ describe('whenCoverReady', () => {
     await Promise.resolve()
     expect(isCoverReady('/preload-bad.jpg')).toBe(false)
   })
+
+  it('登记键经规范化：不同镜像主机的同一封面互相命中', async () => {
+    const p1 = whenCoverReady('https://p1.music.126.net/h==/1.jpg?param=600y600')
+    expect(lastImage().src).toBe('https://p1.music.126.net/h==/1.jpg?param=600y600')
+    lastImage().onload!()
+    await p1
+
+    // 换一个轮换到的镜像主机查询：应视为已就绪，且不再发起新加载
+    const createdBefore = created.length
+    await expect(
+      whenCoverReady('http://p4.music.126.net/h==/1.jpg?param=600y600'),
+    ).resolves.toBe(true)
+    expect(created.length).toBe(createdBefore)
+    expect(isCoverReady('https://p9.music.126.net/h==/1.jpg?param=600y600')).toBe(true)
+  })
 })

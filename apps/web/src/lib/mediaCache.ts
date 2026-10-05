@@ -1,3 +1,4 @@
+import { canonicalNeteaseImage } from '@pterosaur/shared/image'
 import { MEDIA_META_STORE, MEDIA_STORE, idbClear, idbDelete, idbGet, idbGetAll, idbPut } from './idb.js'
 
 /**
@@ -25,7 +26,7 @@ const IMAGE_PREFIX = 'image|'
 export type MediaKind = 'audio' | 'image'
 
 export interface MediaMeta {
-  /** 缓存 key：音频为 `${trackId}|${level}`，封面为 `image|${url}`。 */
+  /** 缓存 key：音频为 `${trackId}|${level}`，封面为 `image|${规范化后的 url}`（见 imageKey）。 */
   key: string
   /** 条目类别，用于用量分项统计。 */
   kind: MediaKind
@@ -54,9 +55,15 @@ export function audioKey(id: string, level: string = DEFAULT_LEVEL): string {
   return `${id}|${level}`
 }
 
-/** 由封面地址生成缓存 key（含 `param` 查询串，故不同尺寸各占一条）。 */
+/**
+ * 由封面地址生成缓存 key（含 `param` 查询串，故不同尺寸各占一条）。
+ *
+ * 键先经 `canonicalNeteaseImage` 规范化：网易云会随机轮换 p1–pN 镜像主机（见
+ * shared/image 与 ADR-020），规范化后「同一封面 + 同一尺寸」无论来自哪个主机、
+ * 新数据还是旧持久化数据，都落在同一条缓存上。
+ */
 export function imageKey(url: string | URL): string {
-  return IMAGE_PREFIX + (typeof url === 'string' ? url : url.href)
+  return IMAGE_PREFIX + canonicalNeteaseImage(typeof url === 'string' ? url : url.href)
 }
 
 /** 结合浏览器配额计算有效容量上限。 */

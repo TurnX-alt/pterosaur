@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import type { Album, Artist, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
+import { canonicalNeteaseImage } from '@pterosaur/shared/image'
 
 const require = createRequire(import.meta.url)
 
@@ -107,12 +108,23 @@ function https(url?: string): string {
 }
 
 /**
- * 追加网易云缩略参数（`param=WxH`）。
- * 兼容地址已带查询串的情况——此时用 `&` 连接，避免出现第二个 `?`（歌单封面常见）。
+ * 封面 / 头像地址：规范化（https + 固定 CDN 镜像主机，见 shared/image 与 ADR-020）
+ * 并设置缩放尺寸（覆盖地址上已有的 `param`）。
+ *
+ * 网易云会在 p1–pN.music.126.net 间随机轮换主机名（实测同一封面同端点两次调用即不同），
+ * 不规范化的话，前端所有以 URL 为键的缓存（SW 媒体池 / 就绪登记表）都会被拆成多条。
  */
-function thumb(url: string, param: string): string {
-  if (!url) return ''
-  return url.includes('?') ? `${url}&${param}` : `${url}?${param}`
+function coverUrl(raw: string | undefined, size: string): string {
+  if (!raw) return ''
+  const canonical = canonicalNeteaseImage(raw)
+  try {
+    const u = new URL(canonical)
+    u.searchParams.delete('param')
+    u.searchParams.set('param', size)
+    return u.href
+  } catch {
+    return ''
+  }
 }
 
 /** 由 fee 推断版权标记。网易云：0 免费、1/4/8 等通常为 VIP 或付费。 */
@@ -138,7 +150,7 @@ export function normalizeTrack(raw: RawSong): Track {
     artist: artists.join(' / ') || '未知艺人',
     album: album?.name ?? '',
     // 封面按需放大，网易云支持 ?param=WxH 缩略参数
-    cover: thumb(https(coverRaw), 'param=600y600'),
+    cover: coverUrl(coverRaw, '600y600'),
     duration: Math.round(((raw.dt ?? raw.duration ?? 0) as number) / 1000),
     fee: feeOf(raw.fee),
     // 供界面跳转艺人页 / 专辑页；缺失时前端降级为纯文本
@@ -152,7 +164,7 @@ export function normalizeArtist(raw: RawArtist): Artist {
   return {
     id: String(raw.id),
     name: raw.name ?? '未知艺人',
-    avatar: thumb(https(raw.picUrl), 'param=300y300'),
+    avatar: coverUrl(raw.picUrl, '300y300'),
     alias: raw.alias?.length ? raw.alias : undefined,
     albumSize: raw.albumSize,
     musicSize: raw.musicSize,
@@ -168,7 +180,7 @@ export function normalizeAlbum(raw: RawAlbum): Album {
   return {
     id: String(raw.id),
     name: raw.name ?? '未命名专辑',
-    cover: thumb(https(raw.picUrl), 'param=600y600'),
+    cover: coverUrl(raw.picUrl, '600y600'),
     artist: names.join(' / ') || '未知艺人',
     artistId: primaryId != null ? String(primaryId) : undefined,
     year: raw.publishTime ? new Date(raw.publishTime).getFullYear() : undefined,
@@ -181,7 +193,7 @@ export function normalizePlaylist(raw: RawPlaylist): Playlist {
   return {
     id: String(raw.id),
     name: raw.name ?? '未命名歌单',
-    cover: thumb(https(raw.coverImgUrl ?? raw.picUrl ?? ''), 'param=600y600'),
+    cover: coverUrl(raw.coverImgUrl ?? raw.picUrl ?? '', '600y600'),
     description: raw.description ?? undefined,
     trackCount: raw.trackCount,
     playCount: raw.playCount,
@@ -255,7 +267,7 @@ export async function playlistTracks(id: string, cookie?: string): Promise<{ pla
     ? {
         id: String(pl.id),
         name: pl.name ?? '未命名歌单',
-        cover: thumb(https(pl.coverImgUrl), 'param=600y600'),
+        cover: coverUrl(pl.coverImgUrl, '600y600'),
         description: pl.description ?? undefined,
         trackCount: pl.trackCount,
         playCount: pl.playCount,
@@ -378,7 +390,7 @@ export async function loginStatus(cookie?: string): Promise<LoginStatus> {
     return {
       logged: true,
       nickname: profile.nickname,
-      avatarUrl: profile.avatarUrl ? https(profile.avatarUrl) : undefined,
+      avatarUrl: profile.avatarUrl ? coverUrl(profile.avatarUrl, '300y300') : undefined,
       userId: profile.userId,
       vip: Boolean(profile.vipType),
     }

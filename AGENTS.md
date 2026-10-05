@@ -24,6 +24,7 @@ Pterosaur —— 仿 Apple Music 的网页音乐播放器（React 19 + Vite 前�
 - 全局规则 / 约定：
   - **同源代理铁律**：前端永远不直连网易云域名；所有网络请求走 `/api/*` 与 `/stream/*`。新增音源能力时在后端加路由，前端只调本域接口。
   - **音频地址必须 https**：网易云返回 `http://` 音频地址，后端已统一改写为 `https://`，不要在浏览器侧直接使用原始地址（会触发混合内容拦截）。
+  - **封面 URL 必须规范化**：网易云会随机轮换 `p1`–`pN.music.126.net` 镜像主机，原始 URL 不稳定。所有封面/头像一律经 `@pterosaur/shared/image` 的 `canonicalNeteaseImage`（server 侧由 `netease.ts` 的 `coverUrl` 产出；web 侧 `mediaCache.imageKey` 与 `lib/imageCache.ts` 已内建），否则以 URL 为键的缓存会被拆成多条（见 ADR-020）。
   - **NeteaseCloudMusicApi 参数是扁平的**：如 `api.cloudsearch({ keywords, limit })`，不是嵌套 `{ query: {...} }`；其返回的 `cookie` 是「Set-Cookie 字符串数组」，透传逻辑见 `apps/server/src/netease.ts`。
   - 状态管理：播放状态在 `apps/web/src/store/player.ts`，收藏/最近播放/本地歌单在 `library.ts`，登录态在 `auth.ts`，临时 UI（队列面板开合）在 `ui.ts`。持久化统一用 zustand `persist`：**`library` 走 IndexedDB**（`lib/libraryStorage.ts`，异步 + 写合并 + 旧 localStorage 一次性迁移，见 ADR-011），`player` / `theme` 仍用 localStorage。改 `library` 时务必同步其 `partialize`——IDB 的 structured clone 不能克隆 action 函数。
   - PWA / 缓存：`vite-plugin-pwa`（配置在 `apps/web/vite.config.ts`，`injectManifest`）把现有手写 SW（`apps/web/src/sw.ts`）作为**唯一** Service Worker 构建为 `sw.js`（IIFE）；`build` 就是单条 `vite build`，**已无第二步 SW 构建**。SW 承担三类互不相交的职责：`/stream/*` 音频与封面图片（`destination === 'image'`，CORS 拉取）写入**同一个** IndexedDB 池（共用 16GB LRU；逻辑在 `lib/mediaCache.ts`，低层封装 `lib/idb.ts`），生产下另经 Workbox 缓存应用外壳、**7 天过期**（`lib/shellCache.ts`）。IDB 库为 v2（`media`/`mediaMeta`）。PWA 生命周期操作（注销 / 清 Cache Storage / 硬刷新）在 `lib/pwa.ts`，均由顶栏设置弹窗调用。
@@ -36,7 +37,7 @@ Pterosaur —— 仿 Apple Music 的网页音乐播放器（React 19 + Vite 前�
 
 - `apps/server/` — Hono 后端（`@pterosaur/server`）：`src/index.ts` 入口与静态托管，`src/app.ts` 路由，`src/netease.ts` 网易云 API 封装与归一化，`tsup.config.ts` 为 tsup 构建配置。
 - `apps/web/` — React 19 前端：`src/` 下为 SPA 源码，`vite.config.ts` 为 Vite 构建配置。
-- `packages/shared/` — 前后端共享（`@pterosaur/shared`）：`src/types.ts` 数据模型与工具，`src/lyric.ts` LRC 歌词解析。
+- `packages/shared/` — 前后端共享（`@pterosaur/shared`）：`src/types.ts` 数据模型与工具，`src/lyric.ts` LRC 歌词解析，`src/image.ts` 网易云封面 URL 规范化。
 - `apps/web/src/api/` — 前端 API 客户端（`client.ts`）。
 - `apps/web/src/store/` — Zustand 状态：`player` / `library` / `auth` / `ui`。
 - `apps/web/src/hooks/` — `useAudioEngine`（音频引擎）、`useKeyboardShortcuts`、`useTheme`、`useAsync`、`audioElement`（单例 audio 与 seek）。

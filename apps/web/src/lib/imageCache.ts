@@ -1,3 +1,5 @@
+import { canonicalNeteaseImage } from '@pterosaur/shared/image'
+
 /**
  * 封面「已就绪」登记表。
  *
@@ -6,19 +8,26 @@
  * 的来源）。而回调里又不能 `await`（rAF 会死锁，见 nowPlayingTransition.ts），所以改用一张
  * 「已解码 URL」表：`Cover` 首帧即按它决定是否直接显色。
  *
+ * 键为规范化 URL（shared/image）：网易云随机轮换 p1–pN 镜像主机，同一封面经不同端点 /
+ * 新旧持久化数据会得到不同字符串，规范化后互相命中，避免同图反复预载。
  * URL 被移除无需通知（同源封面 URL 稳定）；表按插入顺序限量淘汰。
  */
 
 const ready = new Set<string>()
 const MAX = 512
 
+/** 登记表键：规范化后的地址（非网易云地址原样）。 */
+function key(src: string): string {
+  return canonicalNeteaseImage(src)
+}
+
 export function isCoverReady(src?: string): boolean {
-  return !!src && ready.has(src)
+  return !!src && ready.has(key(src))
 }
 
 export function markCoverReady(src?: string): void {
   if (!src) return
-  ready.add(src)
+  ready.add(key(src))
   while (ready.size > MAX) {
     const oldest = ready.values().next().value
     if (oldest === undefined) break
@@ -38,13 +47,15 @@ const inflight = new Map<string, Promise<boolean>>()
  * - 同一 URL 并发等待共享同一次加载。
  */
 export function whenCoverReady(src: string): Promise<boolean> {
-  if (ready.has(src)) return Promise.resolve(true)
-  let p = inflight.get(src)
+  // 判断与去重用规范化键；实际下载仍用原始地址（任一镜像主机皆可取到同一文件）
+  const k = key(src)
+  if (ready.has(k)) return Promise.resolve(true)
+  let p = inflight.get(k)
   if (!p) {
     p = new Promise<boolean>((resolve) => {
       const img = new Image()
       const settle = (ok: boolean) => {
-        inflight.delete(src)
+        inflight.delete(k)
         if (ok) markCoverReady(src)
         resolve(ok)
       }
@@ -57,7 +68,7 @@ export function whenCoverReady(src: string): Promise<boolean> {
       img.onerror = () => settle(false)
       img.src = src
     })
-    inflight.set(src, p)
+    inflight.set(k, p)
   }
   return p
 }

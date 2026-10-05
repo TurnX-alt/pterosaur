@@ -16,6 +16,7 @@ import { seekTo } from '../hooks/audioElement.js'
 import { api } from '../api/client.js'
 import { getCachedLyric, putCachedLyric } from '../lib/lyricCache.js'
 import { whenCoverReady } from '../lib/imageCache.js'
+import { canonicalNeteaseImage } from '@pterosaur/shared/image'
 import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
 import { formatTime } from '@pterosaur/shared/types'
 import type { Lyric } from '@pterosaur/shared/types'
@@ -91,7 +92,9 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
     whenCoverReady(coverUrl).then((ok) => {
       if (cancelled || !ok) return // 加载失败维持旧背景：稳定优先于空白
       setBg((prev) => {
-        if (coverUrl === prev.stable || coverUrl === prev.incoming) return prev
+        // 规范化后比较：旧持久化数据（轮换前的 host）与新鲜 API 数据是同一封面时不重复淡入
+        const same = (a: string | null) => a !== null && canonicalNeteaseImage(a) === canonicalNeteaseImage(coverUrl)
+        if (same(prev.stable) || same(prev.incoming)) return prev
         // 首张直接落位（进场动画本就有整体淡入），此后才走「旧图垫底 + 新图盖上」的交叉淡入
         return prev.stable === null
           ? { stable: coverUrl, incoming: null }

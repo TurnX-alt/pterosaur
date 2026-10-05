@@ -35,11 +35,26 @@ describe('audioKey', () => {
 })
 
 describe('imageKey', () => {
-  it('前缀区分封面并保留完整（含 param 的）地址', () => {
-    expect(imageKey('https://p1.music.126.net/a.jpg?param=600y600')).toBe(
-      'image|https://p1.music.126.net/a.jpg?param=600y600',
+  it('前缀区分封面并保留完整（含 param 的）地址；非网易云地址原样', () => {
+    expect(imageKey('https://cdn.example.com/a.jpg?param=600y600')).toBe(
+      'image|https://cdn.example.com/a.jpg?param=600y600',
     )
-    expect(imageKey(new URL('https://p1.music.126.net/a.jpg'))).toBe('image|https://p1.music.126.net/a.jpg')
+    expect(imageKey(new URL('https://cdn.example.com/a.jpg'))).toBe('image|https://cdn.example.com/a.jpg')
+  })
+
+  it('网易云镜像主机轮换（p1/p4）与 http 均规范化为同一 key（ADR-020）', () => {
+    expect(imageKey('https://p1.music.126.net/h==/1.jpg?param=600y600')).toBe(
+      'image|https://p3.music.126.net/h==/1.jpg?param=600y600',
+    )
+    expect(imageKey('http://p4.music.126.net/h==/1.jpg?param=600y600')).toBe(
+      'image|https://p3.music.126.net/h==/1.jpg?param=600y600',
+    )
+  })
+
+  it('不同 param 尺寸仍各占一条（同图不同字节）', () => {
+    expect(imageKey('https://p1.music.126.net/h==/1.jpg?param=300y300')).not.toBe(
+      imageKey('https://p2.music.126.net/h==/1.jpg?param=600y600'),
+    )
   })
 })
 
