@@ -26,20 +26,50 @@ export function markCoverReady(src?: string): void {
   }
 }
 
+/** 进行中的封面加载：同一 URL 的并发等待共享一次加载（列表快速切歌时不重复请求）。 */
+const inflight = new Map<string, Promise<boolean>>()
+
+/**
+ * 等待封面「已加载并解码完成」，供需要**换图首帧就有像素**的场景（如沉浸页背景）门控。
+ *
+ * - 已在登记表中 → 立即 resolve(true)；
+ * - 成功 → 登记就绪（与 `preloadCover` 副作用一致）；失败 → resolve(false) 且**不**登记
+ *   （失败的 URL 不进登记表，`Cover` 仍能走自己的失败兜底）；
+ * - 同一 URL 并发等待共享同一次加载。
+ */
+export function whenCoverReady(src: string): Promise<boolean> {
+  if (ready.has(src)) return Promise.resolve(true)
+  let p = inflight.get(src)
+  if (!p) {
+    p = new Promise<boolean>((resolve) => {
+      const img = new Image()
+      const settle = (ok: boolean) => {
+        inflight.delete(src)
+        if (ok) markCoverReady(src)
+        resolve(ok)
+      }
+      img.onload = () => {
+        // decode 把解码也提前做完——未解码的大图首绘可能被浏览器推迟。无 decode 的
+        // 环境（jsdom）退化为 onload 即就绪。
+        if (typeof img.decode === 'function') img.decode().then(() => settle(true), () => settle(false))
+        else settle(true)
+      }
+      img.onerror = () => settle(false)
+      img.src = src
+    })
+    inflight.set(src, p)
+  }
+  return p
+}
+
 /** 预取并解码封面，就绪后登记（失败忽略）。幂等。 */
 export function preloadCover(src?: string): void {
   if (!src) return
-  const img = new Image()
-  img.src = src
-  img
-    .decode()
-    .then(() => markCoverReady(src))
-    .catch(() => {
-      /* 解码失败忽略；正式渲染会再走一次 <img> */
-    })
+  void whenCoverReady(src)
 }
 
-/** 清空登记表（供测试 / 重置使用）。 */
+/** 清空登记表与进行中的加载（供测试 / 重置使用）。 */
 export function clearCoverRegistry(): void {
   ready.clear()
+  inflight.clear()
 }

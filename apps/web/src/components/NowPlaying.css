@@ -117,6 +117,8 @@
 .nowplaying__bg {
   position: absolute;
   inset: -40px;
+  /* 兜底底色：封面未就绪 / 加载失败时这层也不再透明，杜绝透出身后页面 */
+  background-color: var(--bg);
   background-size: cover;
   background-position: center;
   /*
@@ -127,6 +129,23 @@
   filter: blur(40px) saturate(150%) brightness(0.5);
   transform: scale(1.1);
   z-index: 0;
+}
+
+/*
+ * 切歌时的交叉淡入层：与稳定层（.nowplaying__bg 常驻旧封面）同款样式，仅多一段淡入；
+ * 组件保证它只在**新封面已加载解码**后挂载（key 换图即重放动画），淡完落位并卸载。
+ */
+.nowplaying__bg-in {
+  animation: np-bg-in var(--dur-slow) var(--ease-ios) both;
+}
+
+@keyframes np-bg-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .nowplaying__scrim {

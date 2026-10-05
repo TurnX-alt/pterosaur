@@ -15,6 +15,7 @@ import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { seekTo } from '../hooks/audioElement.js'
 import { api } from '../api/client.js'
 import { getCachedLyric, putCachedLyric } from '../lib/lyricCache.js'
+import { whenCoverReady } from '../lib/imageCache.js'
 import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
 import { formatTime } from '@pterosaur/shared/types'
 import type { Lyric } from '@pterosaur/shared/types'
@@ -30,6 +31,15 @@ interface NowPlayingProps {
   /** 是否正在播放退出动画。 */
   exiting: boolean
 }
+
+/** 背景双层状态：stable 为常驻绘制层，incoming 为正在淡入、淡完落位即卸载的层。 */
+type BgState = { stable: string | null; incoming: string | null }
+
+/**
+ * 背景淡入动画（`--dur-slow` = 400ms）后的落位时限。用定时器而非 animationend 兜底：
+ * reduced-motion 下动画时长被压到 0.01ms，事件时机不可靠（与 usePresence 同款处理）。
+ */
+const BG_FADE_SETTLE_MS = 480
 
 /**
  * 全屏播放页（Apple Music「正在播放」）。
@@ -65,6 +75,43 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
 
   const [lyric, setLyric] = useState<Lyric | null>(null)
   const [lyricLoading, setLyricLoading] = useState(false)
+
+  /*
+   * 切歌防闪背景：稳定层（旧封面）常驻绘制，新封面**加载并解码完成后**才经淡入层盖上、
+   * 淡完落位。此前单层 `backgroundImage` 跟随 `current.cover` 同步替换——未缓存的封面在
+   * 下载 + 解码期间整层空白，透过 scrim 的 backdrop-filter 糊出身后页面（命中缓存则无感，
+   * 正是「有概率」复现的来源）。
+   */
+  const [bg, setBg] = useState<BgState>({ stable: null, incoming: null })
+
+  const coverUrl = current?.cover
+  useEffect(() => {
+    if (!coverUrl) return
+    let cancelled = false
+    whenCoverReady(coverUrl).then((ok) => {
+      if (cancelled || !ok) return // 加载失败维持旧背景：稳定优先于空白
+      setBg((prev) => {
+        if (coverUrl === prev.stable || coverUrl === prev.incoming) return prev
+        // 首张直接落位（进场动画本就有整体淡入），此后才走「旧图垫底 + 新图盖上」的交叉淡入
+        return prev.stable === null
+          ? { stable: coverUrl, incoming: null }
+          : { stable: prev.stable, incoming: coverUrl }
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [coverUrl])
+
+  // 淡入完成 → 新图落位、卸载淡入层（收敛回单层，避免常驻多层全屏模糊的合成开销）
+  useEffect(() => {
+    if (!bg.incoming) return
+    const t = setTimeout(
+      () => setBg((prev) => (prev.incoming ? { stable: prev.incoming, incoming: null } : prev)),
+      BG_FADE_SETTLE_MS,
+    )
+    return () => clearTimeout(t)
+  }, [bg.incoming])
 
   // 拉取歌词
   useEffect(() => {
@@ -150,8 +197,20 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
       aria-label="正在播放"
       aria-hidden={!open}
     >
-      {/* 动态模糊背景 */}
-      <div className="nowplaying__bg" style={{ backgroundImage: `url(${current.cover})` }} aria-hidden />
+      {/* 动态模糊背景：双层防闪（见组件内「切歌防闪背景」注释） */}
+      <div
+        className="nowplaying__bg"
+        style={bg.stable ? { backgroundImage: `url(${bg.stable})` } : undefined}
+        aria-hidden
+      />
+      {bg.incoming && (
+        <div
+          key={bg.incoming}
+          className="nowplaying__bg nowplaying__bg-in"
+          style={{ backgroundImage: `url(${bg.incoming})` }}
+          aria-hidden
+        />
+      )}
       <div className="nowplaying__scrim" onClick={() => startNowPlayingTransition(false)} aria-hidden />
 
       <div className="nowplaying__inner">
