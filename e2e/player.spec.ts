@@ -829,9 +829,12 @@ test.describe('搜索分栏与艺人 / 专辑跳转', () => {
   test('搜索结果分为歌曲 / 艺人 / 专辑 / 歌单四个 tab', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
 
-    const tabs = page.getByRole('tab')
+    // 限定到「搜索结果分类」tablist：搜索页另有「音源」tablist（多源筛选）
+    const tabs = page
+      .getByRole('tablist', { name: '搜索结果分类' })
+      .getByRole('tab')
     await expect(tabs).toHaveCount(4)
-    await expect(page.getByRole('tab', { name: /歌曲/ })).toHaveAttribute(
+    await expect(tabs.filter({ hasText: /歌曲/ })).toHaveAttribute(
       'aria-selected',
       'true',
     )
