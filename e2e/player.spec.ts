@@ -1135,6 +1135,63 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
     expect(res.bytes).toBe(100)
   })
 
+  test('拖动进度条 seek：带 Range 的请求直连线上、位置到位且无错误提示', async ({
+    page,
+    context,
+  }) => {
+    // 记录线上 /stream 请求：seek 型 Range 才会带有 Range 头（SW 不再接管）。
+    // 旧实现会把 seek 吞成「无 Range 的整文件请求」，本用例据此变红。
+    const seekRanges: string[] = []
+    await context.route('**/stream/**', async (route) => {
+      const range = route.request().headers()['range']
+      if (range && !/^bytes=0-$/.test(range)) seekRanges.push(range)
+      await route.continue()
+    })
+
+    await page.goto('/')
+    await page.evaluate(() => navigator.serviceWorker?.ready)
+    await page.reload()
+
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
+    await page.locator('.track-row').first().click()
+
+    // 等进度条可用（元数据就绪）
+    const slider = page.locator('[role="slider"][aria-label="播放进度"]')
+    await expect(slider).not.toHaveAttribute('aria-disabled', 'true', {
+      timeout: 15000,
+    })
+
+    // 点击进度条 80% 处：跳向未缓冲区间
+    const box = await slider.boundingBox()
+    if (!box) throw new Error('进度条不可见')
+    await page.mouse.click(box.x + box.width * 0.8, box.y + box.height / 2)
+
+    // seek 必须以带 Range 的直连请求发出
+    await expect
+      .poll(() => seekRanges.length, { timeout: 15000 })
+      .toBeGreaterThan(0)
+    expect(seekRanges[0]).toMatch(/^bytes=\d+/)
+
+    // 位置到位（跳转实际完成）
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => {
+            const audio = document.querySelector('audio')
+            if (!audio || !audio.duration) return 0
+            return audio.currentTime / audio.duration
+          }),
+        { timeout: 20000 },
+      )
+      .toBeGreaterThan(0.7)
+
+    // 全程无错误提示
+    await expect(page.locator('.toast[role="alert"]')).toHaveCount(0)
+  })
+
   test('封面图片经 SW 缓存进 IndexedDB（与音频共用存储）', async ({ page }) => {
     await page.goto('/')
     // 等 SW 就绪并 reload，确保图片请求自始即受 SW 控制
