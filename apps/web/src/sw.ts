@@ -323,8 +323,8 @@ sw.addEventListener('fetch', (event) => {
   const parsed = keyFromStreamUrl(url)
   if (parsed) {
     // seek 型 Range（起点 > 0 / 后缀）不接管：由浏览器直接请求同源接口。
-    // 经 SW 转发或应答会让媒体内核在下载途中的 seek 流上读取失败
-    // （FFmpegDemuxer: data source error），拖动进度条随即弹错并启停循环
+    // 若在 SW 内去掉 Range 取整文件应答，seek 将无法完成（seeking 停在
+    // waiting/stalled）；播放侧停滞看门狗只能以重载兜底，且每次重载又触发一次整文件请求
     if (!isWholeFileRange(request.headers.get('range'))) return
     event.respondWith(
       handleStream(
