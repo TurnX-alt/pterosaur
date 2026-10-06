@@ -5,6 +5,7 @@ import type { Track } from '@pterosaur/shared/types'
 /** 构造测试用曲目。 */
 function track(id: string, title = `曲目${id}`): Track {
   return {
+    source: 'netease',
     id,
     title,
     artist: '艺人',

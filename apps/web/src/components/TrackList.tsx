@@ -1,6 +1,6 @@
 import { Play, Pause, Heart, MoreHorizontal, Clock } from 'lucide-react'
 import type { Track } from '@pterosaur/shared/types'
-import { formatTime } from '@pterosaur/shared/types'
+import { formatTime, keyOf } from '@pterosaur/shared/types'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
@@ -61,13 +61,13 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
   const handleRowPlay = (index: number) => {
     const track = tracks[index]
     // 若点击的正是当前曲目：切换播放/暂停
-    if (current && track.id === current.id && isSameQueue(queue, tracks)) {
+    if (current && keyOf(track) === keyOf(current) && isSameQueue(queue, tracks)) {
       toggle()
       return
     }
     // 否则以本列表为新队列播放
     if (isSameQueue(queue, tracks)) {
-      const i = queue.findIndex((t) => t.id === track.id)
+      const i = queue.findIndex((t) => keyOf(t) === keyOf(track))
       if (i >= 0) {
         usePlayer.getState().playIndex(i)
         return
@@ -91,12 +91,12 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
       )}
 
       {tracks.map((t, i) => {
-        const isCurrent = current?.id === t.id
+        const isCurrent = current ? keyOf(current) === keyOf(t) : false
         const isCurrentPlaying = isCurrent && isPlaying
-        const isFav = favorites.some((f) => f.id === t.id)
+        const isFav = favorites.some((f) => keyOf(f) === keyOf(t))
         return (
           <div
-            key={`${t.id}-${i}`}
+            key={`${keyOf(t)}-${i}`}
             className={`track-row${isCurrent ? ' track-row--current' : ''}`}
             role="listitem"
             onClick={() => handleRowPlay(i)}
@@ -135,7 +135,7 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
                         <button
                           type="button"
                           className="track-link"
-                          onClick={(e) => openEntity(e, `/artist/${a.id}`)}
+                          onClick={(e) => openEntity(e, `/artist/${t.source}/${a.id}?name=${encodeURIComponent(a.name)}`)}
                           onKeyDown={stopKey}
                         >
                           {a.name}
@@ -154,7 +154,7 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
                 <button
                   type="button"
                   className="track-link"
-                  onClick={(e) => openEntity(e, `/album/${t.albumId}`)}
+                  onClick={(e) => openEntity(e, `/album/${t.source}/${t.albumId}`)}
                   onKeyDown={stopKey}
                 >
                   {t.album}
@@ -191,9 +191,9 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
   )
 }
 
-/** 判断两个队列是否为同一批曲目（顺序与 ID 一致）。 */
+/** 判断两个队列是否为同一批曲目（顺序与身份键一致）。 */
 function isSameQueue(a: Track[], b: Track[]): boolean {
   if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) if (a[i].id !== b[i].id) return false
+  for (let i = 0; i < a.length; i++) if (keyOf(a[i]) !== keyOf(b[i])) return false
   return true
 }

@@ -2,6 +2,7 @@ import { createRequire } from 'node:module'
 import type { Album, Artist, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
 import { canonicalNeteaseImage } from '@pterosaur/shared/image'
+import type { SourceAdapter } from './types.js'
 
 const require = createRequire(import.meta.url)
 
@@ -145,6 +146,7 @@ export function normalizeTrack(raw: RawSong): Track {
   const album = raw.al ?? raw.album
   const coverRaw = album?.picUrl ?? album?.blurPicUrl ?? ''
   return {
+    source: 'netease',
     id: String(raw.id),
     title: raw.name ?? '未知曲目',
     artist: artists.join(' / ') || '未知艺人',
@@ -162,6 +164,7 @@ export function normalizeTrack(raw: RawSong): Track {
 /** 将网易云原始艺人归一化为共享 Artist。 */
 export function normalizeArtist(raw: RawArtist): Artist {
   return {
+    source: 'netease',
     id: String(raw.id),
     name: raw.name ?? '未知艺人',
     avatar: coverUrl(raw.picUrl, '300y300'),
@@ -178,6 +181,7 @@ export function normalizeAlbum(raw: RawAlbum): Album {
   const names = list.map((a) => a?.name).filter(Boolean)
   const primaryId = list.find((a) => a && a.id != null)?.id
   return {
+    source: 'netease',
     id: String(raw.id),
     name: raw.name ?? '未命名专辑',
     cover: coverUrl(raw.picUrl, '600y600'),
@@ -191,6 +195,7 @@ export function normalizeAlbum(raw: RawAlbum): Album {
 /** 将网易云原始歌单归一化为共享 Playlist。 */
 export function normalizePlaylist(raw: RawPlaylist): Playlist {
   return {
+    source: 'netease',
     id: String(raw.id),
     name: raw.name ?? '未命名歌单',
     cover: coverUrl(raw.coverImgUrl ?? raw.picUrl ?? '', '600y600'),
@@ -265,6 +270,7 @@ export async function playlistTracks(id: string, cookie?: string): Promise<{ pla
   const pl = res?.body?.playlist
   const playlist: Playlist = pl
     ? {
+        source: 'netease',
         id: String(pl.id),
         name: pl.name ?? '未命名歌单',
         cover: coverUrl(pl.coverImgUrl, '600y600'),
@@ -273,7 +279,7 @@ export async function playlistTracks(id: string, cookie?: string): Promise<{ pla
         playCount: pl.playCount,
         creator: pl.creator?.nickname,
       }
-    : { id, name: '歌单', cover: '' }
+    : { source: 'netease', id, name: '歌单', cover: '' }
   const tracks: Track[] = ((pl?.tracks ?? []) as RawSong[]).map(normalizeTrack)
   return { playlist, tracks }
 }
@@ -373,13 +379,6 @@ export async function qrCheck(key: string, cookie?: string): Promise<{ code: num
   }
 }
 
-/** 手机号登录（可选，用于无二维码环境）。 */
-export async function loginCellphone(phone: string, password: string): Promise<{ cookies?: string[] } | undefined> {
-  const res = await api.login_cellphone({ phone, password })
-  if (res?.body?.code !== 200) return undefined
-  return { cookies: res?.cookie }
-}
-
 /** 查询登录状态。 */
 export async function loginStatus(cookie?: string): Promise<LoginStatus> {
   if (!cookie) return { logged: false }
@@ -391,7 +390,7 @@ export async function loginStatus(cookie?: string): Promise<LoginStatus> {
       logged: true,
       nickname: profile.nickname,
       avatarUrl: profile.avatarUrl ? coverUrl(profile.avatarUrl, '300y300') : undefined,
-      userId: profile.userId,
+      userId: profile.userId != null ? String(profile.userId) : undefined,
       vip: Boolean(profile.vipType),
     }
   } catch {
@@ -404,4 +403,36 @@ export async function userPlaylists(uid: string, cookie?: string): Promise<Playl
   const res = await api.user_playlist({ uid, cookie })
   const list: RawPlaylist[] = res?.body?.playlist ?? []
   return list.map(normalizePlaylist)
+}
+
+/* ============================ 适配器 ============================ */
+
+/** 退出登录需清理的网易云会话 cookie。 */
+export const NETEASE_LOGOUT_COOKIE_NAMES = ['MUSIC_U', '__csrf'] as const
+
+/** 网易云音源适配器（供 `sources` 注册表使用）。 */
+export const neteaseAdapter: SourceAdapter = {
+  id: 'netease',
+  sessionCookieNames: SESSION_COOKIE_NAMES,
+  logoutCookieNames: NETEASE_LOGOUT_COOKIE_NAMES,
+  searchSongs,
+  searchArtists,
+  searchAlbums,
+  searchPlaylists,
+  recommendPlaylists,
+  toplists,
+  topPlaylists,
+  artistDetail,
+  albumDetail,
+  playlistTracks,
+  songUrl,
+  songDetail,
+  getLyric,
+  qrKey,
+  qrCreate,
+  qrLoginUrl,
+  qrCheck,
+  loginStatus,
+  userPlaylists,
+  cookieHeaderFromSetCookies,
 }

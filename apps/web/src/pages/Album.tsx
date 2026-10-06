@@ -7,6 +7,7 @@ import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { confirmDialog } from '../store/ui.js'
 import type { Album, Track } from '@pterosaur/shared/types'
+import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
@@ -24,24 +25,26 @@ interface AlbumDetail {
  * 专辑详情页：封面 + 档案（含可点击的艺人）+ 曲目列表。
  */
 export function AlbumPage() {
-  const { id = '' } = useParams()
+  const params = useParams()
+  const source: MusicSource = isMusicSource(params.source) ? params.source : DEFAULT_SOURCE
+  const id = params.id ?? ''
   const navigate = useViewNavigate()
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const savedAlbums = useLibrary((s) => s.savedAlbums)
   const toggleSaveAlbum = useLibrary((s) => s.toggleSaveAlbum)
-  const isSaved = savedAlbums.some((a) => a.id === id)
+  const isSaved = savedAlbums.some((a) => a.source === source && a.id === id)
 
   // 翻录进度：从全局 store 认领属于本专辑的那份（切走再回自动恢复）
-  const ripKey = `album:${id}`
+  const ripKey = `album:${source}:${id}`
   const ripJob = useRip((s) => s.job)
   const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
 
   const { data, loading, error, reload } = useAsync<AlbumDetail>(
-    () => api.album(id),
-    [id],
+    () => api.album(source, id),
+    [source, id],
     null,
-    id ? `album:${id}` : undefined,
+    id ? `album:${source}:${id}` : undefined,
   )
 
   const album = data?.album
@@ -101,7 +104,7 @@ export function AlbumPage() {
               <button
                 type="button"
                 className="detail__artist-link"
-                onClick={() => navigate(`/artist/${album.artistId}`)}
+                onClick={() => navigate(`/artist/${album.source}/${album.artistId}?name=${encodeURIComponent(album.artist)}`)}
               >
                 {album.artist}
               </button>

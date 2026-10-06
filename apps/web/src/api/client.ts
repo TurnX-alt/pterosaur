@@ -4,6 +4,7 @@ import type {
   Artist,
   LoginStatus,
   Lyric,
+  MusicSource,
   Playlist,
   SearchResults,
   SyncEnvelope,
@@ -54,40 +55,55 @@ const post = <T>(path: string, body?: unknown): Promise<T> => send<T>('POST', pa
 const put = <T>(path: string, body?: unknown): Promise<T> => send<T>('PUT', path, body)
 
 export const api = {
-  search: (keywords: string, limit = 30) => get<Track[]>(`${API_BASE}/search`, { keywords, limit }),
+  search: (source: MusicSource, keywords: string, limit = 30) =>
+    get<Track[]>(`${API_BASE}/search`, { keywords, limit, source }),
 
   /** 多类型搜索：一次并行返回歌曲 / 艺人 / 专辑 / 歌单。 */
-  searchAll: (keywords: string, limit = 20) => get<SearchResults>(`${API_BASE}/search/all`, { keywords, limit }),
+  searchAll: (source: MusicSource, keywords: string, limit = 20) =>
+    get<SearchResults>(`${API_BASE}/search/all`, { keywords, limit, source }),
 
-  /** 艺人详情：档案 + 热门单曲 + 专辑列表。 */
-  artist: (id: string) =>
-    get<{ artist: Artist; tracks: Track[]; albums: Album[] }>(`${API_BASE}/artist/${encodeURIComponent(id)}`),
+  /** 艺人详情：档案 + 热门单曲 + 专辑列表（`name` 供 QQ 等无按-mid 取歌手接口的源按名搜索）。 */
+  artist: (source: MusicSource, id: string, name?: string) =>
+    get<{ artist: Artist; tracks: Track[]; albums: Album[] }>(
+      `${API_BASE}/artist/${source}/${encodeURIComponent(id)}`,
+      { name },
+    ),
 
   /** 专辑详情：档案 + 曲目。 */
-  album: (id: string) => get<{ album: Album; tracks: Track[] }>(`${API_BASE}/album/${encodeURIComponent(id)}`),
+  album: (source: MusicSource, id: string) =>
+    get<{ album: Album; tracks: Track[] }>(`${API_BASE}/album/${source}/${encodeURIComponent(id)}`),
 
-  recommend: (limit = 12) => get<Playlist[]>(`${API_BASE}/discover/recommend`, { limit }),
+  /** 某源支持的发现能力：`{ recommend, playlists, toplists }`（供前端隐藏不支持的 tab）。 */
+  discoverCapabilities: (source: MusicSource) =>
+    get<{ recommend: boolean; playlists: boolean; toplists: boolean }>(`${API_BASE}/discover/capabilities`, {
+      source,
+    }),
 
-  toplists: () => get<Playlist[]>(`${API_BASE}/discover/toplists`),
+  recommend: (source: MusicSource, limit = 12) =>
+    get<Playlist[]>(`${API_BASE}/discover/recommend`, { limit, source }),
 
-  playlists: (limit = 12, cat = '全部') => get<Playlist[]>(`${API_BASE}/discover/playlists`, { limit, cat }),
+  toplists: (source: MusicSource, limit = 50) =>
+    get<Playlist[]>(`${API_BASE}/discover/toplists`, { limit, source }),
 
-  playlist: (id: string) =>
-    get<{ playlist: Playlist; tracks: Track[] }>(`${API_BASE}/playlist/${encodeURIComponent(id)}`),
+  playlists: (source: MusicSource, limit = 12, cat = '全部') =>
+    get<Playlist[]>(`${API_BASE}/discover/playlists`, { limit, cat, source }),
 
-  songs: (ids: string[]) => get<Track[]>(`${API_BASE}/songs`, { ids: ids.join(',') }),
+  playlist: (source: MusicSource, id: string) =>
+    get<{ playlist: Playlist; tracks: Track[] }>(`${API_BASE}/playlist/${source}/${encodeURIComponent(id)}`),
 
-  lyric: (id: string) => get<Lyric>(`${API_BASE}/lyric/${encodeURIComponent(id)}`),
+  songs: (source: MusicSource, ids: string[]) => get<Track[]>(`${API_BASE}/songs`, { ids: ids.join(','), source }),
 
-  authStatus: () => get<LoginStatus>(`${API_BASE}/auth/status`),
+  lyric: (source: MusicSource, id: string) =>
+    get<Lyric>(`${API_BASE}/lyric/${source}/${encodeURIComponent(id)}`),
 
-  qrCreate: () => get<{ key: string; qrimg: string }>(`${API_BASE}/auth/qr`),
+  authStatus: (source: MusicSource) => get<LoginStatus>(`${API_BASE}/auth/${source}/status`),
 
-  qrCheck: (key: string) => get<LoginStatus & { code?: number }>(`${API_BASE}/auth/qr/check`, { key }),
+  qrCreate: (source: MusicSource) => get<{ key: string; qrimg: string }>(`${API_BASE}/auth/${source}/qr`),
 
-  login: (phone: string, password: string) => post<LoginStatus>(`${API_BASE}/auth/login`, { phone, password }),
+  qrCheck: (source: MusicSource, key: string) =>
+    get<LoginStatus & { code?: number; message?: string }>(`${API_BASE}/auth/${source}/qr/check`, { key }),
 
-  logout: () => post<LoginStatus>(`${API_BASE}/auth/logout`),
+  logout: (source: MusicSource) => post<LoginStatus>(`${API_BASE}/auth/${source}/logout`),
 
   userPlaylists: (uid?: string) => get<Playlist[]>(`${API_BASE}/user/playlists`, { uid }),
 

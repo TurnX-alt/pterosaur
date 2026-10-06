@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { formatTime, streamUrl } from './types.js'
+import { formatTime, streamUrl, sourceOf, keyOf, isMusicSource } from './types.js'
+import type { MusicSource } from './types.js'
 
 describe('formatTime', () => {
   it('格式化 0 秒', () => {
@@ -25,21 +26,49 @@ describe('formatTime', () => {
 })
 
 describe('streamUrl', () => {
-  it('基础路径', () => {
-    expect(streamUrl('123')).toBe('/stream/123')
+  it('基础路径带源段', () => {
+    expect(streamUrl('netease', '123')).toBe('/stream/netease/123')
+    expect(streamUrl('qq', '003rJSwm3TechU')).toBe('/stream/qq/003rJSwm3TechU')
   })
 
   it('编码特殊字符 ID', () => {
-    expect(streamUrl('a/b')).toBe('/stream/a%2Fb')
+    expect(streamUrl('netease', 'a/b')).toBe('/stream/netease/a%2Fb')
   })
 
   it('附带 level 参数', () => {
-    expect(streamUrl('123', { level: 'lossless' })).toBe('/stream/123?level=lossless')
+    expect(streamUrl('netease', '123', { level: 'lossless' })).toBe('/stream/netease/123?level=lossless')
   })
 
   it('附带 token 参数', () => {
-    const url = streamUrl('123', { level: 'exhigh', token: 'abc' })
+    const url = streamUrl('qq', '123', { level: 'exhigh', token: 'abc' })
     expect(url).toContain('level=exhigh')
     expect(url).toContain('t=abc')
+  })
+})
+
+describe('sourceOf / keyOf', () => {
+  it('缺失 source 时回填缺省源（旧数据兼容）', () => {
+    const legacy = { id: '1' } as { id: string; source?: MusicSource }
+    expect(sourceOf(legacy)).toBe('netease')
+    expect(keyOf(legacy)).toBe('netease:1')
+  })
+
+  it('两源共享原始 id 产生不同身份键', () => {
+    expect(keyOf({ source: 'netease', id: '1' })).toBe('netease:1')
+    expect(keyOf({ source: 'qq', id: '1' })).toBe('qq:1')
+    expect(keyOf({ source: 'netease', id: '1' })).not.toBe(keyOf({ source: 'qq', id: '1' }))
+  })
+})
+
+describe('isMusicSource', () => {
+  it('识别合法音源', () => {
+    expect(isMusicSource('netease')).toBe(true)
+    expect(isMusicSource('qq')).toBe(true)
+  })
+
+  it('拒绝非法值与本地歌单前缀', () => {
+    expect(isMusicSource('pl-abc')).toBe(false)
+    expect(isMusicSource('spotify')).toBe(false)
+    expect(isMusicSource(undefined)).toBe(false)
   })
 })

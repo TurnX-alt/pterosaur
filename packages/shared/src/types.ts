@@ -5,8 +5,36 @@
  * 因此不得包含任何运行环境相关的代码（如 DOM / Node API）。
  */
 
-/** 音源服务器（当前仅网易云）。 */
-export type MusicSource = 'netease'
+/** 音源服务器。 */
+export type MusicSource = 'netease' | 'qq'
+
+/** 全部音源（顺序即 UI 展示顺序：网易云优先）。 */
+export const MUSIC_SOURCES = ['netease', 'qq'] as const
+
+/** 缺省音源：旧数据回填、URL 缺源段时的兜底。 */
+export const DEFAULT_SOURCE: MusicSource = 'netease'
+
+/**
+ * 判定是否合法音源。用于 `:source` 路由段守卫——
+ * 本地自建歌单 id 形如 `pl-xxx`，须确保不被误判为源。
+ */
+export function isMusicSource(v: unknown): v is MusicSource {
+  return v === 'netease' || v === 'qq'
+}
+
+/** 读取实体所属源；旧持久化数据（收藏 / 最近 / 队列 / 云同步载荷）缺失时回填缺省源。 */
+export function sourceOf(e: { source?: MusicSource }): MusicSource {
+  return e.source ?? DEFAULT_SOURCE
+}
+
+/**
+ * 跨源稳定身份键：`<source>:<id>`。
+ * 全仓所有「认曲 / 认实体」的比对（收藏去重、队列定位、缓存键前缀）一律用它，
+ * 避免不同源的曲目共享同一原始 id 时互相覆盖。
+ */
+export function keyOf(e: { id: string; source?: MusicSource }): string {
+  return `${sourceOf(e)}:${e.id}`
+}
 
 /** 播放循环模式。 */
 export type RepeatMode = 'off' | 'all' | 'one'
@@ -19,6 +47,8 @@ export interface ArtistRef {
 
 /** 精简后的曲目模型，前后端统一使用该结构。 */
 export interface Track {
+  /** 所属音源。与 `id` 共同构成跨源唯一身份（见 `keyOf`）。 */
+  source: MusicSource
   /** 曲目在音源内的唯一 ID。 */
   id: string
   /** 曲名。 */
@@ -47,6 +77,8 @@ export interface Track {
 
 /** 艺人模型。 */
 export interface Artist {
+  /** 所属音源。 */
+  source: MusicSource
   id: string
   name: string
   /** 头像地址（已改写为 https）。 */
@@ -63,6 +95,8 @@ export interface Artist {
 
 /** 专辑模型。 */
 export interface Album {
+  /** 所属音源。 */
+  source: MusicSource
   id: string
   name: string
   /** 封面地址（已改写为 https）。 */
@@ -83,10 +117,17 @@ export interface SearchResults {
   artists: Artist[]
   albums: Album[]
   playlists: Playlist[]
+  /**
+   * 各类型在**当前源**下是否受支持（缺失视为支持）。
+   * 某些源可能不具备全部搜索能力（如 QQ 音乐暂不支持歌单搜索），供 UI 隐藏不支持的分类。
+   */
+  capabilities?: Record<'songs' | 'artists' | 'albums' | 'playlists', boolean>
 }
 
 /** 歌单 / 排行榜等合集的精简模型。 */
 export interface Playlist {
+  /** 所属音源。 */
+  source: MusicSource
   id: string
   name: string
   cover: string
@@ -170,8 +211,11 @@ export interface LoginStatus {
   logged: boolean
   nickname?: string
   avatarUrl?: string
-  /** 用户 ID（用于拉取「我的歌单」）。 */
-  userId?: number
+  /**
+   * 账号 ID（用于云同步锚点与拉取「我的歌单」）。
+   * 用**字符串**：QQ 的 `uin` 会超出 JS 安全整数范围，数字会丢精度。
+   */
+  userId?: string
   /** 是否 VIP。 */
   vip?: boolean
 }
@@ -183,17 +227,22 @@ export const API_BASE = '/api'
 export const STREAM_BASE = '/stream'
 
 /**
- * 由曲目 ID 构造同源音频流地址。
+ * 由「源 + 曲目 ID」构造同源音频流地址。
  *
- * 浏览器 `<audio>` 直接请求该地址，后端负责解析真实 URL、
+ * 浏览器 `<audio>` 直接请求该地址，后端按源分发、解析真实 URL、
  * 改写为 https 并支持 Range 分段，从而规避混合内容与跨域问题。
  */
-export function streamUrl(id: string, opts?: { level?: string; token?: string }): string {
+export function streamUrl(source: MusicSource, id: string, opts?: { level?: string; token?: string }): string {
   const q = new URLSearchParams()
   if (opts?.level) q.set('level', opts.level)
   if (opts?.token) q.set('t', opts.token)
   const qs = q.toString()
-  return `${STREAM_BASE}/${encodeURIComponent(id)}${qs ? `?${qs}` : ''}`
+  return `${STREAM_BASE}/${source}/${encodeURIComponent(id)}${qs ? `?${qs}` : ''}`
+}
+
+/** 便捷式：由曲目构造同源音频流地址（`source` 缺失时按缺省源）。 */
+export function streamUrlOf(track: Track, opts?: { level?: string; token?: string }): string {
+  return streamUrl(sourceOf(track), track.id, opts)
 }
 
 /** 将秒数格式化为 `m:ss`。 */

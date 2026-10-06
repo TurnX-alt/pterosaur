@@ -158,7 +158,7 @@ test.describe('应用外壳', () => {
   test('立即收听：点击快捷入口本体进入对应页面（而非播放）', async ({ page }) => {
     await page.goto('/')
     // 种入一条收藏与一条最近播放，确认「有内容」时点击本体也走导航而非播放
-    const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
+    const t = { source: 'netease', id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
     await seedLibrary(page, { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] })
     await page.reload()
     await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
@@ -178,7 +178,7 @@ test.describe('应用外壳', () => {
 
   test('立即收听：快捷入口的播放按钮直接播放，不跳转', async ({ page }) => {
     await page.goto('/')
-    const t = { id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
+    const t = { source: 'netease', id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
     await seedLibrary(page, { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] })
     await page.reload()
     await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
@@ -527,7 +527,7 @@ test.describe('资料库与收藏', () => {
     const name = ((await page.locator('.card--album .card__title').first().textContent()) ?? '').trim()
 
     await page.locator('.card--album').first().click()
-    await expect(page).toHaveURL(/\/album\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/album\/[^/]+\/\d+/, { timeout: 8000 })
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
 
     // 收藏
@@ -549,8 +549,8 @@ test.describe('资料库与收藏', () => {
       recent: [],
       playlists: [],
       savedPlaylists: [],
-      savedArtists: [{ id: 'ar1', name: '测试艺人', avatar: '' }],
-      savedAlbums: [{ id: 'a1', name: '测试专辑', cover: '', artist: '甲' }],
+      savedArtists: [{ source: 'netease', id: 'ar1', name: '测试艺人', avatar: '' }],
+      savedAlbums: [{ source: 'netease', id: 'a1', name: '测试专辑', cover: '', artist: '甲' }],
     })
     await page.goto('/crate')
 
@@ -589,12 +589,12 @@ test.describe('资料库与收藏', () => {
     await page.getByRole('tab', { name: /专辑/ }).click()
     await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
     await page.locator('.card--album').first().click()
-    await expect(page).toHaveURL(/\/album\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/album\/[^/]+\/\d+/, { timeout: 8000 })
 
     const artistLink = page.locator('.detail__artist-link').first()
     await expect(artistLink).toBeVisible({ timeout: 8000 })
     await artistLink.click()
-    await expect(page).toHaveURL(/\/artist\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/artist\/[^/]+\/\d+/, { timeout: 8000 })
 
     // 收藏
     await page.getByRole('button', { name: '收藏到资料库' }).click()
@@ -613,7 +613,7 @@ test.describe('歌单详情', () => {
     await page.goto('/browse')
     await expect(page.locator('.card').first()).toBeVisible({ timeout: 15000 })
     await page.locator('.card').first().click()
-    await expect(page).toHaveURL(/\/playlist\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/playlist\/[^/]+\/\d+/, { timeout: 8000 })
 
     await expect(page.locator('.detail__name')).toBeVisible({ timeout: 8000 })
     // 曲目应加载（可能较慢，给足时间）
@@ -663,7 +663,7 @@ test.describe('搜索分栏与艺人 / 专辑跳转', () => {
     await expect(page.locator('.card--artist').first()).toBeVisible({ timeout: 8000 })
 
     await page.locator('.card--artist').first().click()
-    await expect(page).toHaveURL(/\/artist\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/artist\/[^/]+\/\d+/, { timeout: 8000 })
     await expect(page.locator('.detail__name')).toBeVisible({ timeout: 8000 })
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
   })
@@ -673,12 +673,12 @@ test.describe('搜索分栏与艺人 / 专辑跳转', () => {
     await page.goto('/browse')
     await expect(page.locator('.card').first()).toBeVisible({ timeout: 15000 })
     await page.locator('.card').first().click()
-    await expect(page).toHaveURL(/\/playlist\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/playlist\/[^/]+\/\d+/, { timeout: 8000 })
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
 
     // 点击首行的专辑链接
     await page.locator('.track-row').first().locator('.col-album .track-link').click()
-    await expect(page).toHaveURL(/\/album\/\d+/, { timeout: 8000 })
+    await expect(page).toHaveURL(/\/album\/[^/]+\/\d+/, { timeout: 8000 })
     await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
   })
 })
@@ -773,7 +773,7 @@ test.describe('后端 API 契约', () => {
     const id = songs.find((x: { id: string }) => x.id)?.id
     expect(id).toBeTruthy()
 
-    const res = await request.get(`/stream/${id}`, {
+    const res = await request.get(`/stream/netease/${id}`, {
       headers: { Range: 'bytes=0-1023' },
     })
     // 206 或 200 均可接受（取决于源），但必须带音频类型且有字节
@@ -804,7 +804,7 @@ test.describe('后端 API 契约', () => {
 
     const artistId = data.artists?.[0]?.id
     if (artistId) {
-      const ar = await request.get(`/api/artist/${artistId}`)
+      const ar = await request.get(`/api/artist/netease/${artistId}`)
       expect(ar.ok()).toBe(true)
       const b = await ar.json()
       expect(b.data.artist.id).toBe(String(artistId))
@@ -814,7 +814,7 @@ test.describe('后端 API 契约', () => {
 
     const albumId = data.albums?.[0]?.id
     if (albumId) {
-      const al = await request.get(`/api/album/${albumId}`)
+      const al = await request.get(`/api/album/netease/${albumId}`)
       expect(al.ok()).toBe(true)
       const b = await al.json()
       expect(b.data.album.id).toBe(String(albumId))

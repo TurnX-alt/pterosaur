@@ -1,5 +1,6 @@
 import { Play, Heart } from 'lucide-react'
 import type { Album, Artist } from '@pterosaur/shared/types'
+import { keyOf } from '@pterosaur/shared/types'
 import { usePlayCollection } from '../hooks/usePlayCollection.js'
 import { useLibrary } from '../store/library.js'
 import { Cover } from './Cover.js'
@@ -22,7 +23,7 @@ interface ArtistCardProps {
 export function ArtistCard({ artist, onClick }: ArtistCardProps) {
   const savedArtists = useLibrary((s) => s.savedArtists)
   const toggleSaveArtist = useLibrary((s) => s.toggleSaveArtist)
-  const isSaved = savedArtists.some((a) => a.id === artist.id)
+  const isSaved = savedArtists.some((a) => keyOf(a) === keyOf(artist))
 
   const meta =
     artist.musicSize || artist.albumSize
@@ -105,7 +106,7 @@ export function AlbumCard({ album, onClick }: AlbumCardProps) {
           disabled={album.trackCount === 0}
           onClick={(e) => {
             e.stopPropagation()
-            void playAlbum(album.id)
+            void playAlbum(album.source, album.id)
           }}
         >
           <Play size={20} fill="currentColor" strokeWidth={0} />

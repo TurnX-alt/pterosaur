@@ -15,7 +15,7 @@ async function seedSavedAlbums(page: Page, count: number): Promise<void> {
   await page.evaluate(
     ({ db, key, count }) =>
       new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open(db, 2)
+        const req = indexedDB.open(db, 3)
         req.onupgradeneeded = () => {
           const d = req.result
           if (!d.objectStoreNames.contains('library')) d.createObjectStore('library')
@@ -23,6 +23,7 @@ async function seedSavedAlbums(page: Page, count: number): Promise<void> {
         req.onsuccess = () => {
           const d = req.result
           const savedAlbums = Array.from({ length: count }, (_, i) => ({
+            source: 'netease',
             id: String(i + 1),
             name: `专辑 ${i + 1}`,
             cover: '',

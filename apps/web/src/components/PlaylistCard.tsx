@@ -44,7 +44,7 @@ export function PlaylistCard({ playlist, onClick, subtitle }: PlaylistCardProps)
           disabled={playlist.trackCount === 0}
           onClick={(e) => {
             e.stopPropagation()
-            void playPlaylist(playlist.id)
+            void playPlaylist(playlist.source, playlist.id)
           }}
         >
           <Play size={20} fill="currentColor" strokeWidth={0} />

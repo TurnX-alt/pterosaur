@@ -150,65 +150,6 @@
   text-align: center;
 }
 
-/* ---------- 手机号表单 ---------- */
-.login-modal__form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.login-modal__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.login-modal__field span {
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.login-modal__field input {
-  height: 42px;
-  padding: 0 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--separator-strong);
-  background: var(--bg-elevated);
-  color: var(--text);
-  font-size: 14px;
-  transition: border-color var(--dur-fast) var(--ease);
-}
-
-.login-modal__field input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.login-modal__submit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 44px;
-  margin-top: 4px;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.login-modal__submit:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.login-modal__submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .login-modal__error {
   margin-top: 14px;
   padding: 9px 12px;
@@ -217,11 +158,4 @@
   color: var(--accent);
   font-size: 12.5px;
   text-align: center;
-}
-
-/* 窄屏：输入框字号 ≥16px，避免 iOS 聚焦时自动放大页面 */
-@media (max-width: 900px) {
-  .login-modal__field input {
-    font-size: 16px;
-  }
 }

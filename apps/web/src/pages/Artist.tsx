@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Play, Shuffle, Heart } from 'lucide-react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
@@ -6,6 +6,7 @@ import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import type { Album, Artist, Track } from '@pterosaur/shared/types'
+import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { AlbumCard } from '../components/EntityCards.js'
 import { Cover } from '../components/Cover.js'
@@ -22,19 +23,24 @@ interface ArtistDetail {
  * 艺人详情页：圆形头像 + 档案 + 热门歌曲 + 专辑网格。
  */
 export function ArtistPage() {
-  const { id = '' } = useParams()
+  const params = useParams()
+  const [search] = useSearchParams()
+  const source: MusicSource = isMusicSource(params.source) ? params.source : DEFAULT_SOURCE
+  const id = params.id ?? ''
+  // 名字供 QQ 等「无按-mid 取歌手」的源按名搜索（见 sources/qq.ts 的 artistDetail）
+  const name = search.get('name') ?? undefined
   const navigate = useViewNavigate()
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
   const savedArtists = useLibrary((s) => s.savedArtists)
   const toggleSaveArtist = useLibrary((s) => s.toggleSaveArtist)
-  const isSaved = savedArtists.some((a) => a.id === id)
+  const isSaved = savedArtists.some((a) => a.source === source && a.id === id)
 
   const { data, loading, error, reload } = useAsync<ArtistDetail>(
-    () => api.artist(id),
-    [id],
+    () => api.artist(source, id, name),
+    [source, id, name],
     null,
-    id ? `artist:${id}` : undefined,
+    id ? `artist:${source}:${id}:${name ?? ''}` : undefined,
   )
 
   const artist = data?.artist
@@ -112,7 +118,7 @@ export function ArtistPage() {
           </div>
           <div className="card-grid">
             {albums.map((album) => (
-              <AlbumCard key={album.id} album={album} onClick={() => navigate(`/album/${album.id}`)} />
+              <AlbumCard key={album.id} album={album} onClick={() => navigate(`/album/${album.source}/${album.id}`)} />
             ))}
           </div>
         </section>

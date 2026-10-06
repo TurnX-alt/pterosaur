@@ -33,7 +33,7 @@ describe('snapshotLibrary / emptyLibrary', () => {
   })
 
   it('快照只含可同步的数据字段', () => {
-    useLibrary.getState().toggleFavorite({ id: '1', title: 't', artist: 'a', album: '', cover: '', duration: 0, fee: 'free' })
+    useLibrary.getState().toggleFavorite({ source: 'netease', id: '1', title: 't', artist: 'a', album: '', cover: '', duration: 0, fee: 'free' })
     expect(snapshotLibrary().favorites.map((t) => t.id)).toEqual(['1'])
     expect(Object.keys(snapshotLibrary()).sort()).toEqual(
       ['favorites', 'playlists', 'recent', 'savedAlbums', 'savedArtists', 'savedPlaylists'].sort(),

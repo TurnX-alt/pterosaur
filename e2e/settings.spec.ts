@@ -156,7 +156,7 @@ test.describe('设置弹窗', () => {
   test('查看占用并清理缓存，资料库保留', async ({ page }) => {
     await page.goto('/')
     await seedMedia(page, { key: 'image|https://example.com/a.jpg', kind: 'image', size: 2048, mime: 'image/jpeg' })
-    await seedMedia(page, { key: '123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
+    await seedMedia(page, { key: 'netease:123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
     await seedLibrary(page)
 
     await page.getByTestId('settings-button').click()
@@ -172,7 +172,7 @@ test.describe('设置弹窗', () => {
 
     // 媒体缓存归零，资料库保留
     // 注：按 key 判定（而非总量），避免与应用后台写入封面缓存的竞态
-    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('123|exhigh')
+    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('netease:123|exhigh')
     await expect.poll(() => mediaKeys(page)).not.toContain('image|https://example.com/a.jpg')
     expect(await favoriteCount(page)).toBe(1)
   })
@@ -197,7 +197,7 @@ test.describe('设置弹窗', () => {
   test('重置清空本机全部内容并刷新', async ({ page }) => {
     await page.goto('/')
     await seedMedia(page, { key: 'image|https://example.com/a.jpg', kind: 'image', size: 2048, mime: 'image/jpeg' })
-    await seedMedia(page, { key: '123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
+    await seedMedia(page, { key: 'netease:123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
     await seedLibrary(page)
     await page.evaluate(() => localStorage.setItem('pterosaur-probe', '1'))
 
@@ -218,7 +218,7 @@ test.describe('设置弹窗', () => {
     // 本机内容清空：localStorage 与 IndexedDB（媒体缓存 + 资料库）
     await expect.poll(() => page.evaluate(() => localStorage.getItem('pterosaur-probe'))).toBeNull()
     // 按 key / 收藏数判定，避免与应用后台写入封面缓存的竞态
-    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('123|exhigh')
+    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('netease:123|exhigh')
     await expect.poll(() => mediaKeys(page)).not.toContain('image|https://example.com/a.jpg')
     expect(await favoriteCount(page)).toBe(0)
   })

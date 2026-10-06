@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import type { MusicSource } from '@pterosaur/shared/types'
 import App from './App.js'
 import { useLibrary } from './store/library.js'
 import { usePlayer } from './store/player.js'
@@ -35,9 +36,9 @@ function registerServiceWorker(): void {
 function listenServiceWorkerMessages(): void {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
   navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
-    const data = event.data as { type?: string } | null
+    const data = event.data as { type?: string; source?: MusicSource } | null
     if (data?.type === 'STREAM_NEED_LOGIN') {
-      usePlayer.getState().setPlayError('该曲目暂不可播放', true)
+      usePlayer.getState().setPlayError('该曲目暂不可播放', true, data.source ?? null)
     }
   })
 }

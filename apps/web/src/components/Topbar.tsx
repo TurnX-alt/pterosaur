@@ -15,7 +15,8 @@ import {
 import { useTheme } from "../hooks/useTheme.js";
 import { startThemeTransition } from "../lib/themeTransition.js";
 import { useViewNavigate } from "../hooks/useViewNavigate.js";
-import { useAuth } from "../store/auth.js";
+import { useAuth, activeSource } from "../store/auth.js";
+import type { MusicSource } from "@pterosaur/shared/types";
 import { useSync } from "../store/sync.js";
 import { syncNow } from "../lib/sync.js";
 import { useSidebarDrawer, useSettingsDialog } from "../store/ui.js";
@@ -25,6 +26,9 @@ import "./Topbar.css";
 interface TopbarProps {
   searchRef: React.RefObject<HTMLInputElement | null>;
 }
+
+/** 会员计划标签：网易云 → `Plan N`，QQ → `Plan T`。 */
+const planOf = (src: MusicSource): string => `Plan ${src === "qq" ? "T" : "N"}`;
 
 /**
  * 顶部栏：前进/后退、全局搜索、主题切换、账户菜单。
@@ -40,6 +44,9 @@ export function Topbar({ searchRef }: TopbarProps) {
   const status = useAuth((s) => s.status);
   const openModal = useAuth((s) => s.openModal);
   const logout = useAuth((s) => s.logout);
+  // 单活动账号：最多一个源登录；登录后不再显示登录入口，只有退出。
+  const src = activeSource(status);
+  const account = src ? status[src] : undefined;
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleSidebar = useSidebarDrawer((s) => s.toggleSidebar);
   const openSettings = useSettingsDialog((s) => s.openSettings);
@@ -51,7 +58,7 @@ export function Topbar({ searchRef }: TopbarProps) {
     if (store.enabled) {
       store.disable();
     } else {
-      store.enable(status.userId);
+      store.enable(src ?? undefined, account?.userId);
       void syncNow().catch((e) => console.warn("[sync] 首次同步失败", e));
     }
   };
@@ -160,7 +167,7 @@ export function Topbar({ searchRef }: TopbarProps) {
           <Settings size={17} strokeWidth={2} />
         </button>
 
-        {status.logged ? (
+        {account && src ? (
           <div className="topbar__account">
             <button
               type="button"
@@ -173,8 +180,8 @@ export function Topbar({ searchRef }: TopbarProps) {
               aria-expanded={menuOpen}
             >
               <Cover
-                src={status.avatarUrl}
-                alt={status.nickname ?? "用户"}
+                src={account.avatarUrl}
+                alt={account.nickname ?? "用户"}
                 rounded
                 size={28}
               />
@@ -185,12 +192,13 @@ export function Topbar({ searchRef }: TopbarProps) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="topbar__menu-head">
-                  <Cover src={status.avatarUrl} alt="" rounded size={36} />
+                  <Cover src={account.avatarUrl} alt="" rounded size={36} />
                   <div>
-                    <div className="topbar__menu-name">{status.nickname}</div>
-                    {status.vip && <div className="topbar__menu-plan">Pterosaur+</div>}
+                    <div className="topbar__menu-name">{account.nickname}</div>
+                    <div className="topbar__menu-plan">{planOf(src)}</div>
                   </div>
                 </div>
+
                 <button
                   type="button"
                   className="topbar__menu-item topbar__menu-item--switch"
@@ -207,11 +215,12 @@ export function Topbar({ searchRef }: TopbarProps) {
                     <span className="topbar__switch-knob" />
                   </span>
                 </button>
+
                 <button
                   type="button"
                   className="topbar__menu-item"
                   onClick={() => {
-                    void logout();
+                    void logout(src);
                     setMenuOpen(false);
                   }}
                 >
@@ -221,7 +230,7 @@ export function Topbar({ searchRef }: TopbarProps) {
             )}
           </div>
         ) : (
-          <button type="button" className="topbar__login" onClick={openModal}>
+          <button type="button" className="topbar__login" onClick={() => openModal()}>
             <User size={16} strokeWidth={2.1} />
             <span>登录</span>
           </button>

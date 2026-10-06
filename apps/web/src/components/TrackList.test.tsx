@@ -9,6 +9,7 @@ import type { Track } from '@pterosaur/shared/types'
 
 function track(id: string, title: string, extra: Partial<Track> = {}): Track {
   return {
+    source: 'netease',
     id,
     title,
     artist: `艺人${id}`,
@@ -131,7 +132,7 @@ describe('TrackList', () => {
     const t = [track('1', '第一首', { artist: '某艺人', artistRefs: [{ id: '9', name: '某艺人' }] })]
     renderList(<TrackList tracks={t} />)
     fireEvent.click(screen.getByRole('button', { name: '某艺人' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/artist/9')
+    expect(screen.getByTestId('loc')).toHaveTextContent('/artist/netease/9')
     expect(usePlayer.getState().current).toBeNull()
   })
 
@@ -147,14 +148,14 @@ describe('TrackList', () => {
     ]
     renderList(<TrackList tracks={t} />)
     fireEvent.click(screen.getByRole('button', { name: '乙' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/artist/2')
+    expect(screen.getByTestId('loc')).toHaveTextContent('/artist/netease/2')
   })
 
   it('点击专辑名跳转专辑页，且不触发行播放', () => {
     const t = [track('1', '第一首', { album: '某专辑', albumId: '77' })]
     renderList(<TrackList tracks={t} />)
     fireEvent.click(screen.getByRole('button', { name: '某专辑' }))
-    expect(screen.getByTestId('loc')).toHaveTextContent('/album/77')
+    expect(screen.getByTestId('loc')).toHaveTextContent('/album/netease/77')
     expect(usePlayer.getState().current).toBeNull()
   })
 

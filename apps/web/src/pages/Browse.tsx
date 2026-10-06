@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
+import { useAuth, activeSource } from '../store/auth.js'
 import type { Playlist } from '@pterosaur/shared/types'
+import { DEFAULT_SOURCE } from '@pterosaur/shared/types'
 import { PlaylistCard } from '../components/PlaylistCard.js'
 import { Loading, ErrorState } from '../components/States.js'
 
@@ -28,25 +30,37 @@ function fmtCount(n?: number): string | undefined {
 export function Browse() {
   const navigate = useViewNavigate()
   const [tab, setTab] = useState<Tab>('recommend')
+  const status = useAuth((s) => s.status)
+  // 发现内容跟随活动账号（未登录用缺省源）。
+  const source = activeSource(status) ?? DEFAULT_SOURCE
 
-  const recommend = useAsync<Playlist[]>(() => api.recommend(30), [], [])
-  const playlists = useAsync<Playlist[]>(() => api.playlists(30), [], [])
-  const toplists = useAsync<Playlist[]>(() => api.toplists(), [], [])
+  const recommend = useAsync<Playlist[]>(() => api.recommend(source, 30), [source], [])
+  const playlists = useAsync<Playlist[]>(() => api.playlists(source, 30), [source], [])
+  const toplists = useAsync<Playlist[]>(() => api.toplists(source), [source], [])
 
-  const active = tab === 'recommend' ? recommend : tab === 'playlists' ? playlists : toplists
+  // 该源支持哪些分区（如 QQ 暂无排行榜）——不支持的 tab 隐藏。
+  const caps = useAsync<{ recommend: boolean; playlists: boolean; toplists: boolean }>(
+    () => api.discoverCapabilities(source),
+    [source],
+    { recommend: true, playlists: true, toplists: true },
+  )
+  const visibleTabs = TABS.filter((t) => caps.data?.[t.key] !== false)
+  const activeTab: Tab = visibleTabs.some((t) => t.key === tab) ? tab : (visibleTabs[0]?.key ?? 'recommend')
+
+  const active = activeTab === 'recommend' ? recommend : activeTab === 'playlists' ? playlists : toplists
 
   return (
     <div className="browse">
       <header className="browse__header">
         <h1 className="browse__title">浏览</h1>
         <div className="browse__tabs" role="tablist">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.key}
               type="button"
               role="tab"
-              aria-selected={tab === t.key}
-              className={`browse__tab${tab === t.key ? ' browse__tab--active' : ''}`}
+              aria-selected={activeTab === t.key}
+              className={`browse__tab${activeTab === t.key ? ' browse__tab--active' : ''}`}
               onClick={() => setTab(t.key)}
             >
               {t.label}
@@ -67,7 +81,7 @@ export function Browse() {
                 key={p.id}
                 playlist={p}
                 subtitle={fmtCount(p.playCount) ? `${fmtCount(p.playCount)} 次播放` : undefined}
-                onClick={() => navigate(`/playlist/${p.id}`)}
+                onClick={() => navigate(`/playlist/${p.source}/${p.id}`)}
               />
             ))}
           </div>

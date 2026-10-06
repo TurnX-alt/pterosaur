@@ -19,7 +19,7 @@ import { getCachedLyric, putCachedLyric } from '../lib/lyricCache.js'
 import { whenCoverReady } from '../lib/imageCache.js'
 import { canonicalNeteaseImage } from '@pterosaur/shared/image'
 import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
-import { formatTime } from '@pterosaur/shared/types'
+import { formatTime, keyOf } from '@pterosaur/shared/types'
 import type { Lyric } from '@pterosaur/shared/types'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
@@ -72,7 +72,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
 
   const favorites = useLibrary((s) => s.favorites)
   const toggleFavorite = useLibrary((s) => s.toggleFavorite)
-  const isFav = current ? favorites.some((t) => t.id === current.id) : false
+  const isFav = current ? favorites.some((t) => keyOf(t) === keyOf(current)) : false
   const toggleQueue = useQueuePanel((s) => s.toggleQueue)
   const queueOpen = useQueuePanel((s) => s.queueOpen)
 
@@ -126,7 +126,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
       return
     }
     // 命中预载缓存：直接显示，无「歌词加载中」停留
-    const cached = getCachedLyric(current.id)
+    const cached = getCachedLyric(current)
     if (cached) {
       setLyric(cached)
       setLyricLoading(false)
@@ -135,10 +135,10 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
     setLyricLoading(true)
     setLyric(null)
     api
-      .lyric(current.id)
+      .lyric(current.source, current.id)
       .then((l) => {
         if (cancelled) return
-        putCachedLyric(current.id, l)
+        putCachedLyric(current, l)
         setLyric(l)
       })
       .catch(() => {
@@ -232,7 +232,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
                 <button
                   type="button"
                   className="nowplaying__link"
-                  onClick={() => openEntity(`/album/${current.albumId}`)}
+                  onClick={() => openEntity(`/album/${current.source}/${current.albumId}`)}
                 >
                   {current.album}
                 </button>
@@ -274,7 +274,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
                       <button
                         type="button"
                         className="nowplaying__link"
-                        onClick={() => openEntity(`/artist/${a.id}`)}
+                        onClick={() => openEntity(`/artist/${current.source}/${a.id}?name=${encodeURIComponent(a.name)}`)}
                       >
                         {a.name}
                       </button>

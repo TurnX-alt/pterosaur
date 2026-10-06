@@ -28,9 +28,13 @@ const meta = (key: string, size: number, lastAccess: number): MediaMeta => ({
 const blobOf = (size: number): Blob => new Blob([new Uint8Array(size)])
 
 describe('audioKey', () => {
-  it('默认档位为 exhigh', () => {
-    expect(audioKey('123')).toBe('123|exhigh')
-    expect(audioKey('123', 'lossless')).toBe('123|lossless')
+  it('带源前缀与默认档位 exhigh', () => {
+    expect(audioKey('netease', '123')).toBe('netease:123|exhigh')
+    expect(audioKey('netease', '123', 'lossless')).toBe('netease:123|lossless')
+  })
+
+  it('两源共享原始 id 产生不同缓存键', () => {
+    expect(audioKey('netease', '1')).not.toBe(audioKey('qq', '1'))
   })
 })
 

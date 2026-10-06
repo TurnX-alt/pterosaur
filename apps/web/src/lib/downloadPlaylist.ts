@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
 import type { Track } from '@pterosaur/shared/types'
-import { streamUrl } from '@pterosaur/shared/types'
+import { streamUrlOf } from '@pterosaur/shared/types'
 
 /** 根据 Content-Type 推断音频文件扩展名，默认 mp3。 */
 function extFromMime(mime: string | null): string {
@@ -88,7 +88,7 @@ export async function downloadPlaylist(
     let ext = 'mp3'
 
     try {
-      const res = await fetch(streamUrl(t.id), { credentials: 'include' })
+      const res = await fetch(streamUrlOf(t), { credentials: 'include' })
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }

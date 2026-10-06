@@ -40,7 +40,7 @@ export function CratePage() {
               </div>
               <div className="card-grid">
                 {savedArtists.map((artist) => (
-                  <ArtistCard key={artist.id} artist={artist} onClick={() => navigate(`/artist/${artist.id}`)} />
+                  <ArtistCard key={artist.id} artist={artist} onClick={() => navigate(`/artist/${artist.source}/${artist.id}?name=${encodeURIComponent(artist.name)}`)} />
                 ))}
               </div>
             </section>
@@ -53,7 +53,7 @@ export function CratePage() {
               </div>
               <div className="card-grid">
                 {savedAlbums.map((album) => (
-                  <AlbumCard key={album.id} album={album} onClick={() => navigate(`/album/${album.id}`)} />
+                  <AlbumCard key={album.id} album={album} onClick={() => navigate(`/album/${album.source}/${album.id}`)} />
                 ))}
               </div>
             </section>

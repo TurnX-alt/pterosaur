@@ -33,6 +33,7 @@ import {
   touchCached,
 } from './lib/mediaCache.js'
 import { registerShellRoutes } from './lib/shellCache.js'
+import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
 
 // —— 最小化 SW 全局类型声明：避免引入 `webworker` lib 与既有 `DOM` lib 产生重复标识符冲突 ——
 interface ExtendableEventLike extends Event {
@@ -95,13 +96,28 @@ async function loadState(): Promise<void> {
   }
 }
 
-/** 从 `/stream/:id?level=` 解析出曲目 id / 档位 / 缓存 key；非音频代理路径返回 null。 */
-function keyFromStreamUrl(url: URL): { id: string; level: string; key: string } | null {
+/**
+ * 从 `/stream/:source/:id?level=` 解析出源 / 曲目 id / 档位 / 缓存 key；
+ * 非音频代理路径返回 null。2 段式 `/stream/:id`（旧格式）视为缺省源。
+ */
+function keyFromStreamUrl(url: URL): { source: MusicSource; id: string; level: string; key: string } | null {
   if (!url.pathname.startsWith(STREAM_PREFIX)) return null
-  const id = decodeURIComponent(url.pathname.slice(STREAM_PREFIX.length))
+  const rest = url.pathname.slice(STREAM_PREFIX.length)
+  if (!rest) return null
+
+  const slash = rest.indexOf('/')
+  let source: MusicSource = DEFAULT_SOURCE
+  let id = decodeURIComponent(rest)
+  if (slash !== -1) {
+    const head = decodeURIComponent(rest.slice(0, slash))
+    if (isMusicSource(head)) {
+      source = head
+      id = decodeURIComponent(rest.slice(slash + 1))
+    }
+  }
   if (!id) return null
   const level = url.searchParams.get('level') ?? DEFAULT_LEVEL
-  return { id, level, key: audioKey(id, level) }
+  return { source, id, level, key: audioKey(source, id, level) }
 }
 
 /** 未命中时把整文件写入缓存并做 LRU 淘汰（音频与封面共用同一预算）。 */
@@ -146,14 +162,21 @@ async function serveCached(key: string, rangeHeader: string | null): Promise<Res
   return responseFromBlob(cached.meta, cached.blob, rangeHeader)
 }
 
-/** 通知受控页面：某曲目因 VIP / 版权受限需要登录（后端以 403 表达）。 */
-async function notifyNeedLogin(): Promise<void> {
+/** 通知受控页面：某曲目因 VIP / 版权受限需要登录（后端以 403 表达），并带上曲目所属源。 */
+async function notifyNeedLogin(source: MusicSource): Promise<void> {
   const clients = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  for (const client of clients) client.postMessage({ type: 'STREAM_NEED_LOGIN' })
+  for (const client of clients) client.postMessage({ type: 'STREAM_NEED_LOGIN', source })
 }
 
 /** `/stream/*`：音频代理（Range 分段、整文件缓存）。 */
-async function handleStream(request: Request, url: URL, id: string, level: string, key: string): Promise<Response> {
+async function handleStream(
+  request: Request,
+  url: URL,
+  source: MusicSource,
+  id: string,
+  level: string,
+  key: string,
+): Promise<Response> {
   const cached = await serveCached(key, request.headers.get('range'))
   if (cached) return cached
 
@@ -171,7 +194,7 @@ async function handleStream(request: Request, url: URL, id: string, level: strin
 
   // VIP 未登录 / 版权受限：后端以 403 表达——通知页面给出登录引导，响应原样放行（不缓存）
   if (upstream.status === 403) {
-    void notifyNeedLogin()
+    void notifyNeedLogin(source)
     return upstream
   }
 
@@ -179,7 +202,7 @@ async function handleStream(request: Request, url: URL, id: string, level: strin
   const contentType = upstream.headers.get('content-type') ?? ''
   if (!upstream.ok || !contentType.startsWith('audio/')) return upstream
 
-  void storeResponse({ key, kind: 'audio', trackId: id, level, mime: contentType }, upstream.clone())
+  void storeResponse({ key, kind: 'audio', source, trackId: id, level, mime: contentType }, upstream.clone())
   return upstream
 }
 
@@ -243,7 +266,7 @@ sw.addEventListener('fetch', (event) => {
 
   const parsed = keyFromStreamUrl(url)
   if (parsed) {
-    event.respondWith(handleStream(request, url, parsed.id, parsed.level, parsed.key))
+    event.respondWith(handleStream(request, url, parsed.source, parsed.id, parsed.level, parsed.key))
     return
   }
 

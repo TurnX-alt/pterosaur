@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useLibrary } from './library.js'
 import type { Album, Artist, Playlist } from '@pterosaur/shared/types'
 
-const album = (id: string): Album => ({ id, name: `专辑${id}`, cover: '', artist: '甲' })
-const artist = (id: string): Artist => ({ id, name: `艺人${id}`, avatar: '' })
-const playlist = (id: string): Playlist => ({ id, name: `歌单${id}`, cover: '' })
+const album = (id: string): Album => ({ source: 'netease', id, name: `专辑${id}`, cover: '', artist: '甲' })
+const artist = (id: string): Artist => ({ source: 'netease', id, name: `艺人${id}`, avatar: '' })
+const playlist = (id: string): Playlist => ({ source: 'netease', id, name: `歌单${id}`, cover: '' })
 
 beforeEach(() => {
   useLibrary.setState({

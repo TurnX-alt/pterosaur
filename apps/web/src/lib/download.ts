@@ -1,5 +1,5 @@
 import type { Track } from '@pterosaur/shared/types'
-import { streamUrl } from '@pterosaur/shared/types'
+import { streamUrlOf } from '@pterosaur/shared/types'
 
 /** 根据 Content-Type 推断音频文件扩展名，默认 mp3。 */
 function extFromMime(mime: string | null): string {
@@ -27,7 +27,7 @@ function safeFileName(track: Track, ext: string): string {
  * @throws 拉取失败或音源不可用（如未登录的 VIP 曲目）时抛出错误。
  */
 export async function downloadTrack(track: Track): Promise<void> {
-  const res = await fetch(streamUrl(track.id), { credentials: 'include' })
+  const res = await fetch(streamUrlOf(track), { credentials: 'include' })
   if (!res.ok) {
     const needLogin = res.status === 403
     throw new Error(needLogin ? '该曲目暂不可下载' : `下载失败（${res.status}）`)

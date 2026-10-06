@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import type { MusicSource } from '@pterosaur/shared/types'
 import { api } from '../api/client.js'
 import { usePlayer } from '../store/player.js'
 
@@ -12,9 +13,9 @@ export function usePlayCollection() {
   const playTracks = usePlayer((s) => s.playTracks)
 
   const playPlaylist = useCallback(
-    async (id: string) => {
+    async (source: MusicSource, id: string) => {
       try {
-        const { tracks } = await api.playlist(id)
+        const { tracks } = await api.playlist(source, id)
         if (tracks.length) playTracks(tracks, 0)
       } catch {
         /* 拉取失败：不改变当前播放 */
@@ -24,9 +25,9 @@ export function usePlayCollection() {
   )
 
   const playAlbum = useCallback(
-    async (id: string) => {
+    async (source: MusicSource, id: string) => {
       try {
-        const { tracks } = await api.album(id)
+        const { tracks } = await api.album(source, id)
         if (tracks.length) playTracks(tracks, 0)
       } catch {
         /* 拉取失败：不改变当前播放 */

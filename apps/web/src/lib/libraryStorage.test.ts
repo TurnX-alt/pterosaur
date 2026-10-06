@@ -7,6 +7,7 @@ import { flushLibraryWrites, libraryStorage } from './libraryStorage.js'
 const NAME = 'pterosaur-library'
 
 const track = (id: string): Track => ({
+  source: 'netease',
   id,
   title: `曲目 ${id}`,
   artist: '艺人',

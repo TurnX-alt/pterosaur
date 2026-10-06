@@ -13,8 +13,12 @@
 
 /** IDB 库名。 */
 export const DB_NAME = 'pterosaur'
-/** 库版本；新增 object store / 索引时递增。v2 起用 `media` / `mediaMeta` 取代 v1 的 `audio` / `audioMeta`。 */
-export const DB_VERSION = 2
+/**
+ * 库版本；新增 object store / 索引时递增。
+ * v2 起用 `media` / `mediaMeta` 取代 v1 的 `audio` / `audioMeta`；
+ * v3 因音频缓存键加入源前缀（`<source>:<id>|<level>`），旧键不再命中，升级时清空媒体缓存重建。
+ */
+export const DB_VERSION = 3
 /** 存 zustand persist 封套 `{state, version}` 的通用键值 store（out-of-line key）。 */
 export const LIBRARY_STORE = 'library'
 /** 存**全部媒体** blob 的 store（音频 + 封面；out-of-line key = 缓存 key，值为裸 `Blob`）。 */
@@ -46,8 +50,14 @@ function openDB(): Promise<IDBDatabase | null> {
       return
     }
 
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = (event) => {
       const db = req.result
+      const oldVersion = event.oldVersion
+      // v3：音频缓存键加入源前缀，旧键（无源）不再命中——清空媒体缓存重建（缓存可弃）。
+      if (oldVersion > 0 && oldVersion < 3) {
+        if (db.objectStoreNames.contains(MEDIA_STORE)) db.deleteObjectStore(MEDIA_STORE)
+        if (db.objectStoreNames.contains(MEDIA_META_STORE)) db.deleteObjectStore(MEDIA_META_STORE)
+      }
       if (!db.objectStoreNames.contains(LIBRARY_STORE)) {
         // out-of-line key：调用方以 persist 的 name 作为 key
         db.createObjectStore(LIBRARY_STORE)

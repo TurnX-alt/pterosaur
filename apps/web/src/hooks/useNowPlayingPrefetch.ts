@@ -15,6 +15,6 @@ export function useNowPlayingPrefetch(): void {
   useEffect(() => {
     if (!current) return
     preloadCover(current.cover)
-    void prefetchLyric(current.id)
+    void prefetchLyric(current)
   }, [current])
 }

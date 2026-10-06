@@ -18,7 +18,7 @@ import { useLibrary } from "../store/library.js";
 import { useQueuePanel } from "../store/ui.js";
 import { startNowPlayingTransition } from "../lib/nowPlayingTransition.js";
 import { seekTo } from "../hooks/audioElement.js";
-import { formatTime } from '@pterosaur/shared/types'
+import { formatTime, keyOf } from '@pterosaur/shared/types'
 import { Cover } from "./Cover.js";
 import { IconButton } from "./IconButton.js";
 import { Slider } from "./Slider.js";
@@ -47,7 +47,7 @@ export function PlayerBar() {
 
   const favorites = useLibrary((s) => s.favorites);
   const toggleFavorite = useLibrary((s) => s.toggleFavorite);
-  const isFav = current ? favorites.some((t) => t.id === current.id) : false;
+  const isFav = current ? favorites.some((t) => keyOf(t) === keyOf(current)) : false;
 
   const queueOpen = useQueuePanel((s) => s.queueOpen);
   const toggleQueue = useQueuePanel((s) => s.toggleQueue);

@@ -1,4 +1,5 @@
 import { canonicalNeteaseImage } from '@pterosaur/shared/image'
+import type { MusicSource } from '@pterosaur/shared/types'
 import { MEDIA_META_STORE, MEDIA_STORE, idbClear, idbDelete, idbGet, idbGetAll, idbPut } from './idb.js'
 
 /**
@@ -26,12 +27,14 @@ const IMAGE_PREFIX = 'image|'
 export type MediaKind = 'audio' | 'image'
 
 export interface MediaMeta {
-  /** 缓存 key：音频为 `${trackId}|${level}`，封面为 `image|${规范化后的 url}`（见 imageKey）。 */
+  /** 缓存 key：音频为 `${source}:${id}|${level}`，封面为 `image|${规范化后的 url}`（见 imageKey）。 */
   key: string
   /** 条目类别，用于用量分项统计。 */
   kind: MediaKind
   /** 音质档位（仅音频）。 */
   level?: string
+  /** 音源（仅音频）。 */
+  source?: MusicSource
   /** 曲目 id（仅音频）。 */
   trackId?: string
   mime: string
@@ -50,9 +53,14 @@ export interface CachedMedia {
   blob: Blob
 }
 
-/** 由曲目 id 与音质档位生成缓存 key。 */
-export function audioKey(id: string, level: string = DEFAULT_LEVEL): string {
-  return `${id}|${level}`
+/**
+ * 由「源 + 曲目 id + 音质档位」生成缓存 key。
+ *
+ * 前缀带源（`<source>:<id>`，与 `keyOf` 同形）：不同源的曲目可能共享同一原始 id，
+ * 不带源会让源 A 的缓存被源 B 命中、播放/下载到**完全错误的音频**。
+ */
+export function audioKey(source: MusicSource, id: string, level: string = DEFAULT_LEVEL): string {
+  return `${source}:${id}|${level}`
 }
 
 /**

@@ -5,8 +5,9 @@ import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
-import { useAuth } from '../store/auth.js'
+import { useAuth, activeSource } from '../store/auth.js'
 import type { Playlist, Track } from '@pterosaur/shared/types'
+import { DEFAULT_SOURCE } from '@pterosaur/shared/types'
 import { PlaylistCard } from '../components/PlaylistCard.js'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
@@ -80,8 +81,10 @@ export function Home() {
   const favorites = useLibrary((s) => s.favorites)
   const playTracks = usePlayer((s) => s.playTracks)
   const status = useAuth((s) => s.status)
+  // 推荐跟随活动账号（未登录用缺省源）。
+  const source = activeSource(status) ?? DEFAULT_SOURCE
 
-  const recommend = useAsync<Playlist[]>(() => api.recommend(12), [], [])
+  const recommend = useAsync<Playlist[]>(() => api.recommend(source, 12), [source], [])
   const [featured, setFeatured] = useState<Track[]>([])
 
   // 从第一个推荐歌单里取若干曲目作为「精选单曲」
@@ -90,7 +93,7 @@ export function Home() {
     if (!first) return
     let cancelled = false
     api
-      .playlist(first.id)
+      .playlist(first.source, first.id)
       .then(({ tracks }) => {
         if (!cancelled) setFeatured(tracks.slice(0, 8))
       })
@@ -109,7 +112,7 @@ export function Home() {
         <div>
           <h1 className="home__greeting">
             {greeting}
-            {status.logged && status.nickname ? `，${status.nickname}` : ''}
+            {status[source]?.logged && status[source].nickname ? `，${status[source].nickname}` : ''}
           </h1>
         </div>
       </header>
@@ -152,7 +155,7 @@ export function Home() {
         ) : (
           <div className="card-grid">
             {recommend.data?.map((p) => (
-              <PlaylistCard key={p.id} playlist={p} onClick={() => navigate(`/playlist/${p.id}`)} />
+              <PlaylistCard key={p.id} playlist={p} onClick={() => navigate(`/playlist/${p.source}/${p.id}`)} />
             ))}
           </div>
         )}

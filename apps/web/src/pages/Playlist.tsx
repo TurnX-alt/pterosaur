@@ -8,6 +8,7 @@ import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { confirmDialog } from '../store/ui.js'
 import type { Playlist, Track } from '@pterosaur/shared/types'
+import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
@@ -32,7 +33,9 @@ function fmtCount(n?: number): string {
  * - 网易云歌单（数字 id，通过 API 拉取）。
  */
 export function PlaylistPage() {
-  const { id = '' } = useParams()
+  const params = useParams()
+  const source: MusicSource = isMusicSource(params.source) ? params.source : DEFAULT_SOURCE
+  const id = params.id ?? ''
   const navigate = useViewNavigate()
   const isLocal = id.startsWith('pl-')
 
@@ -50,7 +53,7 @@ export function PlaylistPage() {
   const renameRef = useRef<HTMLInputElement | null>(null)
 
   // 翻录进度：从全局 store 认领属于本歌单的那份（切走再回自动恢复）
-  const ripKey = `playlist:${id}`
+  const ripKey = `playlist:${source}:${id}`
   const ripJob = useRip((s) => s.job)
   const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
 
@@ -59,21 +62,30 @@ export function PlaylistPage() {
 
   // 远程歌单：通过 API 拉取（带缓存键，参数切换时命中缓存可免于加载态，转场更顺滑）
   const remote = useAsync<{ playlist: Playlist; tracks: Track[] }>(
-    () => (isLocal ? Promise.resolve({ playlist: { id, name: '', cover: '' }, tracks: [] }) : api.playlist(id)),
-    [id, isLocal],
+    () =>
+      isLocal
+        ? Promise.resolve({ playlist: { source: DEFAULT_SOURCE, id, name: '', cover: '' }, tracks: [] })
+        : api.playlist(source, id),
+    [source, id, isLocal],
     null,
-    isLocal ? undefined : `playlist:${id}`,
+    isLocal ? undefined : `playlist:${source}:${id}`,
   )
 
-  const playlist = isLocal
-    ? { id, name: local?.name ?? '歌单', cover: local?.tracks[0]?.cover ?? '', trackCount: local?.tracks.length ?? 0 }
+  const playlist: Playlist | undefined = isLocal
+    ? {
+        source: DEFAULT_SOURCE,
+        id,
+        name: local?.name ?? '歌单',
+        cover: local?.tracks[0]?.cover ?? '',
+        trackCount: local?.tracks.length ?? 0,
+      }
     : remote.data?.playlist
   const tracks = isLocal ? (local?.tracks ?? []) : (remote.data?.tracks ?? [])
   const loading = !isLocal && remote.loading
   const error = !isLocal ? remote.error : isLocal && !local ? '歌单不存在' : null
 
   // 在线歌单是否已收藏到资料库（仅保存引用，按路由 id 判断）
-  const isSaved = !isLocal && savedPlaylists.some((p) => p.id === id)
+  const isSaved = !isLocal && savedPlaylists.some((p) => p.source === source && p.id === id)
 
   const handlePlay = (shuffle = false) => {
     if (!tracks.length) return

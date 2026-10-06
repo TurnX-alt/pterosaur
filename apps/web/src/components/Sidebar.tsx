@@ -155,7 +155,7 @@ export function Sidebar() {
           {savedPlaylists.map((p) => (
             <AppLink
               key={p.id}
-              to={`/playlist/${p.id}`}
+              to={`/playlist/${p.source}/${p.id}`}
               className={({ isActive }) =>
                 `nav-item${isActive ? " nav-item--active" : ""}`
               }

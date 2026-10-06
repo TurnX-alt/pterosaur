@@ -1,4 +1,5 @@
 import { X, Trash2, Play } from 'lucide-react'
+import { keyOf } from '@pterosaur/shared/types'
 import { usePlayer } from '../store/player.js'
 import { useQueuePanel } from '../store/ui.js'
 import { Cover } from './Cover.js'
@@ -40,7 +41,7 @@ export function QueuePanel() {
               const active = i === index
               return (
                 <div
-                  key={`${t.id}-${i}`}
+                  key={`${keyOf(t)}-${i}`}
                   className={`queue-item${active ? ' queue-item--active' : ''}`}
                   onClick={() => playIndex(i)}
                   role="button"

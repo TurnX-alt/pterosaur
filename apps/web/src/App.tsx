@@ -25,6 +25,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js'
 import { useLibrarySync } from './hooks/useLibrarySync.js'
 import { useNowPlayingPrefetch } from './hooks/useNowPlayingPrefetch.js'
 import { useContentScrollRestoration } from './hooks/useContentScrollRestoration.js'
+import { useSourceTheme } from './hooks/useSourceTheme.js'
 import { useApplyTheme } from './hooks/useTheme.js'
 import { usePresence } from './hooks/usePresence.js'
 import { supportsViewTransition } from './lib/viewTransition.js'
@@ -61,6 +62,7 @@ export default function App() {
   useLibrarySync()
   useNowPlayingPrefetch()
   useContentScrollRestoration()
+  useSourceTheme()
 
   const searchRef = useRef<HTMLInputElement | null>(null)
   const focusSearch = () => searchRef.current?.focus()
@@ -105,8 +107,11 @@ export default function App() {
               <Route path="/crate" element={<CratePage />} />
               <Route path="/favorites" element={<FavoritesPage />} />
               <Route path="/recent" element={<RecentPage />} />
+              <Route path="/playlist/:source/:id" element={<PlaylistPage />} />
               <Route path="/playlist/:id" element={<PlaylistPage />} />
+              <Route path="/artist/:source/:id" element={<ArtistPage />} />
               <Route path="/artist/:id" element={<ArtistPage />} />
+              <Route path="/album/:source/:id" element={<AlbumPage />} />
               <Route path="/album/:id" element={<AlbumPage />} />
               <Route path="*" element={<Home />} />
             </Routes>

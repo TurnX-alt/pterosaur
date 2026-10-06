@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { RepeatMode, Track } from '@pterosaur/shared/types'
-import { streamUrl } from '@pterosaur/shared/types'
+import type { RepeatMode, Track, MusicSource } from '@pterosaur/shared/types'
+import { streamUrlOf, keyOf } from '@pterosaur/shared/types'
 
 /**
  * 播放模式：把「随机」与「循环」合并为单一 UI 概念，供播放条的合并按钮循环切换。
@@ -63,6 +63,8 @@ interface PlaybackState {
   playError: string | null
   /** 当前播放错误是否由「需要登录」引起（决定提示条是否展示登录入口）。 */
   playErrorNeedLogin: boolean
+  /** 触发播放错误的曲目所属源（用于把「登录解锁」引导到正确的源）。 */
+  playErrorSource: MusicSource | null
   /** 是否处于缓冲中（网络停滞 / 数据未就绪）。 */
   buffering: boolean
   /** 是否展开全屏播放页。 */
@@ -96,7 +98,7 @@ interface PlaybackActions {
   clearQueue: () => void
   removeAt: (index: number) => void
   setExpanded: (v: boolean) => void
-  setPlayError: (msg: string | null, needLogin?: boolean) => void
+  setPlayError: (msg: string | null, needLogin?: boolean, source?: MusicSource | null) => void
   setPlaybackEnded: (v: boolean) => void
   setBuffering: (v: boolean) => void
 }
@@ -144,6 +146,7 @@ export const usePlayer = create<PlayerStore>()(
       shuffle: false,
       playError: null,
       playErrorNeedLogin: false,
+      playErrorSource: null,
       buffering: false,
       expanded: false,
       playbackEnded: false,
@@ -264,13 +267,13 @@ export const usePlayer = create<PlayerStore>()(
         const { shuffle, baseQueue, current } = get()
         if (!shuffle) {
           // 开启打乱：基于当前曲目重排
-          const seed = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
+          const seed = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
           const order = shuffledIndexes(baseQueue.length, Math.max(seed, 0))
           const queue = order.map((i) => baseQueue[i])
           set({ shuffle: true, queue, index: 0, current: queue[0] ?? null })
         } else {
           // 关闭打乱：恢复原始顺序，并保持当前曲目
-          const idx = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
+          const idx = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
           set({ shuffle: false, queue: baseQueue, index: Math.max(idx, 0) })
         }
       },
@@ -287,13 +290,13 @@ export const usePlayer = create<PlayerStore>()(
         }
         if (target.shuffle) {
           // 进入随机：以当前曲目为种子重排
-          const seed = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
+          const seed = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
           const order = shuffledIndexes(baseQueue.length, Math.max(seed, 0))
           const queue = order.map((i) => baseQueue[i])
           set({ shuffle: true, repeat: target.repeat, queue, index: 0, current: queue[0] ?? null })
         } else {
           // 退出随机：恢复原始顺序并保持当前曲目
-          const idx = current ? baseQueue.findIndex((t) => t.id === current.id) : 0
+          const idx = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
           set({ shuffle: false, repeat: target.repeat, queue: baseQueue, index: Math.max(idx, 0) })
         }
       },
@@ -304,7 +307,7 @@ export const usePlayer = create<PlayerStore>()(
         if (index < 0 || index >= queue.length) return
         const removed = queue[index]
         const newQueue = queue.filter((_, i) => i !== index)
-        const newBase = baseQueue.filter((t) => t.id !== removed.id)
+        const newBase = baseQueue.filter((t) => keyOf(t) !== keyOf(removed))
         let newIndex = cur
         if (index < cur) newIndex = cur - 1
         else if (index === cur) {
@@ -319,8 +322,8 @@ export const usePlayer = create<PlayerStore>()(
         })
       },
       setExpanded: (v) => set({ expanded: v }),
-      setPlayError: (msg, needLogin = false) =>
-        set({ playError: msg, playErrorNeedLogin: msg ? needLogin : false }),
+      setPlayError: (msg, needLogin = false, source = null) =>
+        set({ playError: msg, playErrorNeedLogin: msg ? needLogin : false, playErrorSource: msg ? source : null }),
       setPlaybackEnded: (v) => set({ playbackEnded: v }),
       setBuffering: (v) => set({ buffering: v }),
     }),
@@ -341,6 +344,7 @@ export const usePlayer = create<PlayerStore>()(
         position: 0,
         duration: 0,
         playError: null,
+        playErrorSource: null,
         expanded: false,
         playbackEnded: false,
       }),
@@ -350,7 +354,7 @@ export const usePlayer = create<PlayerStore>()(
 
 /** 由当前曲目派生音频源地址（同源代理，支持 Range）。 */
 export function audioSrc(track: Track | null): string {
-  return track ? streamUrl(track.id) : ''
+  return track ? streamUrlOf(track) : ''
 }
 
 /** 供播放器组件使用的「自然结束」推进逻辑（导出以便测试）。 */

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Lyric } from '@pterosaur/shared/types'
+import type { Lyric, Track } from '@pterosaur/shared/types'
 
 vi.mock('../api/client.js', () => ({ api: { lyric: vi.fn() } }))
 
@@ -8,6 +8,16 @@ import { clearLyricCache, getCachedLyric, prefetchLyric, putCachedLyric } from '
 
 const lyricMock = api.lyric as unknown as ReturnType<typeof vi.fn>
 const sample: Lyric = { lines: [{ time: 0, text: 'hi' }], timed: true }
+const track = (id: string): Track => ({
+  source: 'netease',
+  id,
+  title: '',
+  artist: '',
+  album: '',
+  cover: '',
+  duration: 0,
+  fee: 'free',
+})
 
 beforeEach(() => {
   clearLyricCache()
@@ -16,47 +26,55 @@ beforeEach(() => {
 
 describe('lyricCache', () => {
   it('未缓存返回 null', () => {
-    expect(getCachedLyric('a')).toBeNull()
+    expect(getCachedLyric(track('a'))).toBeNull()
   })
 
   it('put 后可读', () => {
-    putCachedLyric('a', sample)
-    expect(getCachedLyric('a')).toBe(sample)
+    putCachedLyric(track('a'), sample)
+    expect(getCachedLyric(track('a'))).toBe(sample)
   })
 
   it('prefetch 拉取并写入缓存', async () => {
     lyricMock.mockResolvedValue(sample)
-    await prefetchLyric('a')
-    expect(lyricMock).toHaveBeenCalledWith('a')
-    expect(getCachedLyric('a')).toBe(sample)
+    await prefetchLyric(track('a'))
+    expect(lyricMock).toHaveBeenCalledWith('netease', 'a')
+    expect(getCachedLyric(track('a'))).toBe(sample)
   })
 
   it('命中缓存不再请求', async () => {
-    putCachedLyric('a', sample)
-    await prefetchLyric('a')
+    putCachedLyric(track('a'), sample)
+    await prefetchLyric(track('a'))
     expect(lyricMock).not.toHaveBeenCalled()
   })
 
   it('并发预取同一曲目只发一次请求（in-flight 去重）', async () => {
     lyricMock.mockImplementation(() => new Promise((r) => setTimeout(() => r(sample), 5)))
-    await Promise.all([prefetchLyric('a'), prefetchLyric('a')])
+    await Promise.all([prefetchLyric(track('a')), prefetchLyric(track('a'))])
     expect(lyricMock).toHaveBeenCalledTimes(1)
-    expect(getCachedLyric('a')).toBe(sample)
+    expect(getCachedLyric(track('a'))).toBe(sample)
   })
 
   it('请求失败不污染缓存，之后可重试', async () => {
     lyricMock.mockRejectedValue(new Error('boom'))
-    await prefetchLyric('a')
-    expect(getCachedLyric('a')).toBeNull()
+    await prefetchLyric(track('a'))
+    expect(getCachedLyric(track('a'))).toBeNull()
 
     lyricMock.mockResolvedValue(sample)
-    await prefetchLyric('a')
-    expect(getCachedLyric('a')).toBe(sample)
+    await prefetchLyric(track('a'))
+    expect(getCachedLyric(track('a'))).toBe(sample)
   })
 
   it('超过上限按插入顺序淘汰最旧', () => {
-    for (let i = 0; i < 70; i++) putCachedLyric(`k${i}`, sample)
-    expect(getCachedLyric('k0')).toBeNull()
-    expect(getCachedLyric('k69')).toBe(sample)
+    for (let i = 0; i < 70; i++) putCachedLyric(track(`k${i}`), sample)
+    expect(getCachedLyric(track('k0'))).toBeNull()
+    expect(getCachedLyric(track('k69'))).toBe(sample)
+  })
+
+  it('两源共享原始 id 不互相串歌词', () => {
+    const qq: Track = { ...track('1'), source: 'qq' }
+    const ne: Track = { ...track('1'), source: 'netease' }
+    putCachedLyric(ne, { lines: [{ time: 0, text: 'ne' }], timed: true })
+    expect(getCachedLyric(qq)).toBeNull()
+    expect(getCachedLyric(ne)?.lines[0].text).toBe('ne')
   })
 })

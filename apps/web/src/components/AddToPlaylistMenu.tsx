@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Plus, Check, Download, Loader2 } from 'lucide-react'
 import type { Track } from '@pterosaur/shared/types'
+import { keyOf } from '@pterosaur/shared/types'
 import { useLibrary } from '../store/library.js'
 import { downloadTrack } from '../lib/download.js'
 import './AddToPlaylistMenu.css'
@@ -81,7 +82,7 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
               <div className="atp__sep" />
               <div className="atp__sub">
                 {playlists.map((p) => {
-                  const inList = p.tracks.some((t) => t.id === track.id)
+                  const inList = p.tracks.some((t) => keyOf(t) === keyOf(track))
                   return (
                     <button
                       key={p.id}
@@ -90,7 +91,7 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
                       className="atp__item"
                       onClick={() => {
                         // 点一次加入，再点一次移除；不关闭菜单，便于连续调整多个歌单
-                        if (inList) removeFromPlaylist(p.id, track.id)
+                        if (inList) removeFromPlaylist(p.id, track)
                         else addToPlaylist(p.id, track)
                       }}
                     >

@@ -27,7 +27,7 @@
 - 状态：已采纳
 - 背景：需要一个轻量、TypeScript 友好、能与前端共享类型的后端；用户额外要求「支持登录自己的网易云账号以充分支持 VIP 曲目」。
 - 考虑过的方案：Express（重、TS 体验一般）、Fastify（可以但生态偏 REST）、原生 `node:http`（太底层）、**Hono**（超轻量、Web 标准 `Request/Response`、TS 一等公民、`@hono/node-server` 可直接跑在 Node 且能托管静态资源）。
-- 决策：后端用 Hono；网易云能力用 `NeteaseCloudMusicApi` 在 Node 进程内以函数形式调用（而非另起其 HTTP server）；登录用网易云扫码（`login_qr_*`）为主、手机号（`login_cellphone`）为辅。
+- 决策：后端用 Hono；网易云能力用 `NeteaseCloudMusicApi` 在 Node 进程内以函数形式调用（而非另起其 HTTP server）；登录用网易云**扫码**（`login_qr_*`）。
 - 为什么选这个：Hono 让「同一进程既发 API 又发 SPA 静态资源」非常自然，天然同源；`NeteaseCloudMusicApi` 以库形式调用省掉一层进程与端口，且其加密签名逻辑现成可用。扫码登录把 cookie 通过 Set-Cookie 下发浏览器，后续请求自动回传、后端透传即可解锁 VIP。
 - 为什么不选其他：Express/Fastify 与「共享 TS 类型 + 静态托管 + 极简」的诉求不如 Hono 贴合；自建网易云加密签名成本高且易随上游变动失效。
 - 后果：
@@ -326,4 +326,136 @@
   - 起播超时 12s 后若 `play()` 迟到 resolve，会因 `isPlaying` 已为 false 而被 `pause()` 抵消，行为自洽。
   - SW / 后端超时只覆盖连接建立阶段，长音频弱网慢速下载（body 阶段）不受影响，仍由 undici 300s / 生产 nginx 60s 兜底。
   - `buffering` / `playErrorNeedLogin` 为运行时字段，不在 `player` store 的 persist 白名单内，不持久化。
-- 何时重新审视：若做音频分片缓存（ADR-012 提及「边下边存」），可据此实现精确续传而非整段重载；若需后台标签页的恢复能力，应改为 `setInterval` 驱动（并接受与 rAF 的时钟并存）；若网易云 CDN 改为稳定长连接，可下调重试参数。
+- 何时重新审视：若做音频分片缓存（ADR-012 提及「边下边存」），可据此实现精准续传而非整段重载；若需后台标签页的恢复能力，应改为 `setInterval` 驱动（并接受与 rAF 的时钟并存）；若网易云 CDN 改为稳定长连接，可下调重试参数。
+
+## ADR-022：多源架构——实体带 `source`、`keyOf` 统一身份、`SourceAdapter` 归一化
+
+- 日期：2026-10-06
+- 状态：已采纳
+- 背景：项目原为单一音源（网易云），`Track` 的 `id` 是**全局唯一身份**，贯穿搜索产出 → 卡片 key / 跳转 → URL path → 页面取数 → 收藏/最近/歌单成员去重 → 队列定位 → 音频/歌词缓存键 → 后端 `/stream` 与 urlCache（约 60 个判等点位）。需求是接入第二个源（QQ 音乐）并支持多平台混合。若不引入「源」维度，两源共享同一原始 id 时会**互相覆盖**（收藏串源、队列定位错、缓存命中到错误音频）。
+- 考虑过的方案：① 把源编码进 `id` 字符串（`qq:mid`）而不加字段；② 给实体加必填 `source` 字段 + 组合键助手 `keyOf`；③ 只加可选 `source` 字段。
+- 决策：②。`MusicSource = 'netease' | 'qq'`；`Track`/`Artist`/`Album`/`Playlist` 各加**必填** `source`；新增 `sourceOf(e)`（旧数据回填 `'netease'`）与 `keyOf(e) = \`${sourceOf(e)}:${e.id}\``；全仓所有「认曲 / 认实体」的比对一律改用 `keyOf`；`streamUrl(source, id)` 与便捷式 `streamUrlOf(track)`；后端抽 `SourceAdapter` 接口（`sources/{types,netease,qq,index}.ts`），路由 `/stream/:source/:id`、`/api/artist|album|playlist|lyric/:source/:id`，另**保留 2 段式别名**（视为缺省源，兼容 SW 外壳 7 天缓存下的旧页面）。
+- 为什么选这个：`keyOf` 产物是普通字符串，可直接当 React key / Map key / Set 成员 / 缓存键前缀，**零结构改动**就让「收藏 / 最近 / 歌单成员 / 队列定位 / 缓存」跨源安全；必填 `source` 让所有产出点与构造点在 `tsc` 下**一次性报错、被迫处理**（尤其防止「QQ 曲目被当网易云解析」这类静默错误）；`SourceAdapter` 让「能力可缺」成为显式语义（缺失成员 → 路由回 501、前端隐藏入口），便于分阶段上线。
+- 为什么不选其他：① 把源塞进 id 字符串会让 URL 不透明、且 `encodeURIComponent` 后不可读，且仍有「忘记加前缀」的漏网点；③ 可选字段无法在编译期拦截漏设 `source` 的产出点（正是最危险的错误）。
+- 后果 / 已知边界：
+  - 旧持久化数据（player localStorage 队列 / library IDB / 云同步 JSON 载荷）缺 `source`，一律经 `sourceOf` 读时回填 `'netease'`，**不做**破坏性回写。
+  - 本地自建歌单 id 仍以 `pl-` 开头，与源命名（`netease`/`qq`）不冲突；`isMusicSource()` 守卫 `:source` 段，非法即 404（或对本地歌单而言视为 2 段式路由）。
+  - **QQ 适配器的 `sign` 风险**见 ADR-024。
+- 何时重新审视：接入第三个源时（`MusicSource` 扩展 + 注册表加一项即可）；或当某源需要「同一实体多源合并」（需 ISRC 级实体解析）时另立 ADR。
+
+## ADR-023：云同步身份锚点仅网易——多源下**有意不动**
+
+- 日期：2026-10-06
+- 状态：已采纳 → **部分修订**（云同步锚点已由 **ADR-028** 改为跟随活动账号；本条的其余内容仍有效）
+- 背景：ADR-016 的云同步按**网易云 `userId`** 把 library 存到 `.data/sync/<userId>.json`。接入 QQ 音乐后浮现一个选择：是否引入与源无关的首方身份（`profileId`），让「只绑 QQ、不绑网易云」的用户也能云同步。
+- 决策：**保持仅网易锚点，不动**。`requireUserId` 只取访客本人网易云 cookie；未登录网易云即无云同步；前端「云同步」开关**仅当网易云已登录时出现**（头像菜单内分源展示登录态，主头像优先显示网易云，否则 QQ）。
+- 为什么选这个：本项目的定位是「**免注册**即用」（PRD 非目标明确排除「多用户账号体系」）。引入首方 `profileId` 意味着自建账号/身份基建，作用域与风险都显著增大；而「一个浏览器同时持多源会话、跨源数据（混搭歌单）存本地 IDB」在无云同步时已完全可用。
+- 为什么不选其他：现在就上首方账号系统（方案 B）违背既定非目标，属过度设计；用「任一源登录即当锚」会让「换源登录」悄然切换云端副本归属，语义危险。
+- 后果 / 已知边界：**只绑 QQ 的用户没有云同步**（属有意取舍，非缺陷）；跨设备同步仍要求登录网易云。若日后确有「源无关身份」需求，另立 ADR 引入 `profileId`（本地生成、可被某一源登录认领）。
+- 何时重新审视：当用户反馈「只想用 QQ 却要同步」成为高频诉求时。
+
+## ADR-024：QQ 音乐接入方式——自研最小适配器（实测：全程无需 sign）
+
+- 日期：2026-10-06
+- 状态：已采纳（**已实测校准**）
+- 背景：需要第二个源，选 QQ 音乐（版权更全）。QQ 的流是**明文**（`ws.stream.qqmusic.qq.com/...mp3?vkey=`，`.mflac/.mgg` 加密仅针对客户端下载文件、不涉及串流），故非 DRM、可沿用 `/stream` 代理模型（区别于被否决的 Spotify——见 `docs/researches/spotify-multi-source.md`）。接入方式需在「自研最小适配器」与「依赖维护库/侧车进程」间定夺。
+- 考虑过的方案：① 起一个 QQ API 服务进程，后端 HTTP 转调；② 引入第三方 QQ API npm 库；③ 自研最小适配器（`fetch` 直连若干端点）。
+- 决策：③，且**全程无签名**（`platform:'h5'`）。经真实环境逐一实测：
+  - **搜索** `musicu.fcg` 的 `SearchCgiService.DoSearchForQQMusicDesktop`（**无需 sign**），`search_type`：0 单曲 / 1 歌手 / 2 专辑 / **3 歌单**（歌单响应键为 `songlist`）。旧的 `c.y.qq.com/client_search_cp` 已被**阉割**（返回 `code:0` 但 `totalnum:0`）——这是「什么都搜不出来」的根因，弃用。
+  - **取流** `vkey.GetVkeyServer`（**无需 sign**）；**不带 `filename`** —— 由 QQ 按内部 `media_mid` 返回正确文件。自拼 `M500<songmid>.mp3` 在 `songmid ≠ media_mid` 时会指向**不存在的文件（404→502）**（旧曲尤甚），这正是「歌单/专辑里的歌点了放不出」的根因。付费曲匿名空 purl → 需登录。
+  - **专辑** `fcg_v8_album_info_cp.fcg`、**歌单** `fcg_ucc_getcdinfo_byids_cp.fcg`、**歌词** `fcg_query_lyric_new.fcg`（`nobase64=1`）——均无签名、实测可用（曲目为**老式键** `songmid/payplay`，搜索为**新式键** `mid/pay_play`，归一化兼容两者）。
+  - **歌手详情**：`music.musichallSinger.SingerInfoInter.GetSingerDetail` **恒返回 104400**（无按-mid 取法），改用**按歌手名搜索**（演唱者页跳转携带 `?name=`，见路由 `artistDetail(id, cred, name)`）+ 按 mid 过滤；无名字时退化为最小档案。
+  - **登录** QQ PT 扫码（`ptqrshow` → `ptqrlogin`，`hash33` 算 `ptqrtoken`），成功码映射为网易云 800/801/802/803 契约。
+  - 另**保留**自研经典 `zzc` 签名 `qqSign` 及单测（当前请求**并不需要**，作为 h5 平台若被锁时的回退）。
+  完整能力面：`searchSongs/Albums/Artists/Playlists`、`albumDetail`、`artistDetail`、`playlistTracks`、`songUrl`、`getLyric`、`qr*`。
+- 为什么选这个：与既有 `netease.ts` 的「归一化 + https 改写 + Set-Cookie 收敛」三段式同构；零新进程，保持「单进程同源」；QQ 私有 API 无论用不用第三方都存在「上游一变即碎」的风险，自研至少可控可调。
+- 为什么不选其他：① 引入第二个进程/端口/生命周期，违背 ADR-002「以函数形式调用，省掉一层进程与端口」的精神，部署变复杂；② 这类包多为薄封装且维护不稳，引入后仍要自己写归一化（`Track/Album/Artist` 是本项目专属形态），收益仅剩「签名」一处。
+- 现状与已知边界（**已实测校准**）：
+  - 搜索/专辑/歌单/歌词/免费曲取流**均可用**（实测：`searchSongs('汪峰')` 出《光明》等；`albumDetail` 14 首；`artistDetail` 56 首 + 31 专辑；`playlistTracks` 100 首；`getLyric` 48 行带时间轴；免费曲 `songUrl` 取流 200 `audio/mpeg`）。
+  - **VIP 曲匿名取流为空** → `songUrl` 返回 null → 前端「暂不可播放 + 登录解锁」（复用既有机制）。
+  - **QQ 登录扫码流程**已实现但**未在真实扫码下验证**（需人用 QQ 音乐 App 扫一次）；`QQ_COOKIE` 缺省凭证同理。
+  - QQ 对匿名请求有频控；h5 `platform` 目前免签，若上游收紧需回退到 `qqSign`（已备）或换 `platform`。
+- 何时重新审视：若 h5 平台被要求签名且 `qqSign` 失效，则改为**依赖带 sign 机器的维护库**；若 QQ 提供按-mid 的歌手接口，可去掉 `?name=` 依赖。
+
+## ADR-025：音频缓存键加入源前缀；DB v3 丢弃旧音频缓存
+
+- 日期：2026-10-06
+- 状态：已采纳
+- 背景：SW 音频缓存键原为 `${trackId}|${level}`，后端 urlCache 原为 `${id}|${level}|${cred}`。多源下两源可能共享同一原始 id，不带源会让源 A 的缓存被源 B 命中、**播放/下载到完全错误的音频**（正确性问题，非命中率问题）。
+- 决策：前端 `mediaCache.audioKey(source, id, level)` → `` `${source}:${id}|${level}` ``（与 `keyOf` 同形）；后端 urlCache 键 → `` `${source}|${id}|${level}|${credKey}` ``（后端多一维凭证指纹，与前端**有意不同形**，见 ADR-012）。改动使旧键条目不再命中——升 `idb.ts` `DB_VERSION` 2→3，在 `onupgradeneeded` 中**删除并重建** `media` / `mediaMeta`（沿用 v1→v2 删 store 的先例；媒体缓存「可弃」）。**封面 `imageKey` 不加源**（键是完整规范化绝对 URL，跨源天然不冲突；且 SW 图片拦截路径拿不到 source）。
+- 为什么选这个：全仓只有一套身份拼法（`: <source>:<id>`），SW / 后端 / 前端三处对照即懂；删 store 重建代码最少且封面本有 7 天 TTL 会自然刷新。
+- 为什么不选其他：精细迁移（只清非新格式的 audio 条目、保留封面）代码多、收益小；封面加源在前端做不到（拿不到 source）。
+- 后果 / 已知边界：升级后**音频与封面缓存清空一次**（重新下载，可接受）；`MediaMeta` 增 `source?` 为纯加性变更。
+- 何时重新审视：若日后做音频分片缓存，键形需一并重估。
+
+## ADR-026：搜索按源分组、提供二元源 tab、不跨源去重
+
+- 日期：2026-10-06
+- 状态：已采纳
+- 背景：多源搜索需决定「如何整合」：一次返回全部源再合并排序，还是按选中源分别查询。
+- 决策：`/api/search/all?source=` 按源查询（默认网易云，不默认双发）；前端在分类 tab **之上**加一行**源 tab**（网易云 / QQ 音乐），并把 `source` 写进 URL（`?q=&source=`）；**不跨源去重**（各源内部 id 唯一，`key={id}` 在该源内不冲突）。响应带 `capabilities` 标记各类目是否受支持（缺失视为支持），供前端隐藏不支持的分类。
+- 为什么选这个：默认源是网易云 → **绝大多数搜索根本不触达 QQ**（QQ 频控敏感，这是不可恢复的风险，优于「每次搜索双发」）；单源失败隔离（该 tab 报错不影响另一 tab）；`useAsync` 的内存缓存让来回切 tab 第二次即瞬时。
+- 为什么不选其他：一次返回两源分组会**放大频控暴露**且上游负载翻倍，与「默认网易云」的诉求相悖；跨源自动合并需要实体解析（ISRC 或 title+artist 模糊），有「把可播放源悄悄藏掉」的风险，且打分跨源不可比。
+- 后果 / 已知边界：切到 QQ tab 首次有一次网络往返；不做「同曲多版本」聚合（待两源都提供 ISRC 后再议）。
+- 何时重新审视：若引入提供 ISRC 的源，可考虑曲目级「版本聚合」。
+
+## ADR-027：单活动账号模型——最多登录一个源，登录入口在登录后消失
+
+- 日期：2026-10-06
+- 状态：已采纳（**部分修订 ADR-023**，见 ADR-028）
+- 背景：多源地基落地后，登录态是「每源一份」（`Record<MusicSource, LoginStatus>`），Topbar 分源列出登录/退出。用户提出：**第三方账号最多同时登录一个**；一旦登录，就不再需要登录入口。如此，「退出 / 云同步锚点 / 搜索默认源 / 首页·浏览的推荐」都只需跟随**那一个活动账号**，语义与实现都大幅简化。
+- 考虑过的方案：① 维持多源并存，各自独立；② 单活动账号（登一个后无登录入口，只有退出）；③ 单活动账号 + 自动替换（登新源时自动登出旧的）。
+- 决策：②。前端新增 `activeSource(status)`（遍历 `MUSIC_SOURCES` 取第一个 `logged`，无则 `null`）；`Topbar` **仅当未登录**才渲染「登录」按钮，登录后菜单只留「退出登录」（登 `activeSource`）与云同步开关——去掉分源登录/退出行。后端双保险：`/api/auth/:source/qr/check` 在 803 成功时，对**其它**已注册源下发其 `logoutCookieNames` 的过期 `Set-Cookie`，清掉可能的陈旧会话。
+- 为什么选这个：UI 层面「登录后无入口」天然保证最多一个，无需处理"登第二个该怎么办"的分支；活动源唯一，后续三项（退出/同步/搜索·推荐）只需读 `activeSource`，不必再为每个源分别决策。用户明确选择此形态（而非自动替换）。
+- 为什么不选其他：① 需要为"两个都登录时"定义显示、退出、同步归属等一堆规则，复杂且易歧义；③ 自动替换会在用户不知情时登出旧账号，逆用户预期。
+- 后果 / 已知边界：
+  - 想换账号必须**先退出**再登录。
+  - 「播放受限提示」条里对**非活动源**曲目的"登录解锁"按钮仍会打开登录弹窗（切换账号的通道），后端清它源 cookie 保证切换干净。
+  - `PlayErrorToast` 的源引导语义不变。
+- 何时重新审视：若日后要支持"同时挂多个账号"，本决定与 ADR-028 需一并重估。
+
+## ADR-028：云同步锚点跟随活动账号（`<source>:<accountId>`，修订 ADR-023）
+
+- 日期：2026-10-06
+- 状态：已采纳（**修订 ADR-023**）
+- 背景：ADR-023 为守住"免注册"，把云同步锚点**固定为网易云 `userId`**。但单活动账号模型（ADR-027）下，"只登 QQ"是常态，固定网易锚点会让这些用户完全没有云同步。
+- 考虑过的方案：① 保持仅网易（ADR-023 原样）；② 锚点改为 `<source>:<accountId>`（网易云 `userId` / QQ `uin`），随活动账号走。
+- 决策：②。后端 `requireUserId` → **`requireIdentity(c): { source, id } | null`**（遍历源取已登录者的 `userId`）；云同步文件键 = **`<source>-<id>`**（`syncStore.sanitizeId` 已允许 `-`）。前端 `store/sync` 由 `userId?: number` 改为 `{ source?, accountId? }`，`enable(source, accountId)`；`useLibrarySync` 激活条件 = `enabled && activeSource===boundSource && 当前 id===boundId`。**`LoginStatus.userId` 由 `number` 改 `string`**（QQ `uin` 超出 JS 安全整数）。
+- 为什么选这个：单活动账号下锚点天然唯一，`<源>:<id>` 是最小改动即可让"登谁就同步谁"；`loginStatus` 已能取到各源账号 id（QQ 侧补 `userId = uin`）。
+- 为什么不选其他：① 让 QQ 用户无法云同步，与用户明确诉求相悖。
+- 后果 / 已知边界：
+  - 云同步归属随活动账号；换账号自动失活（绑定不符），不为新账号悄然开启——与 ADR-016 的失活语义一致。
+  - 数据文件从 `sync/<neteaseUserId>.json` 变为 `sync/<source>-<id>.json`：**旧网易云云端副本需按新键名迁移**（旧部署需手工改名，或接受一次性的"云端无数据→以本地覆盖"）。
+  - 已实测：`/api/discover/capabilities` 返回 `qq:{recommend:true,playlists:true,toplists:false}`。
+- 何时重新审视：若引入源无关的首方 `profileId`（研究文档方案 C），锚点应再升级为该 id。
+
+## ADR-029：QQ 音乐也提供「发现」（免登录歌单；无排行榜）
+
+- 日期：2026-10-06
+- 状态：已采纳
+- 背景：ADR-027 后搜索/推荐都跟随活动源，故 QQ 也需提供首页「为你推荐」与浏览页各分区，否则登 QQ 后这些区域空白。
+- 决策：`SourceAdapter` 新增**可选能力** `recommendPlaylists / toplists / topPlaylists`；`/api/discover/*` 加 `?source=`，并新增 `/api/discover/capabilities?source=` 返回 `{recommend, playlists, toplists}` 供前端隐藏不支持的 tab。QQ 侧用免签接口 `c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg`（歌单列表；`sortId` 区分排序）：`recommendPlaylists`（sortId=5，**以热门歌单近似个性化推荐**，QQ 的个性化推荐需登录/上下文）、`topPlaylists`（sortId=2）。
+- 为什么选这个：该接口免签、实测可用、结构与 `normalizeQqPlaylist` 吻合；`capabilities` 让"某源缺某分区"成为显式语义而非 500/空。
+- 为什么不选其他：QQ 的 `musicu.fcg` 个性化推荐模块全部 `500003`（模块名/参数未探得）且多需登录，不值得为免登录场景硬啃。
+- 后果 / 已知边界：
+  - **QQ 无「排行榜」**（`fcg_v8_toplist_opt.fcg` 及各类 `ToplistInfoServer` 模块均不可用）→ `toplists` 不实现，前端经 `capabilities` **隐藏该 tab**；`Radio` 无排行榜的源**退回热门歌单**。
+  - QQ 的「为你推荐」实为「热门歌单」，非个性化——不在 UI 标注"个性化"。
+- 何时重新审视：若探得 QQ 免登录的排行榜/个性化端点，可补上 `toplists` 并从 capabilities 放行。
+
+## ADR-030：按活动平台展示——`Plan N/T` 标签、QQ 绿色主题、QQ 昵称与头像来源
+
+- 日期：2026-10-06
+- 状态：已采纳
+- 背景：单活动账号（ADR-027）下，头像菜单原固定显示「Pterosaur+」，看不出当前用的是哪个平台；主题强调色固定为 Apple Music 红；QQ 登录后**昵称为空**（显示成 `QQ <号>`）、**头像不显示**。
+- 决策：
+  1. **计划标签**：该位置按活动源显示 **`Plan N`**（网易云）/ **`Plan T`**（QQ）——N=NetEase、T=Tencent。
+  2. **主题色**：活动源为 QQ 时给 `<html>` 打 `data-source="qq"`（`hooks/useSourceTheme.ts`），`tokens.css` 的 `:root[data-source='qq']` 把 `--accent*` 覆盖为 **QQ 绿 `#31c27c`**；其它情况回到默认红。
+  3. **QQ 昵称**：来自 **PT 登录回调** `ptuiCB(...,'<nick>')` 的第 6 参（`qrCheck` 捕获），随会话以 `qq_nick` cookie 携带（`encodeURIComponent` 编码），`loginStatus` 读取解码；缺失退化 `QQ <号>`。
+  4. **QQ 头像**：**按 QQ 号直接拼** `https://q1.qlogo.cn/g?b=qq&nk=<uin>&s=100`（免鉴权，实测 200）。
+- 为什么选这个：QQ **无免登录的资料查询接口**（实测 `music.UnifiedHomepage.UnifiedHomepageSrv.GetHomepageHeader` 等一律返回空 `BaseInfo`，无论是否带 `HostUin`/`authst`），故昵称取登录回调、头像用 QQ 号模板——两者都**确定性可用**、零额外上游调用。
+- 为什么不选其他：继续调 `GetHomepageHeader` 每次状态查询都多一次徒劳的上游请求，且对匿名/无 musickey 的会话根本不返回内容。
+- 后果 / 已知边界：
+  - `qq_nick` 是**会话 cookie**（非敏感展示名），与 `uin`/`qm_keyst` 同批下发、退出时一并清理；昵称含中文时经 URL 编码，cookie 值保持 ASCII。
+  - `Plan T`/绿色主题仅表示"当前活动源是 QQ"，**不代表真会员**；原 `vip` 字段仍随 `LoginStatus` 返回，供后续使用。
+  - QQ 头像始终是**QQ 号头像**（非 QQ 音乐资料图）。
+- 何时重新审视：若 QQ 开放免登录资料接口，可改取官方昵称/头像。

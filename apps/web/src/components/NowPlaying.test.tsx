@@ -35,6 +35,7 @@ class FakeImage {
 
 function track(id: string, cover: string): Track {
   return {
+    source: 'netease',
     id,
     title: `歌曲${id}`,
     artist: `艺人${id}`,

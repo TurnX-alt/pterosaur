@@ -11,9 +11,14 @@ import './PlayErrorToast.css'
 export function PlayErrorToast() {
   const playError = usePlayer((s) => s.playError)
   const playErrorNeedLogin = usePlayer((s) => s.playErrorNeedLogin)
+  const playErrorSource = usePlayer((s) => s.playErrorSource)
   const setPlayError = usePlayer((s) => s.setPlayError)
-  const logged = useAuth((s) => s.status.logged)
+  const status = useAuth((s) => s.status)
   const openModal = useAuth((s) => s.openModal)
+
+  // 出错曲目所属源：决定「登录解锁」引导到哪个源的登录页
+  const src = playErrorSource ?? 'netease'
+  const logged = status[src]?.logged ?? false
 
   useEffect(() => {
     if (!playError) return
@@ -28,7 +33,7 @@ export function PlayErrorToast() {
       <AlertCircle size={18} className="toast__icon" />
       <span className="toast__text">{playError}</span>
       {!logged && playErrorNeedLogin && (
-        <button type="button" className="toast__action" onClick={openModal}>
+        <button type="button" className="toast__action" onClick={() => openModal(src)}>
           登录解锁
         </button>
       )}
