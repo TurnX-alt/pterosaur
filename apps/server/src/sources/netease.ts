@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
-import type { Album, Artist, LoginStatus, Playlist, Track, Lyric } from '@pterosaur/shared/types'
+import { DEFAULT_AUDIO_LEVEL, type Album, type Artist, type LoginStatus, type Playlist, type Track, type Lyric, type AudioLevel } from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
-import { canonicalNeteaseImage } from '@pterosaur/shared/image'
+import { canonicalNeteaseImage, COVER_LARGE } from '@pterosaur/shared/image'
 import type { SourceAdapter } from './types.js'
 
 const require = createRequire(import.meta.url)
@@ -108,6 +108,9 @@ function https(url?: string): string {
   return url.replace(/^http:\/\//, 'https://')
 }
 
+/** 封面/头像基准尺寸（产出大图，前端按使用场景经 `coverAt` 降到小图；见 shared/image）。 */
+const BASE_COVER_SIZE = `${COVER_LARGE}y${COVER_LARGE}`
+
 /**
  * 封面 / 头像地址：规范化（https + 固定 CDN 镜像主机，见 shared/image 与 ADR-020）
  * 并设置缩放尺寸（覆盖地址上已有的 `param`）。
@@ -115,7 +118,7 @@ function https(url?: string): string {
  * 网易云会在 p1–pN.music.126.net 间随机轮换主机名（实测同一封面同端点两次调用即不同），
  * 不规范化的话，前端所有以 URL 为键的缓存（SW 媒体池 / 就绪登记表）都会被拆成多条。
  */
-function coverUrl(raw: string | undefined, size: string): string {
+function coverUrl(raw: string | undefined, size: string = BASE_COVER_SIZE): string {
   if (!raw) return ''
   const canonical = canonicalNeteaseImage(raw)
   try {
@@ -152,7 +155,7 @@ export function normalizeTrack(raw: RawSong): Track {
     artist: artists.join(' / ') || '未知艺人',
     album: album?.name ?? '',
     // 封面按需放大，网易云支持 ?param=WxH 缩略参数
-    cover: coverUrl(coverRaw, '600y600'),
+    cover: coverUrl(coverRaw, BASE_COVER_SIZE),
     duration: Math.round(((raw.dt ?? raw.duration ?? 0) as number) / 1000),
     fee: feeOf(raw.fee),
     // 供界面跳转艺人页 / 专辑页；缺失时前端降级为纯文本
@@ -167,7 +170,7 @@ export function normalizeArtist(raw: RawArtist): Artist {
     source: 'netease',
     id: String(raw.id),
     name: raw.name ?? '未知艺人',
-    avatar: coverUrl(raw.picUrl, '300y300'),
+    avatar: coverUrl(raw.picUrl, BASE_COVER_SIZE),
     alias: raw.alias?.length ? raw.alias : undefined,
     albumSize: raw.albumSize,
     musicSize: raw.musicSize,
@@ -184,7 +187,7 @@ export function normalizeAlbum(raw: RawAlbum): Album {
     source: 'netease',
     id: String(raw.id),
     name: raw.name ?? '未命名专辑',
-    cover: coverUrl(raw.picUrl, '600y600'),
+    cover: coverUrl(raw.picUrl, BASE_COVER_SIZE),
     artist: names.join(' / ') || '未知艺人',
     artistId: primaryId != null ? String(primaryId) : undefined,
     year: raw.publishTime ? new Date(raw.publishTime).getFullYear() : undefined,
@@ -198,7 +201,7 @@ export function normalizePlaylist(raw: RawPlaylist): Playlist {
     source: 'netease',
     id: String(raw.id),
     name: raw.name ?? '未命名歌单',
-    cover: coverUrl(raw.coverImgUrl ?? raw.picUrl ?? '', '600y600'),
+    cover: coverUrl(raw.coverImgUrl ?? raw.picUrl ?? '', BASE_COVER_SIZE),
     description: raw.description ?? undefined,
     trackCount: raw.trackCount,
     playCount: raw.playCount,
@@ -273,7 +276,7 @@ export async function playlistTracks(id: string, cookie?: string): Promise<{ pla
         source: 'netease',
         id: String(pl.id),
         name: pl.name ?? '未命名歌单',
-        cover: coverUrl(pl.coverImgUrl, '600y600'),
+        cover: coverUrl(pl.coverImgUrl, BASE_COVER_SIZE),
         description: pl.description ?? undefined,
         trackCount: pl.trackCount,
         playCount: pl.playCount,
@@ -316,7 +319,7 @@ export async function albumDetail(id: string, cookie?: string): Promise<{ album:
  * @param level 音质（exhigh / lossless / hires 等），默认 exhigh
  * @returns 已改写为 https 的可播放地址；无法播放时返回 null
  */
-export async function songUrl(id: string, cookie?: string, level = 'exhigh'): Promise<string | null> {
+export async function songUrl(id: string, cookie?: string, level: AudioLevel = DEFAULT_AUDIO_LEVEL): Promise<string | null> {
   try {
     const res = await api.song_url_v1({ id, level, cookie })
     const url: string | null = res?.body?.data?.[0]?.url ?? null
@@ -389,7 +392,7 @@ export async function loginStatus(cookie?: string): Promise<LoginStatus> {
     return {
       logged: true,
       nickname: profile.nickname,
-      avatarUrl: profile.avatarUrl ? coverUrl(profile.avatarUrl, '300y300') : undefined,
+      avatarUrl: profile.avatarUrl ? coverUrl(profile.avatarUrl, BASE_COVER_SIZE) : undefined,
       userId: profile.userId != null ? String(profile.userId) : undefined,
       vip: Boolean(profile.vipType),
     }

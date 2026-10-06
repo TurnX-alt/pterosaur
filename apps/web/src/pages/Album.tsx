@@ -8,6 +8,8 @@ import { useLibrary } from '../store/library.js'
 import { confirmDialog } from '../store/ui.js'
 import type { Album, Track } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
+import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
+import { useSettings } from '../store/settings.js'
 import { TrackList } from '../components/TrackList.js'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
@@ -31,6 +33,7 @@ export function AlbumPage() {
   const navigate = useViewNavigate()
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const level = useSettings((s) => s.level)
   const savedAlbums = useLibrary((s) => s.savedAlbums)
   const toggleSaveAlbum = useLibrary((s) => s.toggleSaveAlbum)
   const isSaved = savedAlbums.some((a) => a.source === source && a.id === id)
@@ -70,7 +73,8 @@ export function AlbumPage() {
       key: ripKey,
       tracks,
       zipName: `${album.name} - ${album.artist}`,
-      coverUrl: album.cover,
+      coverUrl: coverAt(album.cover, COVER_LARGE),
+      level,
     })
   }
 
@@ -95,7 +99,7 @@ export function AlbumPage() {
   return (
     <div className="detail" aria-busy={loading}>
       <header className="detail__hero">
-        <Cover src={album.cover} alt={album.name} radius="lg" className="detail__cover" />
+        <Cover src={coverAt(album.cover, COVER_LARGE)} alt={album.name} radius="lg" className="detail__cover" />
         <div className="detail__info">
           <span className="detail__type">专辑</span>
           <h1 className="detail__name">{album.name}</h1>

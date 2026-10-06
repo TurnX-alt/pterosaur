@@ -10,6 +10,7 @@ import type { Playlist, Track } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE } from '@pterosaur/shared/types'
 import { PlaylistCard } from '../components/PlaylistCard.js'
 import { TrackList } from '../components/TrackList.js'
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
 import { Cover } from '../components/Cover.js'
 import { Loading, ErrorState } from '../components/States.js'
 import './pages.css'
@@ -170,7 +171,7 @@ export function Home() {
           <div className="home__featured">
             {featured.map((t, i) => (
               <button key={t.id} type="button" className="featured-item" onClick={() => playTracks(featured, i)}>
-                <Cover src={t.cover} alt={t.title} radius="sm" size={48} />
+                <Cover src={coverAt(t.cover, COVER_SMALL)} alt={t.title} radius="sm" size={48} />
                 <span className="featured-item__text">
                   <span className="featured-item__title ellipsis">{t.title}</span>
                   <span className="featured-item__artist ellipsis">{t.artist}</span>

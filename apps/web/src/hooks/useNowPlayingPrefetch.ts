@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
 import { usePlayer } from '../store/player.js'
 import { prefetchLyric } from '../lib/lyricCache.js'
 import { preloadCover } from '../lib/imageCache.js'
@@ -14,7 +15,7 @@ export function useNowPlayingPrefetch(): void {
   const current = usePlayer((s) => s.current)
   useEffect(() => {
     if (!current) return
-    preloadCover(current.cover)
+    preloadCover(coverAt(current.cover, COVER_LARGE))
     void prefetchLyric(current)
   }, [current])
 }

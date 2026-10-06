@@ -1,5 +1,5 @@
 import { canonicalNeteaseImage } from '@pterosaur/shared/image'
-import type { MusicSource } from '@pterosaur/shared/types'
+import { DEFAULT_AUDIO_LEVEL, type MusicSource } from '@pterosaur/shared/types'
 import { MEDIA_META_STORE, MEDIA_STORE, idbClear, idbDelete, idbGet, idbGetAll, idbPut } from './idb.js'
 
 /**
@@ -14,8 +14,8 @@ import { MEDIA_META_STORE, MEDIA_STORE, idbClear, idbDelete, idbGet, idbGetAll, 
 
 /** 缓存容量上限（字节），16GB；实际生效值还会受浏览器配额约束。 */
 export const CAP_BYTES = 16 * 1024 ** 3
-/** 默认音质档位（与后端 `/stream` 默认一致）。 */
-export const DEFAULT_LEVEL = 'exhigh'
+/** 默认音质档位（与后端 `/stream` 默认一致；单一来源见 shared 的 DEFAULT_AUDIO_LEVEL）。 */
+export const DEFAULT_LEVEL = DEFAULT_AUDIO_LEVEL
 /** 配额安全系数：有效上限取 min(16GB, 配额 * 该系数)。 */
 export const QUOTA_SAFETY = 0.9
 /** 封面缓存有效期：7 天（毫秒）。从写入时刻起算，到期后访问即回源刷新（与外壳 7 天策略对齐）。 */

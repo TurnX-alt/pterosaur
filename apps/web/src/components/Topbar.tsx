@@ -20,6 +20,7 @@ import type { MusicSource } from "@pterosaur/shared/types";
 import { useSync } from "../store/sync.js";
 import { syncNow } from "../lib/sync.js";
 import { useSidebarDrawer, useSettingsDialog } from "../store/ui.js";
+import { coverAt, COVER_SMALL } from "@pterosaur/shared/image";
 import { Cover } from "./Cover.js";
 import "./Topbar.css";
 
@@ -180,7 +181,7 @@ export function Topbar({ searchRef }: TopbarProps) {
               aria-expanded={menuOpen}
             >
               <Cover
-                src={account.avatarUrl}
+                src={coverAt(account.avatarUrl, COVER_SMALL)}
                 alt={account.nickname ?? "用户"}
                 rounded
                 size={28}
@@ -192,7 +193,7 @@ export function Topbar({ searchRef }: TopbarProps) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="topbar__menu-head">
-                  <Cover src={account.avatarUrl} alt="" rounded size={36} />
+                  <Cover src={coverAt(account.avatarUrl, COVER_SMALL)} alt="" rounded size={36} />
                   <div>
                     <div className="topbar__menu-name">{account.nickname}</div>
                     <div className="topbar__menu-plan">{planOf(src)}</div>

@@ -2,6 +2,7 @@ import { X, Trash2, Play } from 'lucide-react'
 import { keyOf } from '@pterosaur/shared/types'
 import { usePlayer } from '../store/player.js'
 import { useQueuePanel } from '../store/ui.js'
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
 import './QueuePanel.css'
@@ -56,7 +57,7 @@ export function QueuePanel() {
                   <div className="queue-item__index">
                     {active ? <Play size={13} fill="currentColor" /> : i + 1}
                   </div>
-                  <Cover src={t.cover} alt={t.title} radius="sm" size={40} />
+                  <Cover src={coverAt(t.cover, COVER_SMALL)} alt={t.title} radius="sm" size={40} />
                   <div className="queue-item__meta">
                     <div className="queue-item__title ellipsis">{t.title}</div>
                     <div className="queue-item__artist ellipsis">{t.artist}</div>

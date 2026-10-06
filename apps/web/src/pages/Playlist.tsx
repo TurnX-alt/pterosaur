@@ -10,11 +10,13 @@ import { confirmDialog } from '../store/ui.js'
 import type { Playlist, Track } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
+import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
 import { RipButton } from '../components/RipButton.js'
 import { Loading, ErrorState } from '../components/States.js'
 import { useRip } from '../store/rip.js'
+import { useSettings } from '../store/settings.js'
 import { isRipping, runRip } from '../lib/rip.js'
 
 /** 格式化播放量。 */
@@ -46,6 +48,7 @@ export function PlaylistPage() {
   const toggleSavePlaylist = useLibrary((s) => s.toggleSavePlaylist)
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const level = useSettings((s) => s.level)
 
   // 本地歌单标题的内联重命名
   const [renaming, setRenaming] = useState(false)
@@ -141,7 +144,7 @@ export function PlaylistPage() {
       confirmText: '开始翻录',
     })
     if (!ok) return
-    await runRip({ key: ripKey, tracks, zipName: playlist?.name ?? '歌单' })
+    await runRip({ key: ripKey, tracks, zipName: playlist?.name ?? '歌单', level })
   }
 
   if (loading) {
@@ -165,7 +168,7 @@ export function PlaylistPage() {
   return (
     <div className="detail">
       <header className="detail__hero">
-        <Cover src={playlist.cover} alt={playlist.name} radius="lg" className="detail__cover" />
+        <Cover src={coverAt(playlist.cover, COVER_LARGE)} alt={playlist.name} radius="lg" className="detail__cover" />
         <div className="detail__info">
           <span className="detail__type">{isLocal ? '本地歌单' : '歌单'}</span>
           {isLocal && renaming ? (

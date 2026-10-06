@@ -17,7 +17,7 @@ import { seekTo } from '../hooks/audioElement.js'
 import { api } from '../api/client.js'
 import { getCachedLyric, putCachedLyric } from '../lib/lyricCache.js'
 import { whenCoverReady } from '../lib/imageCache.js'
-import { canonicalNeteaseImage } from '@pterosaur/shared/image'
+import { canonicalNeteaseImage, coverAt, COVER_LARGE } from '@pterosaur/shared/image'
 import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
 import { formatTime, keyOf } from '@pterosaur/shared/types'
 import type { Lyric } from '@pterosaur/shared/types'
@@ -87,7 +87,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
    */
   const [bg, setBg] = useState<BgState>({ stable: null, incoming: null })
 
-  const coverUrl = current?.cover
+  const coverUrl = current ? coverAt(current.cover, COVER_LARGE) : undefined
   useEffect(() => {
     if (!coverUrl) return
     let cancelled = false
@@ -255,7 +255,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
           {/* 左：封面 */}
           <div className="nowplaying__art">
             <Cover
-              src={current.cover}
+              src={coverAt(current.cover, COVER_LARGE)}
               alt={current.title}
               radius="lg"
               className={`nowplaying__cover${isPlaying ? ' nowplaying__cover--playing' : ''}`}

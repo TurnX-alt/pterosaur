@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  buildVkeyFilename,
   canonicalQqImage,
   canonicalQqSingerImage,
   cookieHeaderFromSetCookies,
@@ -8,6 +9,7 @@ import {
   normalizeQqArtist,
   normalizeQqPlaylist,
   normalizeQqTrack,
+  qqLevelToCandidates,
   qqSign,
   readCookieValue,
 } from './qq.js'
@@ -29,7 +31,7 @@ describe('normalizeQqTrack（QQ 原始曲目 → 共享 Track）', () => {
     expect(t.artist).toBe('周杰伦')
     expect(t.album).toBe('叶惠美')
     expect(t.duration).toBe(269)
-    expect(t.cover).toBe('https://y.gtimg.cn/music/photo_new/T002R300x300M000000MkMni19ClKG.jpg')
+    expect(t.cover).toBe('https://y.gtimg.cn/music/photo_new/T002R1200x1200M000000MkMni19ClKG.jpg')
     expect(t.artistRefs).toEqual([{ id: '001BLpXF2DyJe2', name: '周杰伦' }])
     expect(t.albumId).toBe('000MkMni19ClKG')
     expect(t.fee).toBe('vip')
@@ -67,7 +69,7 @@ describe('normalizeQqTrack（QQ 原始曲目 → 共享 Track）', () => {
 
 describe('canonicalQqImage', () => {
   it('固定 https + 稳定主机 + 尺寸', () => {
-    expect(canonicalQqImage('MID')).toBe('https://y.gtimg.cn/music/photo_new/T002R300x300M000MID.jpg')
+    expect(canonicalQqImage('MID')).toBe('https://y.gtimg.cn/music/photo_new/T002R1200x1200M000MID.jpg')
   })
   it('缺 mid 返回空串', () => {
     expect(canonicalQqImage(undefined)).toBe('')
@@ -87,7 +89,7 @@ describe('normalizeQqAlbum / Artist / Playlist', () => {
     })
     expect(a.source).toBe('qq')
     expect(a.id).toBe('MID')
-    expect(a.cover).toBe('https://y.gtimg.cn/music/photo_new/T002R300x300M000MID.jpg')
+    expect(a.cover).toBe('https://y.gtimg.cn/music/photo_new/T002R1200x1200M000MID.jpg')
     expect(a.artistId).toBe('SMID')
     expect(a.year).toBe(2020)
     expect(a.trackCount).toBe(10)
@@ -103,7 +105,7 @@ describe('normalizeQqAlbum / Artist / Playlist', () => {
   it('歌手：头像用 T001 模板', () => {
     const ar = normalizeQqArtist({ singerMID: 'S1', singerName: '甲', songNum: 5, albumNum: 2 })
     expect(ar.id).toBe('S1')
-    expect(ar.avatar).toBe('https://y.gtimg.cn/music/photo_new/T001R300x300M000S1.jpg')
+    expect(ar.avatar).toBe('https://y.gtimg.cn/music/photo_new/T001R1200x1200M000S1.jpg')
     expect(ar.musicSize).toBe(5)
     expect(ar.albumSize).toBe(2)
   })
@@ -131,7 +133,21 @@ describe('normalizeQqAlbum / Artist / Playlist', () => {
 
   it('canonicalQqSingerImage 空 mid 返回空串', () => {
     expect(canonicalQqSingerImage(undefined)).toBe('')
-    expect(canonicalQqSingerImage('x')).toBe('https://y.gtimg.cn/music/photo_new/T001R300x300M000x.jpg')
+    expect(canonicalQqSingerImage('x')).toBe('https://y.gtimg.cn/music/photo_new/T001R1200x1200M000x.jpg')
+  })
+})
+
+describe('qqLevelToCandidates / buildVkeyFilename（按档取流）', () => {
+  it('抽象档映射到 QQ 候选链（由高到低，含降级）', () => {
+    expect(qqLevelToCandidates('hires').map((c) => c.prefix)).toEqual(['Q000', 'F000', 'M800'])
+    expect(qqLevelToCandidates('lossless')[0]).toEqual({ prefix: 'F000', ext: '.flac' })
+    expect(qqLevelToCandidates('exhigh')[0]).toEqual({ prefix: 'M800', ext: '.mp3' })
+    expect(qqLevelToCandidates('standard')[0]).toEqual({ prefix: 'M500', ext: '.mp3' })
+  })
+
+  it('filename 以 media_mid 为主体；缺失时用 songmid 兜底', () => {
+    expect(buildVkeyFilename('F000', '.flac', 'SONGMID', 'MEDIA')).toBe('F000MEDIA.flac')
+    expect(buildVkeyFilename('F000', '.flac', 'SONGMID')).toBe('F000SONGMIDSONGMID.flac')
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { usePlayer, advanceOnEnd, shuffledIndexes, currentPlayMode } from './player.js'
+import { usePlayer, advanceOnEnd, shuffledIndexes, currentPlayMode, audioSrc } from './player.js'
 import type { Track } from '@pterosaur/shared/types'
 
 /** 构造测试用曲目。 */
@@ -36,6 +36,17 @@ beforeEach(() => {
     playErrorNeedLogin: false,
     buffering: false,
     expanded: false,
+  })
+})
+
+describe('audioSrc（音质档位）', () => {
+  it('带档位时以 ?level= 形式拼入流地址', () => {
+    expect(audioSrc(track('7'), 'lossless')).toBe('/stream/netease/7?level=lossless')
+  })
+
+  it('缺省档位时不带 level（由后端兜底）；空曲目返回空串', () => {
+    expect(audioSrc(track('8'))).toBe('/stream/netease/8')
+    expect(audioSrc(null)).toBe('')
   })
 })
 

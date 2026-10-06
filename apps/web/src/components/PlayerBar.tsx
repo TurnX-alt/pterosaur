@@ -19,6 +19,7 @@ import { useQueuePanel } from "../store/ui.js";
 import { startNowPlayingTransition } from "../lib/nowPlayingTransition.js";
 import { seekTo } from "../hooks/audioElement.js";
 import { formatTime, keyOf } from '@pterosaur/shared/types'
+import { coverAt, COVER_SMALL } from "@pterosaur/shared/image";
 import { Cover } from "./Cover.js";
 import { IconButton } from "./IconButton.js";
 import { Slider } from "./Slider.js";
@@ -82,7 +83,7 @@ export function PlayerBar() {
               aria-label="展开播放页"
             >
               <Cover
-                src={current.cover}
+                src={coverAt(current.cover, COVER_SMALL)}
                 alt={current.title}
                 radius="md"
                 size={56}

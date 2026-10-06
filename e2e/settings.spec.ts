@@ -177,11 +177,27 @@ test.describe('设置弹窗', () => {
     expect(await favoriteCount(page)).toBe(1)
   })
 
+  test('音质档位可选并持久化', async ({ page }) => {
+    await page.goto('/')
+    await page.getByTestId('settings-button').click()
+    await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible()
+
+    // 默认档位为 exhigh（选中态）
+    await expect(page.getByTestId('quality-exhigh')).toHaveAttribute('aria-checked', 'true')
+    await page.getByTestId('quality-lossless').click()
+    await expect(page.getByTestId('quality-lossless')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('quality-exhigh')).toHaveAttribute('aria-checked', 'false')
+
+    // 刷新后仍为无损（localStorage 持久化）
+    await page.reload()
+    await page.getByTestId('settings-button').click()
+    await expect(page.getByTestId('quality-lossless')).toHaveAttribute('aria-checked', 'true')
+  })
+
   test('检查更新触发整页刷新', async ({ page }) => {
     await page.goto('/')
     await page.getByTestId('settings-button').click()
     await page.getByTestId('check-update').click()
-
     const confirm = page.getByRole('dialog', { name: '检查更新？' })
     await expect(confirm).toBeVisible()
 

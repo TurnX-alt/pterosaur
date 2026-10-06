@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { RepeatMode, Track, MusicSource } from '@pterosaur/shared/types'
-import { streamUrlOf, keyOf } from '@pterosaur/shared/types'
+import { streamUrlOf, keyOf, type AudioLevel } from '@pterosaur/shared/types'
 
 /**
  * 播放模式：把「随机」与「循环」合并为单一 UI 概念，供播放条的合并按钮循环切换。
@@ -352,9 +352,9 @@ export const usePlayer = create<PlayerStore>()(
   ),
 )
 
-/** 由当前曲目派生音频源地址（同源代理，支持 Range）。 */
-export function audioSrc(track: Track | null): string {
-  return track ? streamUrlOf(track) : ''
+/** 由当前曲目派生音频源地址（同源代理，支持 Range）；`level` 为音质档位（缺省时由后端兜底）。 */
+export function audioSrc(track: Track | null, level?: AudioLevel): string {
+  return track ? streamUrlOf(track, level ? { level } : undefined) : ''
 }
 
 /** 供播放器组件使用的「自然结束」推进逻辑（导出以便测试）。 */

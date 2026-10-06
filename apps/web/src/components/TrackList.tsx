@@ -4,6 +4,7 @@ import { formatTime, keyOf } from '@pterosaur/shared/types'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
 import { AddToPlaylistMenu } from './AddToPlaylistMenu.js'
@@ -124,7 +125,7 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
             )}
 
             <span className="col-title">
-              <Cover src={t.cover} alt={t.title} radius="sm" size={40} />
+              <Cover src={coverAt(t.cover, COVER_SMALL)} alt={t.title} radius="sm" size={40} />
               <span className="col-title__text">
                 <span className="col-title__name ellipsis">{t.title}</span>
                 <span className="col-title__artist ellipsis">

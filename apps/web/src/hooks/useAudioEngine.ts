@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
+import { keyOf } from '@pterosaur/shared/types'
+import { COVER_LARGE } from '@pterosaur/shared/image'
 import { usePlayer, audioSrc, advanceOnEnd } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
+import { useSettings } from '../store/settings.js'
 import { audioEl } from './audioElement.js'
 import { createWatchdog, isPrematureEnd, type Watchdog } from '../lib/playbackWatchdog.js'
 
@@ -22,25 +25,55 @@ export function useAudioEngine(): void {
   const getState = () => usePlayer.getState()
   // 弱网停滞看门狗：事件 effect 创建，换曲 effect 复位（经 ref 互通）
   const watchdogRef = useRef<Watchdog | null>(null)
+  // 重载豁免位：load()（弱网恢复 / 换档）会派发一次 pause，需豁免其回写；跨 effect 经 ref 互通
+  const recoveringRef = useRef(false)
+  // 已加载曲目的 `source:id`，用于区分「换曲」（重置进度）与「同曲换档」（保留进度）
+  const loadedKeyRef = useRef('')
 
-  // current 变化 -> 换源并重置进度
+  // current / level 变化 -> 换源（同曲换档时保留播放位置）
   const current = usePlayer((s) => s.current)
+  const level = useSettings((s) => s.level)
   useEffect(() => {
     const audio = audioEl.current
     if (!audio) return
-    const src = audioSrc(current)
-    // 新曲换源即进入缓冲态（待 canplay/playing 后解除），并复位停滞看门狗
+    const src = audioSrc(current, level)
+    const key = current ? keyOf(current) : ''
+    const sameTrack = !!key && key === loadedKeyRef.current
+    const resumeAt = sameTrack ? audio.currentTime : 0
+    loadedKeyRef.current = key
+    // 换源即进入缓冲态（待 canplay/playing 后解除），并复位停滞看门狗
     getState().setBuffering(Boolean(src))
     watchdogRef.current?.reset()
-    if (src) {
-      const abs = new URL(src, window.location.origin).href
-      if (audio.src !== abs) audio.src = abs
-      audio.load()
-    } else {
+    if (!src) {
       audio.removeAttribute('src')
       audio.load()
+      return
     }
-  }, [current])
+    const abs = new URL(src, window.location.origin).href
+    if (audio.src === abs) return
+    audio.src = abs
+    if (sameTrack) {
+      // 同曲换档：重载并保留位置（与弱网恢复同一手法），并豁免 load 触发的 pause
+      recoveringRef.current = true
+      audio.load()
+      const seekBack = () => {
+        try {
+          audio.currentTime = resumeAt
+        } catch {
+          /* 元数据未就绪时忽略，随后由 loadedmetadata 补做 */
+        }
+      }
+      seekBack()
+      audio.addEventListener('loadedmetadata', seekBack, { once: true })
+      if (getState().isPlaying) {
+        void audio.play().catch(() => {
+          /* 起播失败交由 error / 看门狗兜底 */
+        })
+      }
+    } else {
+      audio.load()
+    }
+  }, [current, level])
 
   // isPlaying -> play/pause
   const isPlaying = usePlayer((s) => s.isPlaying)
@@ -96,8 +129,8 @@ export function useAudioEngine(): void {
 
     let rafId = 0
     let disposed = false
-    // 恢复重载（load）会派发一次 pause，需豁免其回写以免打断恢复
-    let recovering = false
+    // 重载（load：弱网恢复 / 换档）会派发一次 pause，需豁免其回写
+    recoveringRef.current = false
     const watchdog = createWatchdog()
     watchdogRef.current = watchdog
 
@@ -112,9 +145,9 @@ export function useAudioEngine(): void {
     }
     const onPause = () => {
       if (disposed) return
-      if (recovering) {
-        // 恢复重载引发的暂停：不覆盖播放态，仅复位豁免
-        recovering = false
+      if (recoveringRef.current) {
+        // 重载引发的暂停：不覆盖播放态，仅复位豁免
+        recoveringRef.current = false
         return
       }
       // ended 触发的 pause 不应覆盖播放态，交由 ended 处理
@@ -193,7 +226,7 @@ export function useAudioEngine(): void {
           /* 元数据未就绪时忽略，随后由 loadedmetadata 补做 */
         }
       }
-      recovering = true
+      recoveringRef.current = true
       audio.load()
       seekBack()
       audio.addEventListener('loadedmetadata', seekBack, { once: true })
@@ -275,7 +308,7 @@ export function useAudioEngine(): void {
       title: current.title,
       artist: current.artist,
       album: current.album,
-      artwork: current.cover ? [{ src: current.cover, sizes: '600x600', type: 'image/jpeg' }] : [],
+      artwork: current.cover ? [{ src: current.cover, sizes: `${COVER_LARGE}x${COVER_LARGE}`, type: 'image/jpeg' }] : [],
     })
     const s = getState()
     navigator.mediaSession.setActionHandler('play', () => s.setPlaying(true))

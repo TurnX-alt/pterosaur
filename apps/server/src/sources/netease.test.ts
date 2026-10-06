@@ -23,7 +23,7 @@ describe('normalizeTrack', () => {
     expect(t.albumId).toBe('99')
     expect(t.album).toBe('专辑')
     // 规范化：https + 固定镜像主机 + 统一尺寸（网易云会随机轮换 p1–pN，见 ADR-020）
-    expect(t.cover).toBe(`https://${NETEASE_IMAGE_HOST}/x.jpg?param=600y600`)
+    expect(t.cover).toBe(`https://${NETEASE_IMAGE_HOST}/x.jpg?param=1200y1200`)
     expect(t.duration).toBe(200)
   })
 
@@ -34,7 +34,7 @@ describe('normalizeTrack', () => {
       ar: [],
       al: { id: 1, name: '专辑', picUrl: 'http://p4.music.126.net/y.jpg?param=200y200' },
     })
-    expect(t.cover).toBe(`https://${NETEASE_IMAGE_HOST}/y.jpg?param=600y600`)
+    expect(t.cover).toBe(`https://${NETEASE_IMAGE_HOST}/y.jpg?param=1200y1200`)
   })
 
   it('缺少 id 时 artistRefs / albumId 为 undefined（供前端降级为纯文本）', () => {
@@ -57,7 +57,7 @@ describe('normalizeArtist', () => {
       alias: ['别名'],
     })
     expect(a.id).toBe('5')
-    expect(a.avatar).toBe(`https://${NETEASE_IMAGE_HOST}/a.jpg?param=300y300`)
+    expect(a.avatar).toBe(`https://${NETEASE_IMAGE_HOST}/a.jpg?param=1200y1200`)
     expect(a.albumSize).toBe(3)
     expect(a.musicSize).toBe(20)
     expect(a.alias).toEqual(['别名'])
@@ -82,6 +82,6 @@ describe('normalizeAlbum', () => {
     expect(al.artistId).toBe('3')
     expect(al.year).toBe(2020)
     expect(al.trackCount).toBe(10)
-    expect(al.cover).toBe(`https://${NETEASE_IMAGE_HOST}/b.jpg?param=600y600`)
+    expect(al.cover).toBe(`https://${NETEASE_IMAGE_HOST}/b.jpg?param=1200y1200`)
   })
 })

@@ -6,6 +6,7 @@ import { IconButton } from '../components/IconButton.js'
 import { RipButton } from '../components/RipButton.js'
 import { Empty } from '../components/States.js'
 import { useRip } from '../store/rip.js'
+import { useSettings } from '../store/settings.js'
 import { isRipping, runRip } from '../lib/rip.js'
 import { confirmDialog } from '../store/ui.js'
 
@@ -16,6 +17,7 @@ export function FavoritesPage() {
   const favorites = useLibrary((s) => s.favorites)
   const playTracks = usePlayer((s) => s.playTracks)
   const toggleShuffle = usePlayer((s) => s.toggleShuffle)
+  const level = useSettings((s) => s.level)
 
   // 翻录进度：从全局 store 认领「我喜欢的音乐」那份（切走再回自动恢复）
   const ripKey = 'favorites'
@@ -38,7 +40,7 @@ export function FavoritesPage() {
       confirmText: '开始翻录',
     })
     if (!ok) return
-    await runRip({ key: ripKey, tracks: favorites, zipName: '我喜欢的音乐' })
+    await runRip({ key: ripKey, tracks: favorites, zipName: '我喜欢的音乐', level })
   }
 
   const totalDuration = favorites.reduce((sum, t) => sum + (t.duration || 0), 0)

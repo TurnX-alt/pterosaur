@@ -1,7 +1,6 @@
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import type { Track } from '@pterosaur/shared/types'
-import { streamUrlOf } from '@pterosaur/shared/types'
+import { streamUrlOf, type AudioLevel, type Track } from '@pterosaur/shared/types'
 
 /** 根据 Content-Type 推断音频文件扩展名，默认 mp3。 */
 function extFromMime(mime: string | null): string {
@@ -69,12 +68,14 @@ export interface DownloadProgress {
  * @param zipName  ZIP 文件名（不含扩展名）
  * @param onProgress  每完成/跳过一个曲目时回调
  * @param coverUrl  可选封面地址；提供则一并打包（获取失败不阻断）
+ * @param level  音质档位；缺省时由后端兜底
  */
 export async function downloadPlaylist(
   tracks: Track[],
   zipName: string,
   onProgress?: (p: DownloadProgress) => void,
   coverUrl?: string,
+  level?: AudioLevel,
 ): Promise<void> {
   const zip = new JSZip()
   const digits = String(tracks.length).length
@@ -88,7 +89,7 @@ export async function downloadPlaylist(
     let ext = 'mp3'
 
     try {
-      const res = await fetch(streamUrlOf(t), { credentials: 'include' })
+      const res = await fetch(streamUrlOf(t, level ? { level } : undefined), { credentials: 'include' })
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }

@@ -176,3 +176,41 @@
 .settings-dialog__btnrow .settings-dialog__btn {
   margin-top: 0;
 }
+
+/* 音质分段选择：一排按钮，选中态用强调色 */
+.settings-dialog__segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.settings-dialog__seg-btn {
+  flex: 1 1 auto;
+  min-width: 60px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.settings-dialog__seg-btn:hover {
+  background: var(--bg-active);
+  color: var(--text);
+}
+
+.settings-dialog__seg-btn--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.settings-dialog__seg-btn--active:hover {
+  background: var(--accent-hover);
+  color: #fff;
+}

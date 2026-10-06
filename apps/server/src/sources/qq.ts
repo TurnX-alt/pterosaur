@@ -5,7 +5,7 @@
  * - 搜索   `client_search_cp`（无签名）
  * - 专辑   `fcg_v8_album_info_cp.fcg`（无签名）
  * - 歌词   `fcg_query_lyric_new.fcg`（无签名，`nobase64=1`）
- * - 取流   `musicu.fcg` 的 `vkey.GetVkeyServer`（**需 `sign`**）
+ * - 取流   `musicu.fcg` 的 `vkey.GetVkeyServer`（免签）+ `music.trackInfo.UniformRuleCtrl`（取 `media_mid`，按档）
  * - 登录   QQ PT 扫码（ptqrshow → ptqrlogin），成功后换取音乐 key
  *
  * ⚠️ **已知风险（实现期待实测）**：
@@ -15,8 +15,10 @@
  * - 抖音——以上均需在**有网络的环境**用真实响应校准。
  */
 import { createHash } from 'node:crypto'
-import type { Album, Artist, LoginStatus, Lyric, Playlist, Track } from '@pterosaur/shared/types'
+import { LRUCache } from 'lru-cache'
+import { DEFAULT_AUDIO_LEVEL, type Album, type Artist, type AudioLevel, type LoginStatus, type Lyric, type Playlist, type Track } from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
+import { COVER_LARGE } from '@pterosaur/shared/image'
 import type { QrCheckResult, SourceAdapter } from './types.js'
 
 const UA =
@@ -206,10 +208,13 @@ interface RawQqSong {
   pay?: { payplay?: number; paydownload?: number; pay_play?: number; pay_down?: number }
 }
 
+/** QQ 图片基准尺寸段（产出大图，前端按使用场景经 `coverAt` 降到小图；见 shared/image）。 */
+const QQ_IMG_SIZE = `${COVER_LARGE}x${COVER_LARGE}`
+
 /** QQ 封面：固定尺寸、稳定主机（`y.gtimg.cn`），便于以 URL 为键的缓存去重（对齐 ADR-020）。 */
 export function canonicalQqImage(albumMid: string | undefined): string {
   if (!albumMid) return ''
-  return `https://y.gtimg.cn/music/photo_new/T002R300x300M000${albumMid}.jpg`
+  return `https://y.gtimg.cn/music/photo_new/T002R${QQ_IMG_SIZE}M000${albumMid}.jpg`
 }
 
 /** 由 pay 字段推断版权标记（兼容新式 `pay_play` 与老式 `payplay`）。 */
@@ -274,7 +279,7 @@ function yearOf(v: unknown): number | undefined {
 /** QQ 歌手头像（稳定主机 + 固定尺寸）。 */
 export function canonicalQqSingerImage(singerMid: string | undefined): string {
   if (!singerMid) return ''
-  return `https://y.gtimg.cn/music/photo_new/T001R300x300M000${singerMid}.jpg`
+  return `https://y.gtimg.cn/music/photo_new/T001R${QQ_IMG_SIZE}M000${singerMid}.jpg`
 }
 
 /** 将 QQ 原始专辑归一化为共享 Album。 */
@@ -534,34 +539,136 @@ function decodeMaybeBase64(s: unknown): string {
   }
 }
 
+/* ============================ 取流（按档） ============================ */
+
+/** QQ 单档候选：`filename` 前缀 + 扩展名。 */
+export interface QqQuality {
+  prefix: string
+  ext: string
+}
+
 /**
- * 解析曲目真实播放地址（`musicu.fcg` 的 `vkey.GetVkeyServer`）。
+ * 抽象档位 → QQ 复合档**候选链**（由高到低，逐个尝试）。
  *
- * **h5 平台无需 sign**（实测）。**不带 `filename`**：QQ 会按内部 `media_mid` 返回正确的文件——
- * 若自行拼 `M500<songmid>.mp3`，当 `songmid ≠ media_mid` 时会解析出**不存在的文件名（404）**，
- * 这正是「歌单/专辑里的歌点了放不出」的根因。付费曲匿名返回空 purl（→ null，前端提示登录）。
- *
- * 注：`level` 参数被忽略——QQ 的按档取流需 `media_mid`，当前统一取默认档（AAC/m4a）。
+ * 依据 2026 社区实测：`M500`=128k mp3、`M800`=320k mp3、`F000`=FLAC 无损、`Q000`=臻品音质。
+ * QQ 无真 192k，故 `higher` 与 `exhigh` 同链；不可得时逐级降级，链末档保证免费曲可播。
  */
-export async function songUrl(id: string, cookie?: string): Promise<string | null> {
+const QQ_QUALITY_CANDIDATES: Record<AudioLevel, QqQuality[]> = {
+  standard: [{ prefix: 'M500', ext: '.mp3' }, { prefix: 'C400', ext: '.m4a' }],
+  higher: [{ prefix: 'M800', ext: '.mp3' }, { prefix: 'M500', ext: '.mp3' }],
+  exhigh: [{ prefix: 'M800', ext: '.mp3' }, { prefix: 'M500', ext: '.mp3' }],
+  lossless: [{ prefix: 'F000', ext: '.flac' }, { prefix: 'M800', ext: '.mp3' }],
+  hires: [{ prefix: 'Q000', ext: '.flac' }, { prefix: 'F000', ext: '.flac' }, { prefix: 'M800', ext: '.mp3' }],
+}
+
+/** 取某抽象档的 QQ 候选链（由高到低）。 */
+export function qqLevelToCandidates(level: AudioLevel): QqQuality[] {
+  return QQ_QUALITY_CANDIDATES[level] ?? QQ_QUALITY_CANDIDATES[DEFAULT_AUDIO_LEVEL]
+}
+
+/**
+ * 构造 `CgiGetVkey` 的 `filename`。
+ *
+ * 文件名主体是 **`media_mid`**（而非 `songmid`——旧曲二者不同，用 `songmid` 会 404，见 ADR-024）；
+ * 缺 `media_mid` 时退化为业界常见的 `songmid+songmid` 兜底。
+ *
+ * ⚠️ 拼接式（`prefix+media_mid+ext` 与变体的取舍）以**联网实测**为准——见 ADR-031 风险节。
+ */
+export function buildVkeyFilename(prefix: string, ext: string, mid: string, mediaMid?: string): string {
+  return `${prefix}${mediaMid || mid + mid}${ext}`
+}
+
+/** 曲目 `media_mid` 缓存（几乎不变，长 TTL；失败以空串标记，避免反复打上游）。 */
+const mediaMidCache = new LRUCache<string, string>({ max: 4000, ttl: 6 * 60 * 60 * 1000 })
+
+/** 取曲目 `media_mid`（best-effort）：失败返回 undefined，不影响取流（走 double-mid 兜底）。 */
+async function qqMediaMid(mid: string, cookie?: string): Promise<string | undefined> {
+  const cached = mediaMidCache.get(mid)
+  if (cached !== undefined) return cached || undefined
   try {
-    const uin = uinOf(cookie)
-    const authst = musickeyOf(cookie)
     const payload = JSON.stringify({
-      comm: { ...SEARCH_COMM, uin, ...(authst ? { authst } : {}) },
+      comm: { ...SEARCH_COMM, uin: uinOf(cookie) },
       req_0: {
-        module: 'vkey.GetVkeyServer',
-        method: 'CgiGetVkey',
-        param: { guid: GUID, songmid: [id], songtype: [0], uin, loginflag: 1, platform: '20' },
+        module: 'music.trackInfo.UniformRuleCtrl',
+        method: 'CgiGetTrackInfo',
+        param: { ctx: 0, client: 1, types: [0], modify_stamp: [0], mids: [mid] },
       },
     })
     const url = `${MUSICU}?format=json&data=${encodeURIComponent(payload)}`
     const { body } = await qqFetch(url, { cookie })
-    const data = (body as { req_0?: { data?: { sip?: string[]; midurlinfo?: { purl?: string }[] } } })?.req_0?.data
-    const purl = data?.midurlinfo?.[0]?.purl ?? ''
-    if (!purl) return null
-    const sip = (data?.sip ?? []).find((s) => s.includes('stream.qqmusic.qq.com')) ?? data?.sip?.[0] ?? SONG_BASE
-    return `${sip}${purl}`.replace(/^http:\/\//, 'https://')
+    const track = (body as { req_0?: { data?: { tracks?: { file?: { media_mid?: string } }[] } } })?.req_0?.data?.tracks?.[0]
+    const mediaMid = track?.file?.media_mid
+    mediaMidCache.set(mid, mediaMid ?? '')
+    return mediaMid
+  } catch {
+    return undefined
+  }
+}
+
+/** `CgiGetVkey` 响应体的 data 段。 */
+interface VkeyData {
+  sip?: string[]
+  /** 与请求的 songmid/filename 下标一一对应。`result`：0 成功 / 104003 无权限 / 104004 VKey 失败。 */
+  midurlinfo?: { purl?: string; result?: number }[]
+}
+
+/**
+ * 发一次 `CgiGetVkey`。`songmid`/`filename`/`songtype` 三数组**按下标一一对应**（长度相等）；
+ * 同一 mid 重复 N 次、配 N 个候选 filename，可一次拿回 N 条 `midurlinfo[i]`。
+ * `filenames` 缺省时不带该字段（旧兜底路径——由 QQ 按 `media_mid` 返回默认档）。
+ */
+async function qqVkey(ids: string[], filenames: string[] | undefined, cookie?: string): Promise<VkeyData | null> {
+  const uin = uinOf(cookie)
+  const authst = musickeyOf(cookie)
+  const param: Record<string, unknown> = {
+    guid: GUID,
+    songmid: ids,
+    songtype: ids.map(() => 0),
+    uin,
+    loginflag: 1,
+    platform: '20',
+  }
+  if (filenames) param.filename = filenames
+  const payload = JSON.stringify({
+    comm: { ...SEARCH_COMM, uin, ...(authst ? { authst } : {}) },
+    req_0: { module: 'vkey.GetVkeyServer', method: 'CgiGetVkey', param },
+  })
+  const url = `${MUSICU}?format=json&data=${encodeURIComponent(payload)}`
+  const { body } = await qqFetch(url, { cookie })
+  return (body as { req_0?: { data?: VkeyData } })?.req_0?.data ?? null
+}
+
+/** 从 sip 列表挑域名并拼 purl，一律改写为 https。 */
+function sipUrl(data: VkeyData | null, purl: string): string {
+  const sip = (data?.sip ?? []).find((s) => s.includes('stream.qqmusic.qq.com')) ?? data?.sip?.[0] ?? SONG_BASE
+  return `${sip}${purl}`.replace(/^http:\/\//, 'https://')
+}
+
+/**
+ * 解析曲目真实播放地址（`musicu.fcg` 的 `vkey.GetVkeyServer`，**h5 平台免签**）。
+ *
+ * 按 `level`（抽象档）构造候选 `filename` 链，**一次**请求并发多档，取首个 `purl` 非空的档
+ * （即选用「≤ 目标档的最高可得档」，天然实现降级）；候选全落空则退化为**不带 `filename`** 的
+ * 旧路径以**零回归**。付费曲匿名返回空 purl → `null`（前端提示登录）。`media_mid` 另行缓存，避免放大请求。
+ */
+export async function songUrl(id: string, cookie?: string, level: AudioLevel = DEFAULT_AUDIO_LEVEL): Promise<string | null> {
+  try {
+    const mediaMid = await qqMediaMid(id, cookie)
+    const candidates = qqLevelToCandidates(level)
+    const data = await qqVkey(
+      candidates.map(() => id),
+      candidates.map((c) => buildVkeyFilename(c.prefix, c.ext, id, mediaMid)),
+      cookie,
+    )
+    const infos = data?.midurlinfo ?? []
+    for (let i = 0; i < candidates.length; i++) {
+      const purl = infos[i]?.purl ?? ''
+      if (purl) return sipUrl(data, purl)
+    }
+    // 兜底：不带 filename（QQ 按 media_mid 返回默认档）——保证既有可用路径零回归
+    const legacy = await qqVkey([id], undefined, cookie)
+    const lpurl = legacy?.midurlinfo?.[0]?.purl ?? ''
+    return lpurl ? sipUrl(legacy, lpurl) : null
   } catch {
     return null
   }

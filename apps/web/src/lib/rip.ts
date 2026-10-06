@@ -1,4 +1,4 @@
-import type { Track } from '@pterosaur/shared/types'
+import type { AudioLevel, Track } from '@pterosaur/shared/types'
 import { downloadPlaylist } from './downloadPlaylist.js'
 import { useRip } from '../store/rip.js'
 
@@ -21,6 +21,8 @@ export async function runRip(opts: {
   zipName: string
   /** 可选封面地址（专辑翻录）。 */
   coverUrl?: string
+  /** 音质档位；缺省时由后端兜底。 */
+  level?: AudioLevel
 }): Promise<void> {
   if (useRip.getState().job) return
   useRip.getState().start(opts.key, opts.tracks.length)
@@ -30,6 +32,7 @@ export async function runRip(opts: {
       opts.zipName,
       (p) => useRip.getState().setProgress(p.current, p.total),
       opts.coverUrl,
+      opts.level,
     )
   } finally {
     useRip.getState().finish()

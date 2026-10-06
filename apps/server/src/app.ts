@@ -7,6 +7,7 @@ import { adapterOf } from './sources/index.js'
 import type { SourceAdapter } from './sources/types.js'
 import {
   isMusicSource,
+  audioLevelOrDefault,
   MUSIC_SOURCES,
   DEFAULT_SOURCE,
   type MusicSource,
@@ -152,7 +153,7 @@ async function streamHandler(c: Context): Promise<Response> {
   if (!source || !adapter) return c.json(fail('未知音源'), 404)
 
   const id = c.req.param('id') ?? ''
-  const level = c.req.query('level') ?? 'exhigh'
+  const level = audioLevelOrDefault(c.req.query('level'))
   const cookie = credentialOf(c, adapter)
 
   const cacheKey = `${source}|${id}|${level}|${credentialKey(cookie)}`

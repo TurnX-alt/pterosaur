@@ -3,6 +3,7 @@ import type { Album, Artist } from '@pterosaur/shared/types'
 import { keyOf } from '@pterosaur/shared/types'
 import { usePlayCollection } from '../hooks/usePlayCollection.js'
 import { useLibrary } from '../store/library.js'
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
 import { Cover } from './Cover.js'
 import './Cards.css'
 
@@ -47,7 +48,7 @@ export function ArtistCard({ artist, onClick }: ArtistCardProps) {
       }}
     >
       <div className="card__art card__art--circle">
-        <Cover src={artist.avatar} alt={artist.name} rounded className="card__cover" />
+        <Cover src={coverAt(artist.avatar, COVER_SMALL)} alt={artist.name} rounded className="card__cover" />
         <button
           type="button"
           className={`card__fav${isSaved ? ' card__fav--active' : ''}`}
@@ -98,7 +99,7 @@ export function AlbumCard({ album, onClick }: AlbumCardProps) {
       }}
     >
       <div className="card__art">
-        <Cover src={album.cover} alt={album.name} radius="md" className="card__cover" />
+        <Cover src={coverAt(album.cover, COVER_SMALL)} alt={album.name} radius="md" className="card__cover" />
         <button
           type="button"
           className="card__play"

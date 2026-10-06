@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Trash2, RefreshCw, Loader2, RotateCcw } from 'lucide-react'
+import { AUDIO_LEVELS, type AudioLevel } from '@pterosaur/shared/types'
 import { useSettingsDialog, confirmDialog } from '../store/ui.js'
 import { useSync } from '../store/sync.js'
+import { useSettings } from '../store/settings.js'
 import { clearMediaCache, mediaUsage, type MediaUsage } from '../lib/mediaCache.js'
 import { checkForUpdates, postToServiceWorker } from '../lib/pwa.js'
 import { pushEmptyLibrary } from '../lib/sync.js'
@@ -12,6 +14,15 @@ import './SettingsDialog.css'
 
 type Busy = 'clear' | 'update' | 'reset' | null
 
+/** 音质档位显示名（键与顺序同 shared `AUDIO_LEVELS`）。 */
+const QUALITY_LABELS: Record<AudioLevel, string> = {
+  standard: '标准',
+  higher: '较高',
+  exhigh: '极高',
+  lossless: '无损',
+  hires: 'Hi-Res',
+}
+
 /**
  * 设置弹窗：缓存管理（查看占用 / 清理）与检查更新（注销 PWA + 强制刷新）。
  *
@@ -20,6 +31,8 @@ type Busy = 'clear' | 'update' | 'reset' | null
 export function SettingsDialog() {
   const open = useSettingsDialog((s) => s.open)
   const closeSettings = useSettingsDialog((s) => s.closeSettings)
+  const level = useSettings((s) => s.level)
+  const setLevel = useSettings((s) => s.setLevel)
 
   const [usage, setUsage] = useState<MediaUsage | null>(null)
   const [quota, setQuota] = useState<number | null>(null)
@@ -118,6 +131,26 @@ export function SettingsDialog() {
             <X size={18} />
           </IconButton>
         </header>
+
+        <section className="settings-dialog__section">
+          <h3 className="settings-dialog__section-title">音质</h3>
+          <p className="settings-dialog__desc">播放与下载的音质档位；该曲不可得时自动降级到最接近的可得档。</p>
+          <div className="settings-dialog__segmented" role="radiogroup" aria-label="音质">
+            {AUDIO_LEVELS.map((lv) => (
+              <button
+                key={lv}
+                type="button"
+                role="radio"
+                aria-checked={level === lv}
+                className={`settings-dialog__seg-btn${level === lv ? ' settings-dialog__seg-btn--active' : ''}`}
+                onClick={() => setLevel(lv)}
+                data-testid={`quality-${lv}`}
+              >
+                {QUALITY_LABELS[lv]}
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section className="settings-dialog__section">
           <h3 className="settings-dialog__section-title">更新</h3>

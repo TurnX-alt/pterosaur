@@ -10,10 +10,11 @@
 
 - 预期行为：
   - 所有 `/api/*` 返回统一的 `ApiResult<T>` 包裹（`{ ok, data } | { ok:false, error, needLogin? }`）。
-  - `GET /stream/:source/:id` 按源分派适配器解析曲目真实音频地址（带 15 分钟 LRU，键含源与凭证指纹），把 `http://` 改写为 `https://`，透传客户端 `Range` 头到上游，按 206/200 回流音频字节；无法解析（VIP 未登录/版权受限）时返回 403 且 `needLogin:true`。（2 段式 `/stream/:id` 为缺省源别名，见 ADR-022。）
+  - `GET /stream/:source/:id?level=<档>` 按源分派适配器解析曲目真实音频地址（带 15 分钟 LRU，键含源、**档位**与凭证指纹），把 `http://` 改写为 `https://`，透传客户端 `Range` 头到上游，按 206/200 回流音频字节；无法解析（VIP 未登录/版权受限）时返回 403 且 `needLogin:true`。（2 段式 `/stream/:id` 为缺省源别名，见 ADR-022。）
+  - **音质档位**：`level` 为**统一抽象档**（`standard | higher | exhigh | lossless | hires`，缺省 `exhigh`，见 ADR-031）。网易云直接透传 `song_url_v1`（上游自动降级）；QQ 由抽象档展开**复合档候选链**（`M500` 128k / `M800` 320k / `F000` FLAC / `Q000` 臻品），**一次取流请求并发多档**并取首个可得，实现「≤ 目标档的最高可得档」。非法 `level` 回退缺省档。
   - 搜索/歌单/歌词接口透传浏览器回传的网易云会话 cookie（若有），从而对登录用户返回可播放的 VIP 地址与个性化内容。
   - 登录：`/api/auth/:source/qr` 生成二维码，`/api/auth/:source/qr/check` 轮询扫码状态，成功（803）时把上游 Set-Cookie 中会话必需的几项（网易云 `MUSIC_U`、`__csrf`、`MUSIC_A`、`NMTID`）下发浏览器；`/api/auth/:source/logout` 下发过期 cookie 清除会话。**各源一律只支持扫码登录**（网易云与 QQ 均已停用帐密登录）。
-  - 归一化：网易云原始结构统一转为 `shared/types.ts` 的 `Track`/`Playlist`，封面改写为 https 并追加 `?param=600y600` 缩略参数，时长由毫秒转秒，`fee` 映射为 `free|vip|unknown`。
+  - 归一化：网易云原始结构统一转为 `shared/types.ts` 的 `Track`/`Playlist`，封面/头像改写为 https 并统一产出**大图基准**（网易云 `?param=1200y1200`、QQ `T002R1200x1200`），由前端 `coverAt` 按使用场景降到小图（300）——见 ADR-031；时长由毫秒转秒，`fee` 映射为 `free|vip|unknown`。
 
 ## 输入 / 输出
 

@@ -3,6 +3,7 @@ import { Plus, Check, Download, Loader2 } from 'lucide-react'
 import type { Track } from '@pterosaur/shared/types'
 import { keyOf } from '@pterosaur/shared/types'
 import { useLibrary } from '../store/library.js'
+import { useSettings } from '../store/settings.js'
 import { downloadTrack } from '../lib/download.js'
 import './AddToPlaylistMenu.css'
 
@@ -27,6 +28,7 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
   const playlists = useLibrary((s) => s.playlists)
   const addToPlaylist = useLibrary((s) => s.addToPlaylist)
   const removeFromPlaylist = useLibrary((s) => s.removeFromPlaylist)
+  const level = useSettings((s) => s.level)
   const wrapRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
     setDownloadError(null)
     setDownloading(true)
     try {
-      await downloadTrack(track)
+      await downloadTrack(track, level)
       setOpen(false)
     } catch (e) {
       setDownloadError(e instanceof Error ? e.message : '下载失败')

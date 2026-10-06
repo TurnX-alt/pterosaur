@@ -459,3 +459,28 @@
   - `Plan T`/绿色主题仅表示"当前活动源是 QQ"，**不代表真会员**；原 `vip` 字段仍随 `LoginStatus` 返回，供后续使用。
   - QQ 头像始终是**QQ 号头像**（非 QQ 音乐资料图）。
 - 何时重新审视：若 QQ 开放免登录资料接口，可改取官方昵称/头像。
+
+## ADR-031：音质档位（统一抽象档）与画质分档（大图基准 + 前端降档）
+
+- 日期：2026-10-06
+- 状态：已采纳（QQ 按档取流的 `filename` 拼接式标记为**待联网校准**）
+- 背景：两个音源此前都「能播就行」——网易云 `song_url_v1` 恒取 `exhigh`（前端**从不传 `level`**），QQ `songUrl` 干脆忽略 `level`；封面/头像尺寸在后端**写死**（网易云 `?param=600y600`、QQ 仅 `T002R300x300`）。既没有可选音质，也没有画质概念：大屏拿小图、小图又可能拉大图。
+- 考虑过的方案：
+  - 音质组织：① 每源分别设置；② 单一「音质优先」开关；③ **统一抽象档位**（一个下拉，各源映射到最接近且可得的档）。→ ③。
+  - QQ 取流：A 恒取默认档（现状）；B **按档构造 `filename` 取流**（保留「不带 filename」兜底）。→ B。
+  - 档位不可得：X 严格不降级；Y **自动逐级降级**。→ Y。
+  - 画质：I 用户可选尺寸；II **固定两档、按场景自动选**（小图 300 / 大图 1200）。→ II。
+- 决策：
+  1. **档位模型**（`packages/shared/src/types.ts`）：`AUDIO_LEVELS = standard | higher | exhigh | lossless | hires`（沿用网易云 `level` 取值，网易云侧**零映射**），`DEFAULT_AUDIO_LEVEL='exhigh'`，`AUDIO_LEVEL_RANK` 供降级排序，`audioLevelOrDefault` 兜底非法输入。`streamUrl/streamUrlOf` 的 `opts.level` 类型收紧为 `AudioLevel`；`mediaCache.DEFAULT_LEVEL` 改为 re-export 自 shared（消除双份默认值）。
+  2. **传递链**：新增 `apps/web/src/store/settings.ts`（`persist`，`pterosaur-settings`）存 `level`；设置弹窗「音质」区块置于**最顶部**。`useAudioEngine` 订阅 `level` → `audioSrc(current, level)`，**换档保留播放位置**（复用弱网恢复的 `recoveringRef` 豁免：`load()` 后 `seekBack` + 续播）；下载链路（`download.ts` / `downloadPlaylist.ts` / `rip.ts`）同样带当前档。后端 `/stream/:source/:id?level=` **早已读该参数、缓存键含 level**，无需改动。
+  3. **网易云**：`level` 直接透传 `song_url_v1`，上游自身按可得档降级。
+  4. **QQ**：抽象档 → 复合档**候选链**（`M500` 128k / `M800` 320k / `F000` FLAC / `Q000` 臻品；`higher` 无真 192k 落 `exhigh` 链），**一次 `CgiGetVkey` 并发多档**（`songmid`/`filename`/`songtype` 按下标一一对应），取首个 `purl` 非空者——即「≤ 目标档的最高可得档」，天然降级；`media_mid` 取自 `music.trackInfo.UniformRuleCtrl`，进程内 LRU/TTL 缓存；候选全落空则回退**不带 `filename`** 的旧路径，保证零回归。
+  5. **画质两档**：`packages/shared/src/image.ts` 新增 `COVER_SMALL=300` / `COVER_LARGE=1200` 与 `coverAt(url, px)`（网易云设 `param`；QQ 替换 `T00?R{W}x{H}M000` 尺寸段；其它 CDN 原样）。后端**统一产出大图基准**（网易云 `1200y1200`、QQ `R1200x1200`），前端按场景 `coverAt` 降档——小图（`TrackList`/`QueuePanel`/`Home`/`Sidebar`/`PlayerBar`/`Topbar`/`EntityCards`/`PlaylistCard`）用 300；大图（`NowPlaying` 封面与背景、`Album`/`Artist`/`Playlist` hero、翻录封面）用 1200。`useNowPlayingPrefetch` 与 `NowPlaying` **必须同档**（1200）以保首帧显色门控。
+- 为什么选这个：档名与网易云一致 → 网易云零映射；抽象档 + 逐级降级让跨源体验一致，且不因高档不可得而断播；画质「大图基准 + 前端降档」把 CDN 细节收口在 `shared/image`，缓存键**天然即 URL**、无需改 SW/IDB（旧封面条目靠 7 天 TTL 自然回收，**无需 DB bump**）。
+- 为什么不选其他：分源设置让设置项翻倍且两源命名不统一；严格不降级会在未登录 / 无无损时频繁断播；画质做用户可选属过度设计；QQ 若恒取默认档则 `lossless` 等形同虚设。
+- 后果 / 已知边界：
+  - **QQ `filename` 拼接式**（`prefix+media_mid+ext` 与社区变体）与**高档通道**（母带/臻品是否在 Web/H5 可得）**待联网校准**；取流失败自动回退默认档，不阻塞播放。要求首次上线在有网环境用真实响应校准。
+  - **QQ 歌单封面**（`normalizeQqPlaylist`）仍返回上游原始 URL、不经尺寸规范化，`coverAt` 对其原样返回（不匹配 QQ 图模板）。
+  - 画质两档使同图 300 与 1200 各占一条封面缓存，**条目与流量翻倍**（预期代价）；小图由原 600 降为 300，列表缩略图略降。
+  - 换档会触发整段重新拉流（SW 未命中新档键）；`higher` 在 QQ 落 `exhigh` 链。
+- 何时重新审视：QQ 若强制 `musics.fcg` 的 `sign`+AES-GCM（ADR-024 已留回退路径），或提供稳定的按档 `filename` 契约；若引入音频分片缓存（ADR-012），换档续播可免整段重拉；若未来要画质用户可选，再评估引入第三档。

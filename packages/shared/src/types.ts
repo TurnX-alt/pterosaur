@@ -226,13 +226,48 @@ export const API_BASE = '/api'
 /** 音频流代理路径前缀。 */
 export const STREAM_BASE = '/stream'
 
+/* ============================ 音质档位 ============================ */
+
+/**
+ * 统一抽象音质档位（跨源一致，从低到高）。
+ *
+ * 档名沿用网易云 `song_url_v1` 的 level 取值，网易云侧**零映射**；
+ * QQ 侧由适配器映射到其复合档（见 `server/sources/qq.ts`）。
+ */
+export const AUDIO_LEVELS = ['standard', 'higher', 'exhigh', 'lossless', 'hires'] as const
+
+/** 抽象音质档位。 */
+export type AudioLevel = (typeof AUDIO_LEVELS)[number]
+
+/** 缺省档位（与后端 `/stream` 默认一致）。 */
+export const DEFAULT_AUDIO_LEVEL: AudioLevel = 'exhigh'
+
+/** 档位高低序（数值越大越高），供「不可得时逐级降级」判断。 */
+export const AUDIO_LEVEL_RANK: Record<AudioLevel, number> = {
+  standard: 0,
+  higher: 1,
+  exhigh: 2,
+  lossless: 3,
+  hires: 4,
+}
+
+/** 判定是否合法档位（用于 query 等不可信输入）。 */
+export function isAudioLevel(v: unknown): v is AudioLevel {
+  return typeof v === 'string' && (AUDIO_LEVELS as readonly string[]).includes(v)
+}
+
+/** 归一化档位：非法或缺失时回退缺省档。 */
+export function audioLevelOrDefault(v: unknown): AudioLevel {
+  return isAudioLevel(v) ? v : DEFAULT_AUDIO_LEVEL
+}
+
 /**
  * 由「源 + 曲目 ID」构造同源音频流地址。
  *
  * 浏览器 `<audio>` 直接请求该地址，后端按源分发、解析真实 URL、
  * 改写为 https 并支持 Range 分段，从而规避混合内容与跨域问题。
  */
-export function streamUrl(source: MusicSource, id: string, opts?: { level?: string; token?: string }): string {
+export function streamUrl(source: MusicSource, id: string, opts?: { level?: AudioLevel; token?: string }): string {
   const q = new URLSearchParams()
   if (opts?.level) q.set('level', opts.level)
   if (opts?.token) q.set('t', opts.token)
@@ -241,7 +276,7 @@ export function streamUrl(source: MusicSource, id: string, opts?: { level?: stri
 }
 
 /** 便捷式：由曲目构造同源音频流地址（`source` 缺失时按缺省源）。 */
-export function streamUrlOf(track: Track, opts?: { level?: string; token?: string }): string {
+export function streamUrlOf(track: Track, opts?: { level?: AudioLevel; token?: string }): string {
   return streamUrl(sourceOf(track), track.id, opts)
 }
 

@@ -9,6 +9,7 @@ import type { Album, Artist, Track } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { AlbumCard } from '../components/EntityCards.js'
+import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
 import { Cover } from '../components/Cover.js'
 import { IconButton } from '../components/IconButton.js'
 import { Loading, ErrorState } from '../components/States.js'
@@ -76,7 +77,7 @@ export function ArtistPage() {
   return (
     <div className="detail" aria-busy={loading}>
       <header className="detail__hero detail__hero--artist">
-        <Cover src={artist.avatar} alt={artist.name} rounded className="detail__cover" />
+        <Cover src={coverAt(artist.avatar, COVER_LARGE)} alt={artist.name} rounded className="detail__cover" />
         <div className="detail__info">
           <span className="detail__type">艺人</span>
           <h1 className="detail__name">{artist.name}</h1>

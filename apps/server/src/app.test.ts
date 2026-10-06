@@ -160,6 +160,14 @@ describe('多源路由：源段与缺省源', () => {
     expect((await app.request('/stream/spotify/123')).status).toBe(404) // 未知源
   })
 
+  it('/stream 的 level query 透传给适配器；非法档回退缺省 exhigh', async () => {
+    const ne = vi.spyOn(neteaseAdapter, 'songUrl').mockResolvedValue(null)
+    await app.request('/stream/netease/123?level=lossless')
+    expect(ne).toHaveBeenCalledWith('123', undefined, 'lossless')
+    await app.request('/stream/netease/456?level=bogus')
+    expect(ne).toHaveBeenLastCalledWith('456', undefined, 'exhigh')
+  })
+
   it('搜索按 source 查询参数分派到对应适配器', async () => {
     searchSongsMock.mockResolvedValue([])
     const qqSearch = vi.spyOn(qqAdapter, 'searchSongs').mockResolvedValue([])

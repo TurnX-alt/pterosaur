@@ -37,8 +37,9 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `server/sources/*` | **音源适配器**：`types.ts` 定义 `SourceAdapter` 接口（必选核心 + 可选能力，含发现 `recommendPlaylists/toplists/topPlaylists`）；`netease.ts` 封装 `NeteaseCloudMusicApi`；`qq.ts` 为自研 QQ 适配器（**全程无签名**）；`index.ts` 注册表（`adapterOf`）。实体一律带 `source` |
 | `server/syncStore.ts` | 云同步的**文件型**持久化：按访客本人的**活动账号** `<source>-<账号id>` 隔离（见 ADR-028），`<DATA_DIR>/sync/<key>.json` 原子写（见 ADR-016） |
 | `server/index.ts` | 服务入口：生产模式挂载静态资源与 SPA 回退，启动 HTTP 服务 |
-| `shared/types.ts` | 前后端共享的数据模型（Track/Artist/Album/Playlist/Lyric/LoginStatus/ApiResult/SearchResults/LocalPlaylist/LibraryData/SyncEnvelope）与工具（formatTime/**sourceOf/keyOf/isMusicSource**/streamUrl/**streamUrlOf**）；实体带 `source`，`keyOf(e)=`${sourceOf(e)}:${e.id}`` 是全仓统一身份（见 ADR-022） |
+| `shared/types.ts` | 前后端共享的数据模型（Track/Artist/Album/Playlist/Lyric/LoginStatus/ApiResult/SearchResults/LocalPlaylist/LibraryData/SyncEnvelope）与工具（formatTime/**sourceOf/keyOf/isMusicSource**/streamUrl/**streamUrlOf**/**AudioLevel/AUDIO_LEVELS**）；实体带 `source`，`keyOf(e)=`${sourceOf(e)}:${e.id}`` 是全仓统一身份（见 ADR-022） |
 | `shared/lyric.ts` | LRC 歌词解析：时间戳展开、排序、翻译对齐 |
+| `shared/image.ts` | 图片 URL 规范化与分档：`canonicalNeteaseImage`（网易云随机镜像主机去重，见 ADR-020）、`coverAt(url, px)` 与 `COVER_SMALL`/`COVER_LARGE`（按场景选画质：网易云改 `param` / QQ 改尺寸段，见 ADR-031） |
 | `src/api/client.ts` | 前端 fetch 封装，解析 `ApiResult`，抛带 `needLogin` 的错误 |
 | `src/store/player.ts` | 播放核心状态机：队列、当前曲目、循环/随机、音量、进度；含持久化 |
 | `src/store/library.ts` | 收藏曲目、最近播放、本地自建歌单、收藏的网易云歌单 / 艺人 / 专辑；持久化到 **IndexedDB**（见 ADR-011） |
@@ -57,6 +58,7 @@ Pterosaur 分三层：浏览器前端（React SPA）、同源 Hono 后端（API 
 | `src/store/auth.ts` | 登录态（按源）；**单活动账号**：最多一个源登录（`activeSource`），登录后无登录入口、只有退出（见 ADR-027） |
 | `src/store/sync.ts` | 云同步开关与记账（`enabled` / 绑定的活动账号 `source`+`accountId` / `updatedAt`），持久化到 localStorage，默认关闭。**锚点跟随活动账号**（见 ADR-028） |
 | `src/store/rip.ts` | 翻录进度的全局状态（`job`：合集 key + 已处理/总数），不持久化；页面按 key 认领，切换页面不丢失 |
+| `src/store/settings.ts` | 应用偏好（`level`：**统一抽象音质档**），持久化到 localStorage；播放 / 下载据此按档取流（见 ADR-031） |
 | `src/store/ui.ts` | 临时 UI 状态（队列面板开合等），不持久化 |
 | `src/hooks/useAudioEngine.ts` | 全局唯一 `<audio>` 的驱动：换源、播放/暂停、事件回写、结束推进、媒体会话 |
 | `src/hooks/useLibrarySync.ts` | 挂载 library 云同步引擎：开关 + 登录态满足时激活（立即同步一次并订阅变更防抖推送），在 `App` 顶层调用 |

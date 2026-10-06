@@ -5,6 +5,7 @@ import { useLibrary } from "../store/library.js";
 import { useCreatePlaylist, useSidebarDrawer } from "../store/ui.js";
 import { useViewNavigate } from "../hooks/useViewNavigate.js";
 import { AppLink } from "./AppLink.js";
+import { coverAt, COVER_SMALL } from "@pterosaur/shared/image";
 import { Cover } from "./Cover.js";
 import "./Sidebar.css";
 
@@ -139,7 +140,7 @@ export function Sidebar() {
               }
             >
               <Cover
-                src={p.tracks[0]?.cover}
+                src={coverAt(p.tracks[0]?.cover, COVER_SMALL)}
                 alt={p.name}
                 radius="sm"
                 size={19}
@@ -160,7 +161,7 @@ export function Sidebar() {
                 `nav-item${isActive ? " nav-item--active" : ""}`
               }
             >
-              <Cover src={p.cover} alt={p.name} radius="sm" size={19} />
+              <Cover src={coverAt(p.cover, COVER_SMALL)} alt={p.name} radius="sm" size={19} />
               <span className="nav-item__label">{p.name}</span>
             </AppLink>
           ))}

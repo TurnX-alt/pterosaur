@@ -1,6 +1,7 @@
 import { Play } from 'lucide-react'
 import type { Playlist } from '@pterosaur/shared/types'
 import { usePlayCollection } from '../hooks/usePlayCollection.js'
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
 import { Cover } from './Cover.js'
 import './Cards.css'
 
@@ -36,7 +37,7 @@ export function PlaylistCard({ playlist, onClick, subtitle }: PlaylistCardProps)
       }}
     >
       <div className="card__art">
-        <Cover src={playlist.cover} alt={playlist.name} radius="md" className="card__cover" />
+        <Cover src={coverAt(playlist.cover, COVER_SMALL)} alt={playlist.name} radius="md" className="card__cover" />
         <button
           type="button"
           className="card__play"
