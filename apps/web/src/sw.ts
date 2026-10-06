@@ -50,13 +50,27 @@ interface ServiceWorkerGlobalScopeLike {
   addEventListener(type: 'fetch', listener: (e: FetchEventLike) => void): void
   addEventListener(type: 'message', listener: (e: MessageEventLike) => void): void
   readonly location: Location
-  readonly clients: { claim(): Promise<void> }
+  readonly clients: {
+    claim(): Promise<void>
+    matchAll(options?: {
+      type?: string
+      includeUncontrolled?: boolean
+    }): Promise<{ postMessage(message: unknown): void }[]>
+  }
   skipWaiting(): Promise<void>
 }
 
 const sw = globalThis as unknown as ServiceWorkerGlobalScopeLike
 
 const STREAM_PREFIX = '/stream/'
+
+/**
+ * 音频回源的响应头超时（毫秒）。仅约束连接建立阶段——网络差时上游可能长时间
+ * 不返回响应头而让 `<audio>` 的请求悬死（无 error、无数据）；超时即 abort，
+ * 走既有 `Response.error()` 路径把故障显式暴露给页面。body 阶段不设整体超时：
+ * 长音频在弱网下慢速下载属正常，交由播放侧看门狗与后端超时兜底。
+ */
+const UPSTREAM_HEADERS_TIMEOUT_MS = 15_000
 
 /** 内存中的元数据索引（轻量，不含 blob），用于 LRU 与命中后刷新 lastAccess。 */
 let metaByKey = new Map<string, MediaMeta>()
@@ -132,20 +146,36 @@ async function serveCached(key: string, rangeHeader: string | null): Promise<Res
   return responseFromBlob(cached.meta, cached.blob, rangeHeader)
 }
 
+/** 通知受控页面：某曲目因 VIP / 版权受限需要登录（后端以 403 表达）。 */
+async function notifyNeedLogin(): Promise<void> {
+  const clients = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  for (const client of clients) client.postMessage({ type: 'STREAM_NEED_LOGIN' })
+}
+
 /** `/stream/*`：音频代理（Range 分段、整文件缓存）。 */
 async function handleStream(request: Request, url: URL, id: string, level: string, key: string): Promise<Response> {
   const cached = await serveCached(key, request.headers.get('range'))
   if (cached) return cached
 
-  // 未命中：取整文件（不转发 Range），失败则交由浏览器报错
+  // 未命中：取整文件（不转发 Range），失败则交由浏览器报错（响应头阶段带超时）
+  const controller = new AbortController()
+  const headersTimer = setTimeout(() => controller.abort(), UPSTREAM_HEADERS_TIMEOUT_MS)
   let upstream: Response
   try {
-    upstream = await fetch(url.href, { credentials: 'same-origin' })
+    upstream = await fetch(url.href, { credentials: 'same-origin', signal: controller.signal })
   } catch {
     return Response.error()
+  } finally {
+    clearTimeout(headersTimer)
   }
 
-  // 仅缓存成功且确为音频的响应；403（VIP 未登录）/502 等直接放行
+  // VIP 未登录 / 版权受限：后端以 403 表达——通知页面给出登录引导，响应原样放行（不缓存）
+  if (upstream.status === 403) {
+    void notifyNeedLogin()
+    return upstream
+  }
+
+  // 仅缓存成功且确为音频的响应；502 等直接放行
   const contentType = upstream.headers.get('content-type') ?? ''
   if (!upstream.ok || !contentType.startsWith('audio/')) return upstream
 

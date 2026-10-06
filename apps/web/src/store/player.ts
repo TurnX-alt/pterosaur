@@ -61,6 +61,10 @@ interface PlaybackState {
   shuffle: boolean
   /** 是否因版权/登录限制无法播放当前曲目。 */
   playError: string | null
+  /** 当前播放错误是否由「需要登录」引起（决定提示条是否展示登录入口）。 */
+  playErrorNeedLogin: boolean
+  /** 是否处于缓冲中（网络停滞 / 数据未就绪）。 */
+  buffering: boolean
   /** 是否展开全屏播放页。 */
   expanded: boolean
   /** 顺序播放模式下最后一首自然结束标记（用于 toggle 区分「结束停止」和「手动暂停」）。 */
@@ -92,8 +96,9 @@ interface PlaybackActions {
   clearQueue: () => void
   removeAt: (index: number) => void
   setExpanded: (v: boolean) => void
-  setPlayError: (msg: string | null) => void
+  setPlayError: (msg: string | null, needLogin?: boolean) => void
   setPlaybackEnded: (v: boolean) => void
+  setBuffering: (v: boolean) => void
 }
 
 export type PlayerStore = PlaybackState & PlaybackActions
@@ -138,6 +143,8 @@ export const usePlayer = create<PlayerStore>()(
       repeat: 'all',
       shuffle: false,
       playError: null,
+      playErrorNeedLogin: false,
+      buffering: false,
       expanded: false,
       playbackEnded: false,
 
@@ -312,8 +319,10 @@ export const usePlayer = create<PlayerStore>()(
         })
       },
       setExpanded: (v) => set({ expanded: v }),
-      setPlayError: (msg) => set({ playError: msg }),
+      setPlayError: (msg, needLogin = false) =>
+        set({ playError: msg, playErrorNeedLogin: msg ? needLogin : false }),
       setPlaybackEnded: (v) => set({ playbackEnded: v }),
+      setBuffering: (v) => set({ buffering: v }),
     }),
     {
       name: 'pterosaur-player',

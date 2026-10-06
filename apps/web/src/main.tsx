@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.js'
 import { useLibrary } from './store/library.js'
+import { usePlayer } from './store/player.js'
 import './styles/global.css'
 
 const rootEl = document.getElementById('root')
@@ -28,6 +29,20 @@ function registerServiceWorker(): void {
 }
 
 /**
+ * 订阅 SW 通知：后端对音频流返回 403（VIP / 版权受限）时提示并给出登录入口。
+ * 音频元素的 error 事件无法区分「网络失败」与「版权受限」，故登录引导只据此后端信号。
+ */
+function listenServiceWorkerMessages(): void {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+  navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
+    const data = event.data as { type?: string } | null
+    if (data?.type === 'STREAM_NEED_LOGIN') {
+      usePlayer.getState().setPlayError('该曲目暂不可播放', true)
+    }
+  })
+}
+
+/**
  * 引导应用。
  *
  * library 持久化已迁移到异步的 IndexedDB，hydration 不再同步完成；在首帧前手动 `rehydrate()`，
@@ -49,6 +64,7 @@ async function bootstrap(): Promise<void> {
   )
 
   registerServiceWorker()
+  listenServiceWorkerMessages()
 }
 
 void bootstrap()

@@ -32,7 +32,37 @@ beforeEach(() => {
     repeat: 'all',
     shuffle: false,
     playError: null,
+    playErrorNeedLogin: false,
+    buffering: false,
     expanded: false,
+  })
+})
+
+describe('播放错误与缓冲态', () => {
+  it('setPlayError 记录错误文案与「是否需登录」标志', () => {
+    usePlayer.getState().setPlayError('该曲目暂不可播放', true)
+    expect(usePlayer.getState().playError).toBe('该曲目暂不可播放')
+    expect(usePlayer.getState().playErrorNeedLogin).toBe(true)
+
+    // 网络类错误：不需要登录入口
+    usePlayer.getState().setPlayError('网络不稳定', false)
+    expect(usePlayer.getState().playError).toBe('网络不稳定')
+    expect(usePlayer.getState().playErrorNeedLogin).toBe(false)
+  })
+
+  it('setPlayError(null) 清除错误并复位登录标志', () => {
+    usePlayer.getState().setPlayError('该曲目暂不可播放', true)
+    usePlayer.getState().setPlayError(null)
+    expect(usePlayer.getState().playError).toBeNull()
+    expect(usePlayer.getState().playErrorNeedLogin).toBe(false)
+  })
+
+  it('setBuffering 切换缓冲态', () => {
+    expect(usePlayer.getState().buffering).toBe(false)
+    usePlayer.getState().setBuffering(true)
+    expect(usePlayer.getState().buffering).toBe(true)
+    usePlayer.getState().setBuffering(false)
+    expect(usePlayer.getState().buffering).toBe(false)
   })
 })
 

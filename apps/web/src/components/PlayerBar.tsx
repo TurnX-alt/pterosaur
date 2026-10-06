@@ -11,6 +11,7 @@ import {
   ListMusic,
   MoreHorizontal,
   Disc3,
+  Loader2,
 } from "lucide-react";
 import { usePlayer, currentPlayMode } from "../store/player.js";
 import { useLibrary } from "../store/library.js";
@@ -34,6 +35,7 @@ export function PlayerBar() {
   const muted = usePlayer((s) => s.muted);
   const repeat = usePlayer((s) => s.repeat);
   const shuffle = usePlayer((s) => s.shuffle);
+  const buffering = usePlayer((s) => s.buffering);
   const toggle = usePlayer((s) => s.toggle);
   const next = usePlayer((s) => s.next);
   const prev = usePlayer((s) => s.prev);
@@ -61,6 +63,8 @@ export function PlayerBar() {
 
   const VolumeIcon =
     muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  // 播放中且处于缓冲态：播放键显示加载动画（暂停态不显示）
+  const showBuffering = buffering && isPlaying;
   const mode = currentPlayMode(shuffle, repeat);
   const modeMeta = PLAY_MODE_META[mode];
   const ModeIcon = modeMeta.icon;
@@ -134,14 +138,21 @@ export function PlayerBar() {
             <SkipBack size={20} strokeWidth={2} fill="currentColor" />
           </IconButton>
           <IconButton
-            label={isPlaying ? "暂停" : "播放"}
+            label={showBuffering ? "缓冲中" : isPlaying ? "暂停" : "播放"}
             size="lg"
             primary
             onClick={toggle}
             disabled={!current}
             data-testid="play-toggle"
           >
-            {isPlaying ? (
+            {showBuffering ? (
+              <Loader2
+                size={22}
+                strokeWidth={2.2}
+                className="spinner"
+                data-testid="play-buffering"
+              />
+            ) : isPlaying ? (
               <Pause size={22} strokeWidth={2.2} fill="currentColor" />
             ) : (
               <Play size={22} strokeWidth={2.2} fill="currentColor" />
@@ -203,14 +214,21 @@ export function PlayerBar() {
         {/* 移动端播放键（桌面端由 center 提供） */}
         <IconButton
           className="playerbar__play-mobile"
-          label={isPlaying ? "暂停" : "播放"}
+          label={showBuffering ? "缓冲中" : isPlaying ? "暂停" : "播放"}
           size="sm"
           primary
           onClick={toggle}
           disabled={!current}
           data-testid="play-toggle-mobile"
         >
-          {isPlaying ? (
+          {showBuffering ? (
+            <Loader2
+              size={17}
+              strokeWidth={2.2}
+              className="spinner"
+              data-testid="play-buffering-mobile"
+            />
+          ) : isPlaying ? (
             <Pause size={17} strokeWidth={2.2} fill="currentColor" />
           ) : (
             <Play size={17} strokeWidth={2.2} fill="currentColor" />

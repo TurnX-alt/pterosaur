@@ -35,6 +35,13 @@ const urlCache = new LRUCache<string, string>({ max: 2000, ttl: 15 * 60 * 1000 }
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
+/**
+ * 上游 CDN 响应头超时（毫秒）：仅约束连接建立阶段——CDN 挂起时避免请求被拖到
+ * undici 默认的 300s body timeout（生产另受 nginx 60s read timeout 限制）。
+ * body 阶段不设整体超时：长音频在弱网下慢速下载属正常。
+ */
+const UPSTREAM_HEADERS_TIMEOUT_MS = 10_000
+
 /** 统一成功响应。 */
 function ok<T>(data: T): ApiResult<T> {
   return { ok: true, data }
@@ -133,14 +140,24 @@ async function streamHandler(c: Context): Promise<Response> {
   const upstreamHeaders: Record<string, string> = { 'User-Agent': UA }
   if (range) upstreamHeaders['Range'] = range
 
+  const controller = new AbortController()
+  const headersTimer = setTimeout(() => controller.abort(), UPSTREAM_HEADERS_TIMEOUT_MS)
   let upstream: Response
   try {
-    upstream = await fetch(url, { headers: upstreamHeaders, redirect: 'follow' })
+    upstream = await fetch(url, {
+      headers: upstreamHeaders,
+      redirect: 'follow',
+      signal: controller.signal,
+    })
   } catch (e) {
     return c.json(fail(`音频获取失败：${(e as Error).message}`), 502)
+  } finally {
+    clearTimeout(headersTimer)
   }
 
   if (!upstream.ok && upstream.status !== 206) {
+    // 地址可能已过期（TTL 内也可能失效）：淘汰缓存项，下次请求重新解析
+    urlCache.delete(cacheKey)
     return c.json(fail(`音频源返回 ${upstream.status}`), 502)
   }
 

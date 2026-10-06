@@ -10,6 +10,7 @@ import './PlayErrorToast.css'
  */
 export function PlayErrorToast() {
   const playError = usePlayer((s) => s.playError)
+  const playErrorNeedLogin = usePlayer((s) => s.playErrorNeedLogin)
   const setPlayError = usePlayer((s) => s.setPlayError)
   const logged = useAuth((s) => s.status.logged)
   const openModal = useAuth((s) => s.openModal)
@@ -26,7 +27,7 @@ export function PlayErrorToast() {
     <div className="toast" role="alert">
       <AlertCircle size={18} className="toast__icon" />
       <span className="toast__text">{playError}</span>
-      {!logged && (
+      {!logged && playErrorNeedLogin && (
         <button type="button" className="toast__action" onClick={openModal}>
           登录解锁
         </button>

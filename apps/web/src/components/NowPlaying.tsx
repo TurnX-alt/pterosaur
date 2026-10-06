@@ -7,6 +7,7 @@ import {
   SkipForward,
   Heart,
   ListMusic,
+  Loader2,
 } from 'lucide-react'
 import { usePlayer, currentPlayMode } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
@@ -55,6 +56,7 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
   const duration = usePlayer((s) => s.duration)
   const repeat = usePlayer((s) => s.repeat)
   const shuffle = usePlayer((s) => s.shuffle)
+  const buffering = usePlayer((s) => s.buffering)
   const toggle = usePlayer((s) => s.toggle)
   const next = usePlayer((s) => s.next)
   const prev = usePlayer((s) => s.prev)
@@ -189,6 +191,8 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
   const mode = currentPlayMode(shuffle, repeat)
   const modeMeta = PLAY_MODE_META[mode]
   const ModeIcon = modeMeta.icon
+  // 播放中且处于缓冲态：播放键显示加载动画
+  const showBuffering = buffering && isPlaying
 
   if (!current) return null
 
@@ -342,8 +346,14 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
               <IconButton label="上一首" size="lg" onClick={prev}>
                 <SkipBack size={26} strokeWidth={2} fill="currentColor" />
               </IconButton>
-              <IconButton label={isPlaying ? '暂停' : '播放'} size="lg" primary onClick={toggle} className="nowplaying__play">
-                {isPlaying ? <Pause size={28} strokeWidth={2.2} fill="currentColor" /> : <Play size={28} strokeWidth={2.2} fill="currentColor" />}
+              <IconButton label={showBuffering ? '缓冲中' : isPlaying ? '暂停' : '播放'} size="lg" primary onClick={toggle} className="nowplaying__play">
+                {showBuffering ? (
+                  <Loader2 size={28} strokeWidth={2.2} className="spinner" data-testid="play-buffering-np" />
+                ) : isPlaying ? (
+                  <Pause size={28} strokeWidth={2.2} fill="currentColor" />
+                ) : (
+                  <Play size={28} strokeWidth={2.2} fill="currentColor" />
+                )}
               </IconButton>
               <IconButton label="下一首" size="lg" onClick={next}>
                 <SkipForward size={26} strokeWidth={2} fill="currentColor" />

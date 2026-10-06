@@ -914,3 +914,58 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
       .toBeGreaterThan(0)
   })
 })
+
+test.describe('弱网韧性', () => {
+  test('音频流挂起：播放键显示缓冲动画，超时后提示并回到暂停', async ({ page, context }) => {
+    test.slow()
+    // 拦截音频流并保持挂起（模拟弱网：请求发出但迟迟无响应）
+    await context.route('**/stream/**', () => new Promise(() => {}))
+
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    const title = ((await page.locator('.track-row .col-title__name').first().textContent()) ?? '').trim()
+    await page.locator('.track-row').first().click()
+
+    // 缓冲态可视化：播放键显示加载动画
+    await expect(page.getByTestId('play-buffering')).toBeVisible({ timeout: 8000 })
+
+    // 起播超时兜底：出现提示，且最终回到暂停态（不无限等待）
+    await expect(page.locator('.toast')).toBeVisible({ timeout: 20000 })
+    await expect
+      .poll(async () => (await audioState(page)).paused, { timeout: 10000 })
+      .toBe(true)
+
+    // 未误切歌：仍停留在原曲目
+    await expect(page.locator('.playerbar__title')).toContainText(title)
+  })
+
+  test('音频流请求失败：提示错误并回暂停，解除故障后可重试播放', async ({ page, context }) => {
+    await context.route('**/stream/**', (route) => route.abort('failed'))
+
+    await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
+    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await page.locator('.track-row').first().click()
+
+    // 请求失败：给出提示且回到暂停态（不静默停在「播放中」）
+    await expect(page.locator('.toast')).toBeVisible({ timeout: 15000 })
+    await expect
+      .poll(async () => (await audioState(page)).paused, { timeout: 10000 })
+      .toBe(true)
+
+    // 等提示条自动消失（避免遮挡播放键）
+    await expect(page.locator('.toast')).toHaveCount(0, { timeout: 10000 })
+
+    // 解除故障后重试：应能恢复播放（失败不导致播放器卡死）
+    await context.unroute('**/stream/**')
+    await page.getByTestId('play-toggle').click()
+    await expect
+      .poll(
+        async () => {
+          const s = await audioState(page)
+          return s.exists && !s.paused && s.readyState >= 2
+        },
+        { timeout: 25000 },
+      )
+      .toBe(true)
+  })
+})

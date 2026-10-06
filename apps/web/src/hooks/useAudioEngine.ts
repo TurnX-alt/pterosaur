@@ -1,7 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePlayer, audioSrc, advanceOnEnd } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { audioEl } from './audioElement.js'
+import { createWatchdog, isPrematureEnd, type Watchdog } from '../lib/playbackWatchdog.js'
+
+/** 起播超时（毫秒）：弱网下 play() 长期既不 resolve 也不 reject 时的兜底。 */
+const PLAY_START_TIMEOUT_MS = 12_000
 
 /**
  * 全局唯一的 `<audio>` 引擎。
@@ -16,6 +20,8 @@ import { audioEl } from './audioElement.js'
  */
 export function useAudioEngine(): void {
   const getState = () => usePlayer.getState()
+  // 弱网停滞看门狗：事件 effect 创建，换曲 effect 复位（经 ref 互通）
+  const watchdogRef = useRef<Watchdog | null>(null)
 
   // current 变化 -> 换源并重置进度
   const current = usePlayer((s) => s.current)
@@ -23,6 +29,9 @@ export function useAudioEngine(): void {
     const audio = audioEl.current
     if (!audio) return
     const src = audioSrc(current)
+    // 新曲换源即进入缓冲态（待 canplay/playing 后解除），并复位停滞看门狗
+    getState().setBuffering(Boolean(src))
+    watchdogRef.current?.reset()
     if (src) {
       const abs = new URL(src, window.location.origin).href
       if (audio.src !== abs) audio.src = abs
@@ -38,18 +47,36 @@ export function useAudioEngine(): void {
   useEffect(() => {
     const audio = audioEl.current
     if (!audio || !current) return
-    if (isPlaying) {
-      audio.play().catch((e: unknown) => {
+    if (!isPlaying) {
+      audio.pause()
+      return
+    }
+    // 元素处于错误态（如上次请求失败）时直接 play() 不会重新拉流，先 reset 再播
+    if (audio.error || audio.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+      audio.load()
+    }
+    // 起播超时兜底：弱网下 play() 可能长时间不 settle，超时后回到暂停态并提示，
+    // 避免 UI 停在「播放中」而实际无声（迟到的 resolve 会因 isPlaying 已为 false 被暂停）
+    let timer = 0
+    const started = audio.play()
+    timer = window.setTimeout(() => {
+      getState().setPlaying(false)
+      getState().setPlayError('网络不稳定，请稍后再试')
+    }, PLAY_START_TIMEOUT_MS)
+    started
+      .then(() => window.clearTimeout(timer))
+      .catch((e: unknown) => {
+        window.clearTimeout(timer)
+        // 恢复重载（load）或暂停会打断未 settle 的 play()，属预期内，静默忽略
+        if (e instanceof DOMException && e.name === 'AbortError') return
         const msg = e instanceof Error ? e.message : String(e)
         getState().setPlaying(false)
         // 浏览器自动播放策略：静默暂停，等待用户手势，不报错
         if (!/NotAllowedError|user didn't interact|play\(\) failed/i.test(msg)) {
-          getState().setPlayError('该曲目暂不可播放')
+          getState().setPlayError('播放出错，请检查网络后重试')
         }
       })
-    } else {
-      audio.pause()
-    }
+    return () => window.clearTimeout(timer)
   }, [isPlaying, current])
 
   // volume / muted
@@ -69,6 +96,10 @@ export function useAudioEngine(): void {
 
     let rafId = 0
     let disposed = false
+    // 恢复重载（load）会派发一次 pause，需豁免其回写以免打断恢复
+    let recovering = false
+    const watchdog = createWatchdog()
+    watchdogRef.current = watchdog
 
     const onDuration = () => {
       if (disposed) return
@@ -80,13 +111,41 @@ export function useAudioEngine(): void {
       if (!disposed) getState().setPlaying(true)
     }
     const onPause = () => {
+      if (disposed) return
+      if (recovering) {
+        // 恢复重载引发的暂停：不覆盖播放态，仅复位豁免
+        recovering = false
+        return
+      }
       // ended 触发的 pause 不应覆盖播放态，交由 ended 处理
-      if (!disposed && !audio.ended) getState().setPlaying(false)
+      if (!audio.ended) getState().setPlaying(false)
+      getState().setBuffering(false)
+    }
+
+    // 缓冲耗尽（waiting / stalled）：数据未就绪，进入缓冲态
+    const onWaiting = () => {
+      if (!disposed) getState().setBuffering(true)
+    }
+    // 数据就绪（playing / canplay）：退出缓冲态
+    const onPlaybackReady = () => {
+      if (!disposed) getState().setBuffering(false)
     }
 
     const onEnded = () => {
       if (disposed) return
       const s = getState()
+      s.setBuffering(false)
+      // 提前结束：上游流被截断（audio 时长被钳短）。尝试原地续播而非当作自然结束，
+      // 避免弱网下逐首级联切歌；恢复预算耗尽则暂停并提示（不自动跳歌）。
+      if (isPrematureEnd(audio.duration, s.current?.duration)) {
+        if (watchdog.noteInterrupt(performance.now())) {
+          recoverPlayback()
+        } else {
+          s.setPlaying(false)
+          s.setPlayError('网络不稳定，播放已暂停')
+        }
+        return
+      }
       const { index, queue, repeat } = s
       const nextIndex = advanceOnEnd(index, queue.length, repeat)
       if (nextIndex === null) {
@@ -96,9 +155,12 @@ export function useAudioEngine(): void {
         s.setPlaying(false)
         s.setPlaybackEnded(true)
       } else if (nextIndex === index) {
-        // repeat='one'：循环当前曲目
+        // repeat='one'：循环当前曲目（起播失败不静默，回退暂停态并提示）
         audio.currentTime = 0
-        void audio.play().catch(() => {})
+        void audio.play().catch(() => {
+          s.setPlaying(false)
+          s.setPlayError('播放中断')
+        })
       } else {
         s.playIndex(nextIndex)
       }
@@ -107,11 +169,37 @@ export function useAudioEngine(): void {
     const onError = () => {
       if (disposed) return
       const s = getState()
+      s.setPlaying(false)
+      s.setBuffering(false)
+      // 已由 SW 标记为「需登录」（后端 403）：保留该提示，勿被中性文案覆盖
+      if (s.playError && s.playErrorNeedLogin) return
       const err = audio.error
-      if (err) {
-        s.setPlaying(false)
-        s.setPlayError(err.code === 2 ? '该曲目暂不可播放' : `播放出错（code ${err.code}）`)
+      // 元素的 error 无法区分网络失败 / 源不可用 / VIP 受限，一律给中性提示；
+      // VIP 的「登录解锁」引导由 SW 针对后端 403 的通知单独驱动。
+      s.setPlayError(err ? '播放出错，请检查网络后重试' : '播放中断')
+    }
+
+    /**
+     * 弱网恢复：重新加载媒体管线并按原位置续播。
+     * `load()` 重置元素并重新发起点播请求（SW 命中缓存则秒回）；
+     * 随后把 currentTime 拨回断点，赋值被忽略时待 loadedmetadata 补一次。
+     */
+    const recoverPlayback = () => {
+      const t = audio.currentTime
+      const seekBack = () => {
+        try {
+          audio.currentTime = t
+        } catch {
+          /* 元数据未就绪时忽略，随后由 loadedmetadata 补做 */
+        }
       }
+      recovering = true
+      audio.load()
+      seekBack()
+      audio.addEventListener('loadedmetadata', seekBack, { once: true })
+      void audio.play().catch(() => {
+        /* 起播失败交由 error / 看门狗兜底 */
+      })
     }
 
     const tick = () => {
@@ -119,6 +207,18 @@ export function useAudioEngine(): void {
       const s = getState()
       if (!audio.paused && Math.abs(audio.currentTime - s.position) > 0.05) {
         s.setPosition(audio.currentTime)
+      }
+      // 弱网停滞看门狗：静默过久则尝试恢复，预算耗尽则暂停并提示
+      const action = watchdog.tick(performance.now(), {
+        paused: audio.paused,
+        currentTime: audio.currentTime,
+        readyState: audio.readyState,
+      })
+      if (action === 'recover') {
+        recoverPlayback()
+      } else if (action === 'giveUp') {
+        s.setPlaying(false)
+        s.setPlayError('网络不稳定，播放已暂停')
       }
       rafId = requestAnimationFrame(tick)
     }
@@ -129,17 +229,26 @@ export function useAudioEngine(): void {
     audio.addEventListener('pause', onPause)
     audio.addEventListener('ended', onEnded)
     audio.addEventListener('error', onError)
+    audio.addEventListener('waiting', onWaiting)
+    audio.addEventListener('stalled', onWaiting)
+    audio.addEventListener('playing', onPlaybackReady)
+    audio.addEventListener('canplay', onPlaybackReady)
     rafId = requestAnimationFrame(tick)
 
     return () => {
       disposed = true
       cancelAnimationFrame(rafId)
+      watchdogRef.current = null
       audio.removeEventListener('durationchange', onDuration)
       audio.removeEventListener('loadedmetadata', onDuration)
       audio.removeEventListener('play', onPlay)
       audio.removeEventListener('pause', onPause)
       audio.removeEventListener('ended', onEnded)
       audio.removeEventListener('error', onError)
+      audio.removeEventListener('waiting', onWaiting)
+      audio.removeEventListener('stalled', onWaiting)
+      audio.removeEventListener('playing', onPlaybackReady)
+      audio.removeEventListener('canplay', onPlaybackReady)
     }
   }, [])
 
