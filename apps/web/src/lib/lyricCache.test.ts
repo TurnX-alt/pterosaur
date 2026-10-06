@@ -77,11 +77,8 @@ describe('lyricCache', () => {
     expect(getCachedLyric(track('k69'))).toBe(sample)
   })
 
-  it('两源共享原始 id 不互相串歌词', () => {
-    const qq: Track = { ...track('1'), source: 'qq' }
-    const ne: Track = { ...track('1'), source: 'netease' }
-    putCachedLyric(ne, { lines: [{ time: 0, text: 'ne' }], timed: true })
-    expect(getCachedLyric(qq)).toBeNull()
-    expect(getCachedLyric(ne)?.lines[0].text).toBe('ne')
+  it('不同曲目 id 不互相串歌词', () => {
+    putCachedLyric(track('1'), sample)
+    expect(getCachedLyric(track('2'))).toBeNull()
   })
 })

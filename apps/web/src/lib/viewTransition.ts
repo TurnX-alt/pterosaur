@@ -66,15 +66,43 @@ export function prefersReducedMotion(): boolean {
 }
 
 /**
+ * 在**下一帧**执行回调（优先 rAF）。
+ *
+ * 用于把「转场结束后清除瞬态标记」推迟到伪树拆除之后——若在 `finished` 解析的同一刻清标记，
+ * 浏览器会在拆除过程中重建快照，使内容区封面落在旧几何。无 rAF 的环境（部分测试 / SSR）
+ * 退化为 `setTimeout(…, 0)`。
+ */
+export function nextFrame(cb: () => void): void {
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(cb)
+  else setTimeout(cb, 0)
+}
+
+/**
  * 在 View Transition 包裹下执行一次路由更新。
  *
  * 满足以下任一条件时直接执行（不转场）：浏览器不支持该 API、用户偏好减少动效、
  * 当前有浮层打开。`flushSync` 确保 DOM 在startViewTransition 的更新回调内同步提交，
  * 这是 React 配合 View Transitions 的官方推荐做法。
  */
+/** 路由转场令牌：连续导航时只让最新一段摘名，避免提前摘下内容区的命名。 */
+let routeToken = 0
+
+/**
+ * 在 View Transition 包裹下执行一次路由更新。
+ *
+ * 满足以下任一条件时直接执行（不转场）：浏览器不支持该 API、用户偏好减少动效、
+ * 当前有浮层打开。`flushSync` 确保 DOM 在startViewTransition 的更新回调内同步提交，
+ * 这是 React 配合 View Transitions 的官方推荐做法。
+ *
+ * 转场期间给 `<html>` 打 `data-route-vt`——**只有路由转场**会让内容区（`.app-content`）
+ * 参与快照（见 global.css / app.css）。主题与沉浸转场不命名它，故不会出现「转场结束后
+ * 内容区恢复命名、其快照与伪树拆除赛跑」而导致的封面错位。
+ */
 export function startRouteTransition(update: () => void): void {
   const doc = document as Document & {
-    startViewTransition?: (cb: () => void) => unknown
+    startViewTransition?: (
+      cb: () => void,
+    ) => { finished?: Promise<void> } | undefined
   }
   if (
     !doc.startViewTransition ||
@@ -87,9 +115,34 @@ export function startRouteTransition(update: () => void): void {
     resetContentScroll()
     return
   }
-  doc.startViewTransition(() => {
+
+  const root = document.documentElement
+  // 仅路由转场命名内容区；必须在拍旧快照之前就绪
+  const token = ++routeToken
+  root.dataset.routeVt = 'on'
+
+  let transition: { finished?: Promise<void> } | undefined
+  try {
+    transition = doc.startViewTransition(() => {
+      flushSync(update)
+      // 新内容就位后立即回到顶部，保证新快照从顶部开始
+      resetContentScroll()
+    })
+  } catch {
+    // 抛错（如文档非 fully-active）：回退为直接切换并摘掉标记，避免残留
+    delete root.dataset.routeVt
     flushSync(update)
-    // 新内容就位后立即回到顶部，保证新快照从顶部开始
     resetContentScroll()
-  })
+    return
+  }
+
+  // 转场结束后摘名；推迟到下一帧，躲开伪树拆除期（其间改样式会触发快照重建）。
+  // 只清「仍是最新一段」的标记，避免快速连续导航时被旧转场提前摘名。
+  const done = () =>
+    nextFrame(() => {
+      if (routeToken !== token) return
+      delete root.dataset.routeVt
+    })
+  if (transition?.finished) transition.finished.then(done, done)
+  else done()
 }

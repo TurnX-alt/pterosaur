@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client.js'
 import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
-import { useAuth, activeSource } from '../store/auth.js'
+import { useAuth, activeMusicSource } from '../store/auth.js'
 import type { Playlist } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE } from '@pterosaur/shared/types'
 import { PlaylistCard } from '../components/PlaylistCard.js'
@@ -32,7 +32,7 @@ export function Browse() {
   const [tab, setTab] = useState<Tab>('recommend')
   const status = useAuth((s) => s.status)
   // 发现内容跟随活动账号（未登录用缺省源）。
-  const source = activeSource(status) ?? DEFAULT_SOURCE
+  const source = activeMusicSource(status) ?? DEFAULT_SOURCE
 
   const recommend = useAsync<Playlist[]>(
     () => api.recommend(source, 30),
@@ -50,7 +50,7 @@ export function Browse() {
     [],
   )
 
-  // 该源支持哪些分区（如 QQ 暂无排行榜）——不支持的 tab 隐藏。
+  // 该源支持哪些分区——不支持的 tab 隐藏。
   const caps = useAsync<{
     recommend: boolean
     playlists: boolean

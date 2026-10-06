@@ -59,21 +59,6 @@ describe('coverAt（按场景选尺寸）', () => {
     ).toBe(`https://${NETEASE_IMAGE_HOST}/h==/1.jpg?param=300x300`)
   })
 
-  it('QQ：替换路径尺寸段（专辑 T002 / 歌手 T001 均适用）', () => {
-    expect(
-      coverAt(
-        'https://y.gtimg.cn/music/photo_new/T002R1200x1200M000MID.jpg',
-        300,
-      ),
-    ).toBe('https://y.gtimg.cn/music/photo_new/T002R300x300M000MID.jpg')
-    expect(
-      coverAt(
-        'https://y.gtimg.cn/music/photo_new/T001R1200x1200M000SID.jpg',
-        300,
-      ),
-    ).toBe('https://y.gtimg.cn/music/photo_new/T001R300x300M000SID.jpg')
-  })
-
   it('其它 CDN / 空值 / 非法地址原样返回（不猜测其 CDN 行为）', () => {
     expect(coverAt('https://img.example.com/a.jpg', 300)).toBe(
       'https://img.example.com/a.jpg',

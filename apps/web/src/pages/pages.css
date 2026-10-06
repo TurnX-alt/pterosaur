@@ -2,6 +2,8 @@
 .home {
   padding: 0 32px 40px;
   max-width: 1600px;
+  /* 超宽屏居中：否则内容被 max-width 压住后靠左、右侧大片留白 */
+  margin-inline: auto;
 }
 
 .home__hero {
@@ -194,6 +196,8 @@
 .browse {
   padding: 0 32px 40px;
   max-width: 1600px;
+  /* 超宽屏居中：否则内容被 max-width 压住后靠左、右侧大片留白 */
+  margin-inline: auto;
 }
 
 .browse__header {
@@ -238,6 +242,8 @@
 .search {
   padding: 0 32px 40px;
   max-width: 1600px;
+  /* 超宽屏居中：否则内容被 max-width 压住后靠左、右侧大片留白 */
+  margin-inline: auto;
 }
 
 .search__header {
@@ -283,9 +289,32 @@
   margin-top: 20px;
 }
 
+/* 分页尾部：哨兵进入视口即续取下一批；到底后显示提示 */
+.search__more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 8px;
+}
+
+.search__sentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.search__end {
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
 /* ============================ 歌单 / 艺人 / 专辑详情 ============================ */
 .detail {
   max-width: 1600px;
+  /* 超宽屏居中：否则内容被 max-width 压住后靠左、右侧大片留白 */
+  margin-inline: auto;
   /* 防止内容区交叉溶解转场期间盒子塌陷导致的高度跳变 */
   min-height: 60vh;
 }
@@ -433,6 +462,8 @@
 .crate {
   padding: 0 32px 40px;
   max-width: 1600px;
+  /* 超宽屏居中：否则内容被 max-width 压住后靠左、右侧大片留白 */
+  margin-inline: auto;
 }
 
 .crate__header {

@@ -34,7 +34,7 @@ export function ArtistPage() {
     ? params.source
     : DEFAULT_SOURCE
   const id = params.id ?? ''
-  // 名字供 QQ 等「无按-mid 取歌手」的源按名搜索（见 sources/qq.ts 的 artistDetail）
+  // 名字供「无按-id 取歌手」能力的源按名搜索（当前网易云忽略它）
   const name = search.get('name') ?? undefined
   const navigate = useViewNavigate()
   const playTracks = usePlayer((s) => s.playTracks)

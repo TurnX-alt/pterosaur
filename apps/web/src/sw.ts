@@ -264,10 +264,15 @@ async function handleImage(
   if (cached) return cached
 
   // 原请求是 no-cors（`<img>`），其响应不可读；改以 CORS 重新拉取才能拿到字节写 IDB。
+  // `referrerPolicy: 'no-referrer'`：部分图床（如 B 站 hdslb）对异域 Referer 直接 403，故不带。
   let upstream: Response
   try {
     upstream = await fetch(
-      new Request(url.href, { mode: 'cors', credentials: 'omit' }),
+      new Request(url.href, {
+        mode: 'cors',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+      }),
     )
   } catch {
     return fetch(request)

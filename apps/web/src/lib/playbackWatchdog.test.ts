@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   createWatchdog,
   isPrematureEnd,
+  DEFAULT_WATCHDOG_CONFIG,
   HAVE_FUTURE_DATA,
   type PlaybackSnapshot,
 } from './playbackWatchdog.js'
@@ -125,6 +126,11 @@ describe('createWatchdog（停滞看门狗）', () => {
     expect(w.noteInterrupt(0)).toBe(true)
     expect(w.noteInterrupt(0)).toBe(false)
     expect(w.retries()).toBe(3)
+  })
+
+  it('默认退避（所有音源统一）：3 次、10/15/20 秒递增', () => {
+    expect(DEFAULT_WATCHDOG_CONFIG.maxRetries).toBe(3)
+    expect(DEFAULT_WATCHDOG_CONFIG.backoffMs).toEqual([10_000, 15_000, 20_000])
   })
 
   it('reset 清空全部状态', () => {
