@@ -40,8 +40,13 @@
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
-  /* 内容区是唯一的 View Transition 快照目标（侧栏/顶栏/播放条保持静止） */
-  view-transition-name: app-content;
+  /*
+   * 默认**不参与** View Transition；仅在**路由转场**期间由 `[data-route-vt]` 命名（见
+   * global.css 与 lib/viewTransition.ts）。绝不常驻命名、也不在主题 / 沉浸转场期间命名——
+   * 否则它会在转场拆除的同一帧恢复命名，其子树（全部封面）的快照重建与拆除赛跑，
+   * 导致封面落在旧几何上（滚动 / 点击后才复位，见 lib/themeTransition.ts 的说明）。
+   */
+  view-transition-name: none;
 }
 
 /* 内容区顶部留白，避免被半透明 Topbar 遮挡（Topbar 在 main 内 sticky） */

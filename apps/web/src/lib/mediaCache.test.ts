@@ -33,8 +33,10 @@ describe('audioKey', () => {
     expect(audioKey('netease', '123', 'lossless')).toBe('netease:123|lossless')
   })
 
-  it('两源共享原始 id 产生不同缓存键', () => {
-    expect(audioKey('netease', '1')).not.toBe(audioKey('qq', '1'))
+  it('不同档位产生不同缓存键', () => {
+    expect(audioKey('netease', '1')).not.toBe(
+      audioKey('netease', '1', 'lossless'),
+    )
   })
 })
 

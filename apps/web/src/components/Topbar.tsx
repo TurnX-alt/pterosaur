@@ -28,11 +28,10 @@ interface TopbarProps {
   searchRef: React.RefObject<HTMLInputElement | null>
 }
 
-/** 会员计划标签：网易云 → `Plan N`，QQ → `Plan T`，咪咕 → `Plan M`。 */
+/** 会员计划标签：网易云 → `Plan N`，B 站 → `Plan B`。 */
 const PLAN_LETTER: Record<MusicSource, string> = {
   netease: 'N',
-  qq: 'T',
-  migu: 'M',
+  bilibili: 'B',
 }
 const planOf = (src: MusicSource): string => `Plan ${PLAN_LETTER[src]}`
 

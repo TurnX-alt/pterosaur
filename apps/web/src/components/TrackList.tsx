@@ -8,6 +8,7 @@ import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
 import { Cover } from './Cover.js'
 import { IconButton } from './IconButton.js'
 import { AddToPlaylistMenu } from './AddToPlaylistMenu.js'
+import { expandGroups } from '../lib/mv.js'
 import './TrackList.css'
 
 interface TrackListProps {
@@ -20,6 +21,8 @@ interface TrackListProps {
   emptyText?: string
   /** 附加类名 */
   className?: string
+  /** 行点击的自定义处理（不传则默认「以本列表为队列播放」，并展开 B 站分P）。 */
+  onPlayRow?: (track: Track, index: number) => void
 }
 
 /**
@@ -36,6 +39,7 @@ export function TrackList({
   showIndex = true,
   emptyText = '暂无曲目',
   className,
+  onPlayRow,
 }: TrackListProps) {
   const queue = usePlayer((s) => s.queue)
   const current = usePlayer((s) => s.current)
@@ -65,26 +69,50 @@ export function TrackList({
     )
   }
 
-  const handleRowPlay = (index: number) => {
-    const track = tracks[index]
-    // 若点击的正是当前曲目：切换播放/暂停
+  /** 以某列表为队列播放（含「点当前曲目即切换播放/暂停」的判定）。 */
+  const playList = (list: Track[], index: number) => {
+    const target = list[index]
+    if (!target) return
     if (
       current &&
-      keyOf(track) === keyOf(current) &&
-      isSameQueue(queue, tracks)
+      keyOf(target) === keyOf(current) &&
+      isSameQueue(queue, list)
     ) {
       toggle()
       return
     }
-    // 否则以本列表为新队列播放
-    if (isSameQueue(queue, tracks)) {
-      const i = queue.findIndex((t) => keyOf(t) === keyOf(track))
+    if (isSameQueue(queue, list)) {
+      const i = queue.findIndex((t) => keyOf(t) === keyOf(target))
       if (i >= 0) {
         usePlayer.getState().playIndex(i)
         return
       }
     }
-    playTracks(tracks, index)
+    playTracks(list, index)
+  }
+
+  const handleRowPlay = (index: number) => {
+    const track = tracks[index]
+    if (onPlayRow) {
+      onPlayRow(track, index)
+      return
+    }
+    // 仅当列表含「一对多」条目（如 B 站分P）时才需异步展开；否则同步走既有路径。
+    const hasParts = tracks.some(
+      (t) => t.source === 'bilibili' && !t.id.includes(':'),
+    )
+    if (!hasParts) {
+      playList(tracks, index)
+      return
+    }
+    void (async () => {
+      const groups = await expandGroups(tracks)
+      const expanded = groups.flat()
+      const startIndex = groups
+        .slice(0, index)
+        .reduce((n, g) => n + g.length, 0)
+      playList(expanded, startIndex)
+    })()
   }
 
   return (
@@ -105,7 +133,14 @@ export function TrackList({
       )}
 
       {tracks.map((t, i) => {
-        const isCurrent = current ? keyOf(current) === keyOf(t) : false
+        // MV 的「一对多」：队列里是分P（`bvid:cid`），列表行却是整视频（`bvid`）——
+        // 故再以 bvid 前缀匹配，保证播放某分P 时对应视频行同样高亮。
+        const isCurrent = current
+          ? keyOf(current) === keyOf(t) ||
+            (current.source === 'bilibili' &&
+              t.source === 'bilibili' &&
+              current.id.split(':')[0] === t.id)
+          : false
         const isCurrentPlaying = isCurrent && isPlaying
         const isFav = favorites.some((f) => keyOf(f) === keyOf(t))
         return (

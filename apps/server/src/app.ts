@@ -8,7 +8,7 @@ import type { SourceAdapter } from './sources/types.js'
 import {
   isMusicSource,
   audioLevelOrDefault,
-  MUSIC_SOURCES,
+  ALL_SOURCES,
   DEFAULT_SOURCE,
   type MusicSource,
   type ApiResult,
@@ -22,8 +22,11 @@ import {
 } from '@pterosaur/shared/types'
 import { isSyncEnvelope, readLibrary, writeLibrary } from './syncStore.js'
 
-/** 音频地址缓存：id|level|凭证指纹 -> https url。网易云地址有时效，TTL 设短一些。 */
-const urlCache = new LRUCache<string, string>({
+/**
+ * 音频地址缓存：id|level|凭证指纹 -> **有序候选 https 地址**（首个优先）。
+ * 网易云地址有时效，TTL 设短一些；命中位会随实际可用候选动态前移（见 streamHandler）。
+ */
+const urlCache = new LRUCache<string, string[]>({
   max: 2000,
   ttl: 15 * 60 * 1000,
 })
@@ -84,12 +87,11 @@ function cookieOf(c: Context, adapter: SourceAdapter): string | undefined {
 
 /**
  * 服务端缺省凭证：由 `pnpm log-in --source=<源>` 写入仓库根 `.env`
- * （`NETEASE_COOKIE` / `QQ_COOKIE` / `MIGU_COOKIE`）。供**未登录访客**解析会员资源，不代表访客身份。
+ * （`NETEASE_COOKIE` / `BILIBILI_COOKIE`）。供**未登录访客**解析会员资源，不代表访客身份。
  */
 const DEFAULT_CREDENTIAL_ENV: Record<MusicSource, string> = {
   netease: 'NETEASE_COOKIE',
-  qq: 'QQ_COOKIE',
-  migu: 'MIGU_COOKIE',
+  bilibili: 'BILIBILI_COOKIE',
 }
 function defaultCredential(source: MusicSource): string | undefined {
   const v = process.env[DEFAULT_CREDENTIAL_ENV[source]]?.trim()
@@ -117,7 +119,8 @@ function credentialKey(cookie?: string): string {
 async function requireIdentity(
   c: Context,
 ): Promise<{ source: MusicSource; id: string } | null> {
-  for (const source of MUSIC_SOURCES) {
+  // 遍历**全部源**（含 MV 渠道）：登录 B 站同样是一个可云同步的账号身份
+  for (const source of ALL_SOURCES) {
     const adapter = adapterOf(source)
     if (!adapter) continue
     const st = await adapter.loginStatus(cookieOf(c, adapter))
@@ -155,6 +158,35 @@ function forwardSessionCookies(
 }
 
 /**
+ * 由**解析出的音频直链后缀**推断响应的 `Content-Type`。
+ *
+ * 上游常谎报类型：网易云对 `.flac`（无损 / Hi-Res）仍回 `audio/mpeg`，B 站 m4s 回
+ * `application/octet-stream`。若照抄上游，浏览器下载会落成 `.mp3`（前端 `extFromMime` 依
+ * `Content-Type` 推后缀），SW 也会因非 `audio/*` 而跳过缓存。**URL 后缀才是权威格式**，故优先它。
+ * 无法判定时返回 `undefined`，调用方回退上游头、再回退 `audio/mpeg`。
+ */
+export function audioContentTypeFromUrl(url: string): string | undefined {
+  let pathname: string
+  try {
+    pathname = new URL(url).pathname.toLowerCase()
+  } catch {
+    return undefined
+  }
+  if (pathname.endsWith('.flac')) return 'audio/flac'
+  if (pathname.endsWith('.mp3')) return 'audio/mpeg'
+  if (
+    pathname.endsWith('.m4a') ||
+    pathname.endsWith('.mp4') ||
+    pathname.endsWith('.m4s')
+  )
+    return 'audio/mp4'
+  if (pathname.endsWith('.wav')) return 'audio/wav'
+  if (pathname.endsWith('.ogg') || pathname.endsWith('.oga')) return 'audio/ogg'
+  if (pathname.endsWith('.aac')) return 'audio/aac'
+  return undefined
+}
+
+/**
  * 音频流代理处理器：`GET|HEAD /stream/:id`。
  *
  * 浏览器 `<audio>` 直接请求本地址；服务端解析真实 CDN 地址、改写为 https，
@@ -177,17 +209,17 @@ async function streamHandler(c: Context): Promise<Response> {
   const cookie = credentialOf(c, adapter)
 
   const cacheKey = `${source}|${id}|${level}|${credentialKey(cookie)}`
-  let url = urlCache.get(cacheKey)
-  if (!url) {
+  let urls = urlCache.get(cacheKey)
+  if (!urls) {
     const resolved = await adapter.songUrl(id, cookie, level)
-    if (resolved) {
-      url = resolved
+    if (resolved.length) {
+      urls = resolved
       urlCache.set(cacheKey, resolved)
     }
   }
 
-  if (!url) {
-    // VIP 曲目未登录 / 版权受限：返回 403 并置 needLogin
+  if (!urls || urls.length === 0) {
+    // VIP 曲目未登录 / 版权受限 / 解析失败：返回 403 并置 needLogin
     return c.json(fail('该曲目暂不可播放', true), 403)
   }
 
@@ -198,34 +230,53 @@ async function streamHandler(c: Context): Promise<Response> {
   }
   if (range) upstreamHeaders['Range'] = range
 
-  const controller = new AbortController()
-  const headersTimer = setTimeout(
-    () => controller.abort(),
-    UPSTREAM_HEADERS_TIMEOUT_MS,
-  )
-  let upstream: Response
-  try {
-    upstream = await fetch(url, {
-      headers: upstreamHeaders,
-      redirect: 'follow',
-      signal: controller.signal,
-    })
-  } catch (e) {
-    return c.json(fail(`音频获取失败：${(e as Error).message}`), 502)
-  } finally {
-    clearTimeout(headersTimer)
+  // 依次尝试候选地址：B 站等源的直链含多个 CDN 镜像，单节点故障不应直接判死。
+  // 每次尝试独立计时，连接建立超时即中止该候选、换下一个。
+  let upstream: Response | undefined
+  let usedUrl = urls[0]
+  for (const candidate of urls) {
+    const controller = new AbortController()
+    const timer = setTimeout(
+      () => controller.abort(),
+      UPSTREAM_HEADERS_TIMEOUT_MS,
+    )
+    try {
+      const res = await fetch(candidate, {
+        headers: upstreamHeaders,
+        redirect: 'follow',
+        signal: controller.signal,
+      })
+      if (res.ok || res.status === 206) {
+        upstream = res
+        usedUrl = candidate
+        break
+      }
+      // 非 2xx / 非 206：丢弃该连接的响应体，继续下一个候选
+      void res.body?.cancel()
+    } catch {
+      /* 连接失败 / 超时：继续下一个候选 */
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
-  if (!upstream.ok && upstream.status !== 206) {
-    // 地址可能已过期（TTL 内也可能失效）：淘汰缓存项，下次请求重新解析
+  if (!upstream) {
+    // 全部候选失败（地址过期 / 节点故障）：淘汰缓存，下次请求重新解析
     urlCache.delete(cacheKey)
-    return c.json(fail(`音频源返回 ${upstream.status}`), 502)
+    return c.json(fail('音频源不可用'), 502)
+  }
+
+  // 命中的非首位候选提到队首，下次直接先用它，避免反复白撞已知坏节点
+  if (usedUrl !== urls[0]) {
+    urlCache.set(cacheKey, [usedUrl, ...urls.filter((u) => u !== usedUrl)])
   }
 
   const headers = new Headers()
   headers.set(
     'Content-Type',
-    upstream.headers.get('content-type') ?? 'audio/mpeg',
+    audioContentTypeFromUrl(usedUrl) ??
+      upstream.headers.get('content-type') ??
+      'audio/mpeg',
   )
   const contentLength = upstream.headers.get('content-length')
   if (contentLength) headers.set('Content-Length', contentLength)
@@ -258,6 +309,7 @@ export function createApp() {
   app.get('/api/search', async (c) => {
     const keywords = (c.req.query('keywords') ?? c.req.query('s') ?? '').trim()
     const limit = Number(c.req.query('limit') ?? 30)
+    const page = Math.max(1, Number(c.req.query('page') ?? 1) || 1)
     if (!keywords) return c.json(fail('缺少搜索关键词'), 400)
     const adapter = adapterOf(sourceQuery(c))
     if (!adapter) return c.json(fail('未知音源'), 404)
@@ -266,6 +318,7 @@ export function createApp() {
         keywords,
         Math.min(limit, 60),
         credentialOf(c, adapter),
+        page,
       )
       return c.json(ok<Track[]>(tracks))
     } catch (e) {
@@ -273,7 +326,12 @@ export function createApp() {
     }
   })
 
-  /** 多类型搜索：一次并行返回歌曲 / 艺人 / 专辑 / 歌单；缺失的能力返回空数组并标记。 */
+  /**
+   * 多类型搜索：并行返回歌曲 / 艺人 / 专辑 / 歌单；缺失的能力返回空数组并标记。
+   *
+   * `page`（从 1 起）供前端滚动续取下一批；`type` 可**只跑某一类**（省掉其余三类上游请求，
+   * 供「续取当前 tab 的下一页」用），未指定时四类全跑。
+   */
   app.get('/api/search/all', async (c) => {
     const keywords = (c.req.query('keywords') ?? '').trim()
     if (!keywords) return c.json(fail('缺少搜索关键词'), 400)
@@ -281,20 +339,25 @@ export function createApp() {
       Math.max(Number(c.req.query('limit') ?? 20) || 20, 1),
       50,
     )
+    const page = Math.max(1, Number(c.req.query('page') ?? 1) || 1)
     const adapter = adapterOf(sourceQuery(c))
     if (!adapter) return c.json(fail('未知音源'), 404)
     const cookie = credentialOf(c, adapter)
+    const only = c.req.query('type')
+    const want = (t: string) => !only || only === t
     try {
       const [songs, artists, albums, playlists] = await Promise.all([
-        adapter.searchSongs(keywords, 50, cookie),
-        adapter.searchArtists
-          ? adapter.searchArtists(keywords, limit, cookie)
+        want('songs')
+          ? adapter.searchSongs(keywords, 50, cookie, page)
+          : Promise.resolve([] as Track[]),
+        want('artists') && adapter.searchArtists
+          ? adapter.searchArtists(keywords, limit, cookie, page)
           : Promise.resolve([] as Artist[]),
-        adapter.searchAlbums
-          ? adapter.searchAlbums(keywords, limit, cookie)
+        want('albums') && adapter.searchAlbums
+          ? adapter.searchAlbums(keywords, limit, cookie, page)
           : Promise.resolve([] as Album[]),
-        adapter.searchPlaylists
-          ? adapter.searchPlaylists(keywords, limit, cookie)
+        want('playlists') && adapter.searchPlaylists
+          ? adapter.searchPlaylists(keywords, limit, cookie, page)
           : Promise.resolve([] as Playlist[]),
       ])
       const capabilities = {
@@ -450,6 +513,27 @@ export function createApp() {
     }
   })
 
+  /** 把一个视频 / 曲目展开为多个可播放条目（如 B 站分P 视频的一对多映射）。 */
+  const partsHandler = async (c: Context) => {
+    const ctx = ctxAdapter(c)
+    if (!ctx) return c.json(fail('未知音源'), 404)
+    if (!ctx.adapter.parts) return c.json(fail('该音源暂不支持拆分'), 501)
+    try {
+      return c.json(
+        ok<Track[]>(
+          await ctx.adapter.parts(
+            c.req.param('id') ?? '',
+            credentialOf(c, ctx.adapter),
+          ),
+        ),
+      )
+    } catch (e) {
+      return c.json(fail(`获取分P失败：${(e as Error).message}`), 502)
+    }
+  }
+  app.get('/api/parts/:source/:id', partsHandler)
+  app.get('/api/parts/:id', partsHandler)
+
   const lyricHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
@@ -471,18 +555,32 @@ export function createApp() {
 
   /* ============================ 登录 / VIP ============================ */
 
+  /**
+   * 登录态查询。除返回登录信息，还承担一次**会话自愈**：访客带了该源的会话 cookie、却被判为
+   * **未登录**（即 cookie 已失效），就下发 Set-Cookie 清空该源**全部**会话 cookie。否则这些残留
+   * 会让后续内容请求的 `credentialOf` 认定「访客有自己的会话」而**绕开服务端缺省凭证**，把 VIP
+   * 曲目打回 30 秒试听（见 `credentialOf`）。
+   *
+   * 仅当 `loginStatus` **正常返回**未登录时清理；上游异常走 catch，不下发 cookie 以避免误登出。
+   * 注意个别适配器会把瞬时上游故障也表达为 `{ logged: false }`，故本清理非绝对精确，属尽力而为。
+   */
   const authStatusHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
-    // 该源是否支持登录（有扫码能力）——前端据此隐藏登录入口（无登录源如咪咕，见 ADR-032）
+    // 该源是否支持登录（有扫码能力）——前端据此隐藏登录入口
     const loginable = Boolean(ctx.adapter.qrKey)
+    const presented = cookieOf(c, ctx.adapter)
     try {
-      return c.json(
-        ok<LoginStatus>({
-          ...(await ctx.adapter.loginStatus(cookieOf(c, ctx.adapter))),
-          loginable,
-        }),
-      )
+      const status = await ctx.adapter.loginStatus(presented)
+      // 带了会话 cookie 却判定未登录 → 清掉失效残留，让后续请求回落到缺省凭证
+      if (!status.logged && presented) {
+        for (const name of ctx.adapter.sessionCookieNames) {
+          c.header('Set-Cookie', `${name}=; Path=/; Max-Age=0; SameSite=Lax`, {
+            append: true,
+          })
+        }
+      }
+      return c.json(ok<LoginStatus>({ ...status, loginable }))
     } catch {
       return c.json(ok<LoginStatus>({ logged: false, loginable }))
     }
@@ -530,8 +628,8 @@ export function createApp() {
       const cookieHeader = ctx.adapter.cookieHeaderFromSetCookies(cookies)
       const status = await ctx.adapter.loginStatus(cookieHeader)
       forwardSessionCookies(c, ctx.adapter, cookies)
-      // 单活动账号：登入某源时清掉**其它**源的会话 cookie（防御陈旧 cookie，与前端「登录后无入口」双保险）
-      for (const other of MUSIC_SOURCES) {
+      // 单活动账号：登入某源时清掉**其它源**的会话 cookie（含 MV 渠道，见 ADR-027）
+      for (const other of ALL_SOURCES) {
         if (other === ctx.source) continue
         const oa = adapterOf(other)
         if (!oa) continue
@@ -544,6 +642,9 @@ export function createApp() {
       return c.json(
         ok<LoginStatus & { code: number; message?: string }>({
           ...status,
+          // 与 `/api/auth/:source/status` 一致：带上 `loginable`，否则前端写入登录态时会丢该字段、
+          // 把该源从登录弹窗的 tab 列表里滤掉（「登录后再点登录就没有这个源了」）。
+          loginable: Boolean(ctx.adapter.qrKey),
           code,
           message,
         }),

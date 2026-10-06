@@ -5,11 +5,22 @@
  * 因此不得包含任何运行环境相关的代码（如 DOM / Node API）。
  */
 
-/** 音源服务器。 */
-export type MusicSource = 'netease' | 'qq' | 'migu'
+/** 可浏览的音乐音源（顺序即 UI 展示顺序：网易云优先）。 */
+export const MUSIC_SOURCES = ['netease'] as const
 
-/** 全部音源（顺序即 UI 展示顺序：网易云优先）。 */
-export const MUSIC_SOURCES = ['netease', 'qq', 'migu'] as const
+/**
+ * MV 渠道：只提供「搜视频 + 播放其音频」（B 站 DASH 分轨，只取音频）。
+ *
+ * 作为**独立渠道**存在，故刻意**不放进 {@link MUSIC_SOURCES}**——否则 `activeSource`
+ * 会在登录后返回它，把首页 / 浏览 / 发现的「活动源」带偏。登录态与单活动账号模型也互不干扰。
+ */
+export const MV_SOURCES = ['bilibili'] as const
+
+/** 全部音源（音乐音源 + MV 渠道）；`Track.source` 等实体字段的取值范围。 */
+export const ALL_SOURCES = [...MUSIC_SOURCES, ...MV_SOURCES] as const
+
+/** 音源服务器。 */
+export type MusicSource = (typeof ALL_SOURCES)[number]
 
 /** 缺省音源：旧数据回填、URL 缺源段时的兜底。 */
 export const DEFAULT_SOURCE: MusicSource = 'netease'
@@ -19,7 +30,7 @@ export const DEFAULT_SOURCE: MusicSource = 'netease'
  * 本地自建歌单 id 形如 `pl-xxx`，须确保不被误判为源。
  */
 export function isMusicSource(v: unknown): v is MusicSource {
-  return v === 'netease' || v === 'qq' || v === 'migu'
+  return typeof v === 'string' && (ALL_SOURCES as readonly string[]).includes(v)
 }
 
 /** 读取实体所属源；旧持久化数据（收藏 / 最近 / 队列 / 云同步载荷）缺失时回填缺省源。 */
@@ -119,7 +130,7 @@ export interface SearchResults {
   playlists: Playlist[]
   /**
    * 各类型在**当前源**下是否受支持（缺失视为支持）。
-   * 某些源可能不具备全部搜索能力（如 QQ 音乐暂不支持歌单搜索），供 UI 隐藏不支持的分类。
+   * 某些源可能不具备全部搜索能力（如某源暂不支持歌单搜索），供 UI 隐藏不支持的分类。
    */
   capabilities?: Record<'songs' | 'artists' | 'albums' | 'playlists', boolean>
 }
@@ -213,15 +224,15 @@ export interface LoginStatus {
   avatarUrl?: string
   /**
    * 账号 ID（用于云同步锚点与拉取「我的歌单」）。
-   * 用**字符串**：QQ 的 `uin` 会超出 JS 安全整数范围，数字会丢精度。
+   * 用**字符串**：部分平台的账号 id 会超出 JS 安全整数范围，数字承载会丢精度。
    */
   userId?: string
   /** 是否 VIP。 */
   vip?: boolean
   /**
    * 该源是否**支持登录**（= 适配器是否实现了扫码能力）。
-   * 缺省视为支持；显式 `false` 表示该源没有登录入口（如咪咕无扫码登录），
-   * 前端据此隐藏登录 UI 与「登录解锁」引导（见 ADR-032）。
+   * 缺省视为支持；显式 `false` 表示该源没有登录入口，
+   * 前端据此隐藏登录 UI 与「登录解锁」引导。
    */
   loginable?: boolean
 }
@@ -238,7 +249,7 @@ export const STREAM_BASE = '/stream'
  * 统一抽象音质档位（跨源一致，从低到高）。
  *
  * 档名沿用网易云 `song_url_v1` 的 level 取值，网易云侧**零映射**；
- * QQ 侧由适配器映射到其复合档（见 `server/sources/qq.ts`）。
+ * 其它源由各自适配器映射到其原生档位。
  */
 export const AUDIO_LEVELS = [
   'standard',

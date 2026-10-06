@@ -826,11 +826,13 @@ test.describe('卡片播放按钮', () => {
 })
 
 test.describe('搜索分栏与艺人 / 专辑跳转', () => {
-  test('搜索结果分为歌曲 / 艺人 / 专辑 / 歌单四个 tab', async ({ page }) => {
+  test('搜索结果分为歌曲 / MV / 艺人 / 专辑 / 歌单五个 tab', async ({
+    page,
+  }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
 
     const tabs = page.getByRole('tab')
-    await expect(tabs).toHaveCount(4)
+    await expect(tabs).toHaveCount(5)
     await expect(page.getByRole('tab', { name: /歌曲/ })).toHaveAttribute(
       'aria-selected',
       'true',

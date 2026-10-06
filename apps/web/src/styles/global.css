@@ -131,19 +131,23 @@ ol {
 
 /* ============================ 内容区转场（View Transitions） ============================ */
 /*
- * 只让内容区（.app-content，见 app.css）参与快照：根元素置为 none，
- * 否则侧栏 / 顶栏 / 播放条会随根快照一起交叉溶解。
+ * 内容区（`.app-content`）**仅在路由转场期间**参与快照：转场时 lib/viewTransition.ts 给
+ * <html> 打 `data-route-vt`，本规则据它命名；其余时刻默认 `none`（见 app.css）。
+ * 根元素平时也置 `none`，否则侧栏 / 顶栏 / 播放条会随根快照一起交叉溶解。
  *
  * 例外——主题转场（见 lib/themeTransition.ts）需要**整页**参与：转场期间给 <html> 打
- * `data-theme-vt`，本规则不再命中，根恢复默认捕获；同时把 `.app-content` 的命名摘掉，
- * 免得它被从根快照里挖掉。
+ * `data-theme-vt`，本规则不再命中，根恢复默认捕获。
+ *
+ * 之所以不再让 `.app-content` 常驻命名、靠 `[data-theme-vt]/[data-np-vt]` 临时摘名：
+ * 那会在转场结束（`finished`）的同一帧恢复命名，使滚动容器的子树快照与伪树拆除赛跑，
+ * 让内容区封面落在旧几何（滚动 / 点击后才复位）。
  */
 :root:not([data-theme-vt]) {
   view-transition-name: none;
 }
 
-:root[data-theme-vt] .app-content {
-  view-transition-name: none;
+:root[data-route-vt] .app-content {
+  view-transition-name: app-content;
 }
 
 /*
@@ -174,13 +178,9 @@ ol {
 }
 
 /*
- * 沉浸播放页转场（见 lib/nowPlayingTransition.ts）：转场期间给 <html> 打 data-np-vt，
- * 据此摘掉 .app-content 的命名。它是全站唯一的命名元素，若保留，其新旧快照内容相同 →
- * UA 注入 plus-lighter 混合，在顶层（伪树）闪出白块并盖住 z-index 更高的沉浸页。
+ * 沉浸播放页转场（见 lib/nowPlayingTransition.ts）：`.app-content` 默认即为 `none`
+ * （见 app.css），故此处无需再摘名——它从不会在沉浸转场期间被命名为捕获目标。
  */
-:root[data-np-vt] .app-content {
-  view-transition-name: none;
-}
 
 /* 共享封面（小封面 ↔ 大封面）：几何 morph 用 iOS 缓动，时长与 live 动画保持一致 */
 ::view-transition-group(np-cover) {

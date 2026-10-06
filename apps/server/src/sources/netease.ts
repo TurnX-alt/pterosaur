@@ -228,19 +228,31 @@ export function normalizePlaylist(raw: RawPlaylist): Playlist {
   }
 }
 
+/** 1 起的页码 → 0 起的 offset（网易云 `cloudsearch` 以 `offset` 分页）。 */
+function offsetOf(page: number = 1, limit = 30): number {
+  return Math.max(0, (Math.max(1, page) - 1) * limit)
+}
+
 /**
  * 搜索单曲。
  *
  * @param keywords 关键词
  * @param limit 返回数量上限（默认 30）
  * @param cookie 透传的登录 cookie（可选）
+ * @param page 页码（从 1 起；供滚动续取下一批）
  */
 export async function searchSongs(
   keywords: string,
   limit = 30,
   cookie?: string,
+  page = 1,
 ): Promise<Track[]> {
-  const res = await api.cloudsearch({ keywords, limit, cookie })
+  const res = await api.cloudsearch({
+    keywords,
+    limit,
+    offset: offsetOf(page, limit),
+    cookie,
+  })
   const songs: RawSong[] = res?.body?.result?.songs ?? []
   return songs.map(normalizeTrack)
 }
@@ -250,8 +262,15 @@ export async function searchArtists(
   keywords: string,
   limit = 30,
   cookie?: string,
+  page = 1,
 ): Promise<Artist[]> {
-  const res = await api.cloudsearch({ keywords, type: 100, limit, cookie })
+  const res = await api.cloudsearch({
+    keywords,
+    type: 100,
+    limit,
+    offset: offsetOf(page, limit),
+    cookie,
+  })
   const list: RawArtist[] = res?.body?.result?.artists ?? []
   return list.map(normalizeArtist)
 }
@@ -261,8 +280,15 @@ export async function searchAlbums(
   keywords: string,
   limit = 30,
   cookie?: string,
+  page = 1,
 ): Promise<Album[]> {
-  const res = await api.cloudsearch({ keywords, type: 10, limit, cookie })
+  const res = await api.cloudsearch({
+    keywords,
+    type: 10,
+    limit,
+    offset: offsetOf(page, limit),
+    cookie,
+  })
   const list: RawAlbum[] = res?.body?.result?.albums ?? []
   return list.map(normalizeAlbum)
 }
@@ -272,8 +298,15 @@ export async function searchPlaylists(
   keywords: string,
   limit = 30,
   cookie?: string,
+  page = 1,
 ): Promise<Playlist[]> {
-  const res = await api.cloudsearch({ keywords, type: 1000, limit, cookie })
+  const res = await api.cloudsearch({
+    keywords,
+    type: 1000,
+    limit,
+    offset: offsetOf(page, limit),
+    cookie,
+  })
   const list: RawPlaylist[] = res?.body?.result?.playlists ?? []
   return list.map(normalizePlaylist)
 }
@@ -382,13 +415,13 @@ export async function songUrl(
   id: string,
   cookie?: string,
   level: AudioLevel = DEFAULT_AUDIO_LEVEL,
-): Promise<string | null> {
+): Promise<string[]> {
   try {
     const res = await api.song_url_v1({ id, level, cookie })
     const url: string | null = res?.body?.data?.[0]?.url ?? null
-    return url ? https(url) : null
+    return url ? [https(url)] : []
   } catch {
-    return null
+    return []
   }
 }
 
@@ -487,8 +520,15 @@ export async function userPlaylists(
 
 /* ============================ 适配器 ============================ */
 
-/** 退出登录需清理的网易云会话 cookie。 */
-export const NETEASE_LOGOUT_COOKIE_NAMES = ['MUSIC_U', '__csrf'] as const
+/**
+ * 退出登录需清理的网易云会话 cookie。
+ *
+ * **必须与 {@link SESSION_COOKIE_NAMES} 全量一致**：登出若漏清任一项（曾漏掉 MUSIC_A / NMTID），
+ * 残留项仍会让后端 `cookieOf` 返回非空，于是 `credentialOf` 认定「访客有自己的会话」而**不回落
+ * 到服务端缺省凭证**，把 VIP 曲目打回 30 秒试听（见 app.ts `credentialOf`）。直接复用会话名单，
+ * 杜绝两处名单各自漂移。
+ */
+export const NETEASE_LOGOUT_COOKIE_NAMES = SESSION_COOKIE_NAMES
 
 /** 网易云音源适配器（供 `sources` 注册表使用）。 */
 export const neteaseAdapter: SourceAdapter = {

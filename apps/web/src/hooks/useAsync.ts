@@ -12,6 +12,11 @@ interface AsyncState<T> {
  */
 const asyncCache = new Map<string, unknown>()
 
+/** 清空内存取数缓存（登录 / 退出登录等凭证变化时作废旧结果）。 */
+export function clearAsyncCache(): void {
+  asyncCache.clear()
+}
+
 /**
  * 通用异步数据钩子。
  *

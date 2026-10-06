@@ -71,11 +71,23 @@ export const api = {
   search: (source: MusicSource, keywords: string, limit = 30) =>
     get<Track[]>(`${API_BASE}/search`, { keywords, limit, source }),
 
-  /** 多类型搜索：一次并行返回歌曲 / 艺人 / 专辑 / 歌单。 */
-  searchAll: (source: MusicSource, keywords: string, limit = 20) =>
-    get<SearchResults>(`${API_BASE}/search/all`, { keywords, limit, source }),
+  /** 多类型搜索：并行返回歌曲 / 艺人 / 专辑 / 歌单；`page` 供滚动续取，`type` 限定只跑一类。 */
+  searchAll: (
+    source: MusicSource,
+    keywords: string,
+    limit = 20,
+    page?: number,
+    type?: 'songs' | 'artists' | 'albums' | 'playlists',
+  ) =>
+    get<SearchResults>(`${API_BASE}/search/all`, {
+      keywords,
+      limit,
+      source,
+      page,
+      type,
+    }),
 
-  /** 艺人详情：档案 + 热门单曲 + 专辑列表（`name` 供 QQ 等无按-mid 取歌手接口的源按名搜索）。 */
+  /** 艺人详情：档案 + 热门单曲 + 专辑列表（`name` 供「无按-id 取歌手」能力的源按名搜索）。 */
   artist: (source: MusicSource, id: string, name?: string) =>
     get<{ artist: Artist; tracks: Track[]; albums: Album[] }>(
       `${API_BASE}/artist/${source}/${encodeURIComponent(id)}`,
@@ -113,6 +125,10 @@ export const api = {
 
   songs: (source: MusicSource, ids: string[]) =>
     get<Track[]>(`${API_BASE}/songs`, { ids: ids.join(','), source }),
+
+  /** 把一个视频 / 曲目展开为多个可播放条目（如 B 站分P 视频的一对多映射）。 */
+  parts: (source: MusicSource, id: string) =>
+    get<Track[]>(`${API_BASE}/parts/${source}/${encodeURIComponent(id)}`),
 
   lyric: (source: MusicSource, id: string) =>
     get<Lyric>(`${API_BASE}/lyric/${source}/${encodeURIComponent(id)}`),

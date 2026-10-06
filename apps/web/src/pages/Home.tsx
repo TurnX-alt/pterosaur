@@ -5,7 +5,7 @@ import { useAsync } from '../hooks/useAsync.js'
 import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
-import { useAuth, activeSource } from '../store/auth.js'
+import { useAuth, activeMusicSource } from '../store/auth.js'
 import type { Playlist, Track } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE } from '@pterosaur/shared/types'
 import { PlaylistCard } from '../components/PlaylistCard.js'
@@ -92,7 +92,7 @@ export function Home() {
   const playTracks = usePlayer((s) => s.playTracks)
   const status = useAuth((s) => s.status)
   // 推荐跟随活动账号（未登录用缺省源）。
-  const source = activeSource(status) ?? DEFAULT_SOURCE
+  const source = activeMusicSource(status) ?? DEFAULT_SOURCE
 
   const recommend = useAsync<Playlist[]>(
     () => api.recommend(source, 12),

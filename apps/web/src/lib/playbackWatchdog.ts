@@ -15,7 +15,7 @@ export const HAVE_FUTURE_DATA = 3
 /** 判定停滞所需的静默时长（毫秒）。 */
 export const DEFAULT_STALL_MS = 5000
 
-/** 默认恢复次数上限与退避间隔（毫秒）。 */
+/** 默认恢复次数上限与退避间隔（毫秒）：沿用原设计——3 次、10/15/20 秒递增退避。 */
 export const DEFAULT_MAX_RETRIES = 3
 export const DEFAULT_BACKOFF_MS = [10_000, 15_000, 20_000]
 
@@ -33,6 +33,10 @@ export interface WatchdogConfig {
   backoffMs: number[]
 }
 
+/**
+ * 默认退避策略（**所有音源统一**）：3 次、10/15/20 秒递增退避。
+ * 前端重试一律沿用此模式（网易云即默认），不做按源区分。
+ */
 export const DEFAULT_WATCHDOG_CONFIG: WatchdogConfig = {
   stallMs: DEFAULT_STALL_MS,
   maxRetries: DEFAULT_MAX_RETRIES,

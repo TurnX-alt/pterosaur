@@ -22,7 +22,7 @@ export interface QrCheckResult {
  *
  * 必选成员是「任何源都应具备」的播放公共面与登录态查询；可选成员代表「能力可缺」——
  * 路由层对缺失成员回 501、前端隐藏对应入口，从而允许新源先只实现一部分能力上线，
- * **包括「不支持登录」的源**（如咪咕无扫码登录，缺 `qrKey` 即视为无登录入口）。
+ * **包括「不支持登录」的源**（缺 `qrKey` 即视为无登录入口）。
  */
 export interface SourceAdapter {
   readonly id: MusicSource
@@ -32,20 +32,30 @@ export interface SourceAdapter {
   readonly logoutCookieNames: readonly string[]
 
   /* ---- 内容（必选） ---- */
-  searchSongs(keywords: string, limit: number, cred?: string): Promise<Track[]>
+  /** `page` 从 1 起（缺省 1），供搜索结果「滚动续取下一批」。 */
+  searchSongs(
+    keywords: string,
+    limit: number,
+    cred?: string,
+    page?: number,
+  ): Promise<Track[]>
   albumDetail(
     id: string,
     cred?: string,
   ): Promise<{ album: Album; tracks: Track[] }>
-  /** 解析播放地址；`level` 为**抽象音质档位**（见 shared `AudioLevel`），各源自行映射/降级。 */
-  songUrl(id: string, cred?: string, level?: AudioLevel): Promise<string | null>
+  /**
+   * 解析播放地址，返回**有序候选**（首个优先；后端逐个尝试，前一候选失败才回退下一个）。
+   * 空数组表示不可播放（版权受限 / 未登录 / 解析失败）。
+   * `level` 为**抽象音质档位**（见 shared `AudioLevel`），各源自行映射/降级。
+   */
+  songUrl(id: string, cred?: string, level?: AudioLevel): Promise<string[]>
   getLyric(id: string, cred?: string): Promise<Lyric>
 
   /* ---- 登录（必选面） ---- */
-  /** 查询登录态。无登录能力的源（如咪咕无扫码登录）返回 `{ logged: false }` 即可。 */
+  /** 查询登录态。无登录能力的源返回 `{ logged: false }` 即可。 */
   loginStatus(cred?: string): Promise<LoginStatus>
   cookieHeaderFromSetCookies(cookies?: string[]): string | undefined
-  /** 音频 CDN 需要的附加上游请求头（如 QQ 需要 Referer）。 */
+  /** 音频 CDN 需要的附加上游请求头（如某些源的 CDN 要求 `Referer`）。 */
   streamHeaders?(id: string): Record<string, string>
 
   /* ---- 内容（可选能力） ---- */
@@ -53,16 +63,19 @@ export interface SourceAdapter {
     keywords: string,
     limit: number,
     cred?: string,
+    page?: number,
   ): Promise<Artist[]>
   searchAlbums?(
     keywords: string,
     limit: number,
     cred?: string,
+    page?: number,
   ): Promise<Album[]>
   searchPlaylists?(
     keywords: string,
     limit: number,
     cred?: string,
+    page?: number,
   ): Promise<Playlist[]>
   artistDetail?(
     id: string,
@@ -75,6 +88,12 @@ export interface SourceAdapter {
   ): Promise<{ playlist: Playlist; tracks: Track[] }>
   songDetail?(ids: string[], cred?: string): Promise<Track[]>
 
+  /**
+   * 把「一个视频 / 曲目」展开为多个可播放条目（如 B 站分P 视频的一对多映射）。
+   * 缺省即该源无此概念，路由回 501。返回项的 `id` 需能被本源的 `songUrl` 解析。
+   */
+  parts?(id: string, cred?: string): Promise<Track[]>
+
   /* ---- 发现（可选能力；首页/浏览的推荐） ---- */
   recommendPlaylists?(limit: number, cred?: string): Promise<Playlist[]>
   toplists?(limit: number, cred?: string): Promise<Playlist[]>
@@ -83,7 +102,7 @@ export interface SourceAdapter {
   /* ---- 登录（可选能力：扫码） ---- */
   /**
    * 扫码登录三件套。**缺省即视为该源不支持登录**——`app.ts` 的 auth 路由据此回 501，
-   * 前端据 `LoginStatus.loginable` 隐藏登录入口（见 ADR-032）。目前仅咪咕如此。
+   * 前端据 `LoginStatus.loginable` 隐藏登录入口。
    */
   qrKey?(cred?: string): Promise<string>
   qrCreate?(key: string, cred?: string): Promise<string>

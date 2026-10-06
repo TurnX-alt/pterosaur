@@ -1,11 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import type { ReactElement } from 'react'
 import { TrackList } from './TrackList.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import type { Track } from '@pterosaur/shared/types'
+import { expandGroups } from '../lib/mv.js'
+
+// 屏蔽真实展开（会打网络）；各用例按需给 expandGroups 设返回值。
+vi.mock('../lib/mv.js', () => ({
+  expandTrack: vi.fn(),
+  expandGroups: vi.fn(),
+  expandList: vi.fn(),
+}))
 
 function track(id: string, title: string, extra: Partial<Track> = {}): Track {
   return {
@@ -142,6 +150,30 @@ describe('TrackList', () => {
     expect(usePlayer.getState().isPlaying).toBe(true)
     fireEvent.click(screen.getByText('第一首'))
     expect(usePlayer.getState().isPlaying).toBe(false)
+  })
+
+  it('含 B 站分P 条目时：队列按分P 展开，起点为被点视频的首个分P', async () => {
+    const bili = track('BV1', '某合集', { source: 'bilibili' })
+    const list = [track('a', '甲'), bili, track('b', '乙')]
+    vi.mocked(expandGroups).mockResolvedValueOnce([
+      [list[0]],
+      [
+        track('BV1:1', 'P1 · 甲', { source: 'bilibili' }),
+        track('BV1:2', 'P2 · 乙', { source: 'bilibili' }),
+      ],
+      [list[2]],
+    ])
+    renderList(<TrackList tracks={list} />)
+    fireEvent.click(screen.getByText('某合集'))
+    await waitFor(() =>
+      expect(usePlayer.getState().queue.map((t) => t.id)).toEqual([
+        'a',
+        'BV1:1',
+        'BV1:2',
+        'b',
+      ]),
+    )
+    expect(usePlayer.getState().current?.id).toBe('BV1:1')
   })
 
   it('点击艺人名跳转艺人页，且不触发行播放', () => {

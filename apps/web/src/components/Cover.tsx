@@ -68,6 +68,8 @@ export function Cover({
           alt={alt}
           loading="lazy"
           draggable={draggable ?? false}
+          /* 不带 Referer：部分图床（如 B 站 hdslb）对异域 Referer 直接 403（防盗链） */
+          referrerPolicy="no-referrer"
           onLoad={() => {
             markCoverReady(src)
             setLoaded(true)

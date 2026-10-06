@@ -56,14 +56,10 @@ export const COVER_SMALL = 300
 /** 大图边长（px）：沉浸页封面与背景、专辑/艺人/歌单详情 hero。 */
 export const COVER_LARGE = 1200
 
-/** QQ 图片路径中的尺寸段：`T00?R{W}x{H}M000`（专辑 T002 与歌手 T001 通用）。 */
-const QQ_SIZE_SEGMENT = /(T\d+R)\d+x\d+(M000)/
-
 /**
  * 把封面/头像 URL 改写为指定边长（px），用于「按使用场景选画质」。
  *
  * - 网易云：经 {@link canonicalNeteaseImage} 规范化镜像主机后，设 `param={px}y{px}`；
- * - QQ：把路径中的 `T00?R{W}x{H}M000` 尺寸段替换为 `R{px}x{px}`；
  * - 其它 CDN / 非法地址：**原样返回**（不猜测其 CDN 行为）。
  *
  * 返回串即缓存稳定身份——「同一图 + 同一尺寸」在 SW 媒体池、就绪登记表等各层得到同一键。
@@ -74,8 +70,6 @@ export function coverAt(
 ): string | undefined {
   if (!url) return url
   const size = `${px}x${px}`
-  if (QQ_SIZE_SEGMENT.test(url))
-    return url.replace(QQ_SIZE_SEGMENT, `$1${size}$2`)
   let u: URL
   try {
     u = new URL(url)

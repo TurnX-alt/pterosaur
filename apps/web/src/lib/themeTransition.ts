@@ -2,6 +2,7 @@ import { flushSync } from 'react-dom'
 import {
   supportsViewTransition,
   prefersReducedMotion,
+  nextFrame,
 } from './viewTransition.js'
 
 /**
@@ -57,18 +58,39 @@ export function startThemeTransition(
   const doc = document as Document & {
     startViewTransition: (cb: () => void) => ViewTransitionLike
   }
-  // 回调同步提交（不 await 任何东西：await rAF 会在转场期间死锁）
-  const transition = doc.startViewTransition(() => {
+  let transition: ViewTransitionLike
+  try {
+    // 回调同步提交（不 await 任何东西：await rAF 会在转场期间死锁）
+    transition = doc.startViewTransition(() => {
+      flushSync(apply)
+    })
+  } catch {
+    // 抛错（如文档非 fully-active）：清掉瞬态标记与揭示变量，回退为直接切换，避免永久残留
+    delete root.dataset.themeVt
+    clearRevealVars(root)
     flushSync(apply)
-  })
+    return
+  }
   active = transition
 
   // finished 在 skipTransition 时会以 AbortError reject，两分支都要清理；
   // 且只清理「仍是当前这段」的标记，避免被已 skip 的旧转场误删。
-  const done = () => {
-    if (active !== transition) return
-    active = null
-    delete root.dataset.themeVt
-  }
+  //
+  // 标记的清除**推迟到下一帧**：`finished` 解析时伪树仍在拆除，此刻改样式会触发快照重建
+  // （内容区封面落在旧几何、滚动/点击后才复位），故等拆除完毕再动。
+  const done = () =>
+    nextFrame(() => {
+      if (active !== transition) return
+      active = null
+      delete root.dataset.themeVt
+      clearRevealVars(root)
+    })
   transition.finished.then(done, done)
+}
+
+/** 清除主题揭示用的圆心 / 半径变量（生命周期结束时清理，避免长期残留）。 */
+function clearRevealVars(root: HTMLElement): void {
+  root.style.removeProperty('--theme-vt-x')
+  root.style.removeProperty('--theme-vt-y')
+  root.style.removeProperty('--theme-vt-r')
 }

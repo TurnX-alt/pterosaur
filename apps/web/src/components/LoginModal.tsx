@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Loader2, CheckCircle2 } from 'lucide-react'
 import type { MusicSource } from '@pterosaur/shared/types'
-import { MUSIC_SOURCES } from '@pterosaur/shared/types'
+import { ALL_SOURCES } from '@pterosaur/shared/types'
 import { api } from '../api/client.js'
 import { useAuth, finishQrLogin } from '../store/auth.js'
 import { IconButton } from './IconButton.js'
@@ -13,24 +13,14 @@ type QrStage = 'loading' | 'waiting' | 'scanned' | 'expired' | 'done'
 /** 源的中文全名（用于标题与引导文案）。 */
 const SOURCE_LABELS: Record<MusicSource, string> = {
   netease: '网易云音乐',
-  qq: 'QQ 音乐',
-  migu: '咪咕音乐',
-}
-
-/**
- * 连接「动词 + 源名」时按**中英混排**补空格：源名以拉丁字母开头（「QQ 音乐」）时加一个空格，
- * 纯中文（「网易云音乐」）则不加——避免「登录QQ 音乐」这种紧贴。
- */
-function joinLabel(prefix: string, source: MusicSource): string {
-  const label = SOURCE_LABELS[source]
-  return /^[A-Za-z]/.test(label) ? `${prefix} ${label}` : `${prefix}${label}`
+  bilibili: '哔哩哔哩',
 }
 
 /** 各扫码阶段的文案（引导文案随源变化）。 */
 function stageText(source: MusicSource): Record<QrStage, string> {
   return {
     loading: '二维码加载中…',
-    waiting: `${joinLabel('打开', source)} App 扫码登录`,
+    waiting: `打开${SOURCE_LABELS[source]} App 扫码登录`,
     scanned: '扫码成功，请在手机上确认',
     expired: '二维码已过期，点击刷新',
     done: '登录成功',
@@ -38,7 +28,7 @@ function stageText(source: MusicSource): Record<QrStage, string> {
 }
 
 /**
- * 登录弹窗：各音源统一以**扫码**登录（网易云与 QQ 音乐均只提供扫码，不再支持帐密登录）。
+ * 登录弹窗：各音源统一以**扫码**登录（不再支持帐密登录）。
  *
  * 流程：`/api/auth/:source/qr` 取 key+图片 → 每 2s 轮询 `/api/auth/:source/qr/check`
  * → 803 成功时后端下发该源 Set-Cookie，前端写入对应源登录态并关闭弹窗。
@@ -52,8 +42,8 @@ export function LoginModal() {
 
   const [source, setSource] = useState<MusicSource>(modalSource)
 
-  // 仅列出**支持登录**的源——无登录能力的源（如咪咕）不出现（见 ADR-032）
-  const loggableSources = MUSIC_SOURCES.filter((s) => status[s]?.loginable)
+  // 仅列出已确认**支持登录**的源（`loginable`；含 MV 渠道 B 站，未加载的源暂时不出现）
+  const loggableSources = ALL_SOURCES.filter((s) => status[s]?.loginable)
 
   // 扫码状态
   const [qrimg, setQrimg] = useState('')
@@ -96,6 +86,8 @@ export function LoginModal() {
                   avatarUrl: res.avatarUrl,
                   userId: res.userId,
                   vip: res.vip,
+                  // 刚扫码成功 ⇒ 该源必然支持登录；带上它，否则会从弹窗源 tab 列表里消失
+                  loginable: true,
                 })
               } else {
                 setStage('expired')
@@ -122,20 +114,22 @@ export function LoginModal() {
     [stopPolling, setError],
   )
 
-  // 打开弹窗时对齐到触发它的源
-  useEffect(() => {
-    setSource(modalSource)
-  }, [modalSource])
+  // 实际生效的源：所选源若当前**不可登录**（如状态尚未加载 / 异常），回落到第一个可登录源。
+  // 用**派生值**而非 effect 回写 state——否则每次渲染都会把用户手动切的 tab 顶回触发源
+  // （表现为「切不到 B 站、一按就弹回网易云」）。
+  const loginSource: MusicSource = loggableSources.includes(source)
+    ? source
+    : (loggableSources[0] ?? source)
 
-  // 源变化时（重新）生成二维码
+  // 生效源变化时（重新）生成二维码
   useEffect(() => {
     aliveRef.current = true
-    void startQr(source)
+    void startQr(loginSource)
     return () => {
       aliveRef.current = false
       stopPolling()
     }
-  }, [source, startQr, stopPolling])
+  }, [loginSource, startQr, stopPolling])
 
   // Esc 关闭
   useEffect(() => {
@@ -151,12 +145,12 @@ export function LoginModal() {
       className="login-modal"
       role="dialog"
       aria-modal="true"
-      aria-label={joinLabel('登录', source)}
+      aria-label={`登录${SOURCE_LABELS[loginSource]}`}
     >
       <div className="login-modal__scrim" onClick={closeModal} aria-hidden />
       <div className="login-modal__card">
         <header className="login-modal__head">
-          <h2>{joinLabel('登录', source)}</h2>
+          <h2>登录{SOURCE_LABELS[loginSource]}</h2>
           <IconButton label="关闭" size="sm" onClick={closeModal}>
             <X size={18} />
           </IconButton>
@@ -170,8 +164,8 @@ export function LoginModal() {
               key={s}
               type="button"
               role="tab"
-              aria-selected={source === s}
-              className={`login-modal__tab${source === s ? ' login-modal__tab--active' : ''}`}
+              aria-selected={loginSource === s}
+              className={`login-modal__tab${loginSource === s ? ' login-modal__tab--active' : ''}`}
               onClick={() => setSource(s)}
             >
               {SOURCE_LABELS[s]}
@@ -192,7 +186,7 @@ export function LoginModal() {
               <button
                 type="button"
                 className="login-modal__qr-refresh"
-                onClick={() => void startQr(source)}
+                onClick={() => void startQr(loginSource)}
               >
                 点击刷新
               </button>
@@ -203,7 +197,9 @@ export function LoginModal() {
               </div>
             )}
           </div>
-          <p className="login-modal__qr-text">{stageText(source)[stage]}</p>
+          <p className="login-modal__qr-text">
+            {stageText(loginSource)[stage]}
+          </p>
         </div>
 
         {error && (

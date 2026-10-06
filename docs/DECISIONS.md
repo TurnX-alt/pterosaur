@@ -316,11 +316,11 @@
 - 状态：已采纳
 - 背景：用户报告「网络不良时进度条还在走，但音乐已经停了」。复现与排查（含 Playwright 逐秒采样）确认了四条互不相同的静默路径：(1) 引擎只绑 6 个事件，`waiting`/`stalled`/`canplay` 全部无人监听，缓冲耗尽后 UI 永远停在「播放中」、无提示无恢复；(2) 弱网下切歌的 `play()` promise 既不 resolve 也不 reject，`isPlaying` 被钉死为 true；(3) 上游 chunked 流被截断时浏览器把已收数据当完整文件、提前触发 `ended`，而 `onEnded` 不校验时长直接切歌，弱网下逐首级联；(4) 音频元素的 `error` 事件无法区分「网络失败」与「VIP/版权受限」，原实现按 MediaError code 猜测，把网络故障也提示成「该曲目暂不可播放 + 登录解锁」。放大器：SW 回源丢 Range 取整文件、SW 与后端全链路无超时。
 - 考虑过的方案：恢复手段——① `audio.currentTime = audio.currentTime` 触发重取；② `load()` 重载后回拨位置再播；③ 仅重调 `play()`。停滞判定位置——④ 引擎内嵌定时器；⑤ 独立纯逻辑模块 + rAF 逐帧喂快照。登录引导来源——⑥ 继续按 MediaError code 猜；⑦ 后端 403 经 SW `postMessage` 通知页面。
-- 决策：⑤ + ② + ⑦，并补齐其余三项。新增 `src/lib/playbackWatchdog.ts`（纯逻辑、时间注入，便于单测）：`isPrematureEnd(audioDuration, trackDuration)` 以「`audio.duration` 比元数据时长短超过 **10s 且超过 10%**」双阈值判定截断（避开 VBR 估算误差误判，真截断通常差数十秒）；`createWatchdog` 以 `stallMs=5s`、退避 `[10s,15s,20s]`、`maxRetries=3` 判定停滞，**未起播（位置为 0）时不介入**，交由 12s 起播超时统一兜底。引擎逐帧驱动看门狗，`recover` 执行 `load()` + 回拨 `currentTime` + `play()`（`recovering` 标志豁免 `load()` 派发的那次 `pause` 回写），预算耗尽则暂停并提示、**不自动跳歌**。截断场景同一恢复流程，`ended` 不再一律切歌。起播 `play()` 以 `setTimeout` 超时（12s）兜底，`AbortError`（被 load/pause 主动中断）静默；元素处于错误态时先 `load()` 再播，保证故障排除后重试可恢复。缓冲态：`waiting`/`stalled` → `buffering=true`，`playing`/`canplay`/`pause` → false，播放键在缓冲中改显加载动画。登录引导改为⑦：`error` 一律中性文案，`needLogin` 仅由后端 403（`app.ts` 既有的 `fail(..., true)`）经 SW 广播 `STREAM_NEED_LOGIN` 驱动。超时：SW 回源 15s（仅响应头阶段）、后端上游 10s（仅响应头阶段），后端上游非 2xx 时淘汰 `urlCache` 项以便重新解析。
+- 决策：⑤ + ② + ⑦，并补齐其余三项。新增 `src/lib/playbackWatchdog.ts`（纯逻辑、时间注入，便于单测）：`isPrematureEnd(audioDuration, trackDuration)` 以「`audio.duration` 比元数据时长短超过 **10s 且超过 10%**」双阈值判定截断（避开 VBR 估算误差误判，真截断通常差数十秒）；`createWatchdog` 以 `stallMs=5s`、退避 `[10s,15s,20s]`、`maxRetries=3` 判定停滞（**所有音源统一**，不做按源区分），**未起播（位置为 0）时不介入**，交由 12s 起播超时统一兜底。引擎逐帧驱动看门狗，`recover` 执行 `load()` + 回拨 `currentTime` + `play()`（`recovering` 标志豁免 `load()` 派发的那次 `pause` 回写），预算耗尽则暂停并提示、**不自动跳歌**。截断场景同一恢复流程，`ended` 不再一律切歌。起播 `play()` 以 `setTimeout` 超时（12s）兜底，`AbortError`（被 load/pause 主动中断）静默；元素处于错误态时先 `load()` 再播，保证故障排除后重试可恢复。缓冲态：`waiting`/`stalled` → `buffering=true`，`playing`/`canplay`/`pause` → false，播放键在缓冲中改显加载动画。登录引导改为⑦：`error` 一律中性文案，`needLogin` 仅由后端 403（`app.ts` 既有的 `fail(..., true)`）经 SW 广播 `STREAM_NEED_LOGIN` 驱动。超时：SW 回源 15s（仅响应头阶段）、后端上游 10s（仅响应头阶段），后端上游非 2xx 时淘汰 `urlCache` 项以便重新解析。
 - 为什么选这个：第五条把判定逻辑与 DOM 副作用分离，可直接单测（10 个用例覆盖阈值、退避、清零、中断预算）；`load()` 是唯一能重建媒体管线、重新发起点播请求的手段（`currentTime` 自赋值多数浏览器会忽略，`play()` 不解决「数据已断」）；「未起播不介入」消除了看门狗与起播超时两份机制的互相打断（实测从互相抖动、27s 才闭环降为 12s 干净闭环）；登录引导改由后端 403 驱动后语义可靠，网络故障不再误导用户去登录。
 - 为什么不选其他：①/③ 对已断流的元素无效；④ 定时器与 rAF 双时钟难对齐且不可测；⑥ 实测 code 4 既可能是真 VIP 也可能是网络失败（SW 超时后元素即报 code 4），按 code 猜必然误判。此外**不做** body 停滞超时与多路 tee 下载去重——前者需在音频关键路径包装流、引入新失败面，后者需 multi-tee 分发，复杂度/收益比不划算；截断与停滞已由前端兜底。
 - 后果 / 已知边界：
-  - 恢复用 `load()` 会丢弃已缓冲数据（有 3 次上限与递增退避；播放重新前进 >1s 即清零预算）。
+  - 恢复用 `load()` 会丢弃已缓冲数据（有 3 次上限与递增退避；播放重新前进 >1s 即清零预算），**所有音源同一套退避**。
   - 看门狗由 rAF 驱动：**后台标签页不推进**，后台期间的停滞只能在切回前台后检测到（已知边界，未用定时器规避其双时钟问题）。
   - 截断双阈值是保守判据：差不足 10s 的截断按正常结束处理（宁可漏判，不可误判——误判会把正常播完的歌拖入恢复流程）。
   - 起播超时 12s 后若 `play()` 迟到 resolve，会因 `isPlaying` 已为 false 而被 `pause()` 抵消，行为自洽。
@@ -331,10 +331,10 @@
 ## ADR-022：多源架构——实体带 `source`、`keyOf` 统一身份、`SourceAdapter` 归一化
 
 - 日期：2026-10-06
-- 状态：已采纳
+- 状态：已采纳（**部分修订**：源清单改为 `MUSIC_SOURCES` + `MV_SOURCES` 双名单，见 ADR-033）
 - 背景：项目原为单一音源（网易云），`Track` 的 `id` 是**全局唯一身份**，贯穿搜索产出 → 卡片 key / 跳转 → URL path → 页面取数 → 收藏/最近/歌单成员去重 → 队列定位 → 音频/歌词缓存键 → 后端 `/stream` 与 urlCache（约 60 个判等点位）。需求是接入第二个源（QQ 音乐）并支持多平台混合。若不引入「源」维度，两源共享同一原始 id 时会**互相覆盖**（收藏串源、队列定位错、缓存命中到错误音频）。
 - 考虑过的方案：① 把源编码进 `id` 字符串（`qq:mid`）而不加字段；② 给实体加必填 `source` 字段 + 组合键助手 `keyOf`；③ 只加可选 `source` 字段。
-- 决策：②。`MusicSource = 'netease' | 'qq'`；`Track`/`Artist`/`Album`/`Playlist` 各加**必填** `source`；新增 `sourceOf(e)`（旧数据回填 `'netease'`）与 `keyOf(e) = \`${sourceOf(e)}:${e.id}\``；全仓所有「认曲 / 认实体」的比对一律改用 `keyOf`；`streamUrl(source, id)`与便捷式`streamUrlOf(track)`；后端抽 `SourceAdapter` 接口（`sources/{types,netease,qq,index}.ts`），路由 `/stream/:source/:id`、`/api/artist|album|playlist|lyric/:source/:id`，另**保留 2 段式别名**（视为缺省源，兼容 SW 外壳 7 天缓存下的旧页面）。
+- 决策：②。`MusicSource`（**现为 `'netease' | 'bilibili'`**，见 ADR-033）；`Track`/`Artist`/`Album`/`Playlist` 各加**必填** `source`；新增 `sourceOf(e)`（旧数据回填 `'netease'`）与 `keyOf(e) = \`${sourceOf(e)}:${e.id}\``；全仓所有「认曲 / 认实体」的比对一律改用 `keyOf`；`streamUrl(source, id)`与便捷式`streamUrlOf(track)`；后端抽 `SourceAdapter` 接口（`sources/{types,netease,qq,index}.ts`），路由 `/stream/:source/:id`、`/api/artist|album|playlist|lyric/:source/:id`，另**保留 2 段式别名**（视为缺省源，兼容 SW 外壳 7 天缓存下的旧页面）。
 - 为什么选这个：`keyOf` 产物是普通字符串，可直接当 React key / Map key / Set 成员 / 缓存键前缀，**零结构改动**就让「收藏 / 最近 / 歌单成员 / 队列定位 / 缓存」跨源安全；必填 `source` 让所有产出点与构造点在 `tsc` 下**一次性报错、被迫处理**（尤其防止「QQ 曲目被当网易云解析」这类静默错误）；`SourceAdapter` 让「能力可缺」成为显式语义（缺失成员 → 路由回 501、前端隐藏入口），便于分阶段上线。
 - 为什么不选其他：① 把源塞进 id 字符串会让 URL 不透明、且 `encodeURIComponent` 后不可读，且仍有「忘记加前缀」的漏网点；③ 可选字段无法在编译期拦截漏设 `source` 的产出点（正是最危险的错误）。
 - 后果 / 已知边界：
@@ -357,7 +357,7 @@
 ## ADR-024：QQ 音乐接入方式——自研最小适配器（实测：全程无需 sign）
 
 - 日期：2026-10-06
-- 状态：已采纳（**已实测校准**）
+- 状态：~~已采纳~~ **已废弃**（QQ 音源已整体移除，见 ADR-033；本条保留作历史记录）
 - 背景：需要第二个源，选 QQ 音乐（版权更全）。QQ 的流是**明文**（`ws.stream.qqmusic.qq.com/...mp3?vkey=`，`.mflac/.mgg` 加密仅针对客户端下载文件、不涉及串流），故非 DRM、可沿用 `/stream` 代理模型（区别于被否决的 Spotify——见 `docs/researches/spotify-multi-source.md`）。接入方式需在「自研最小适配器」与「依赖维护库/侧车进程」间定夺。
 - 考虑过的方案：① 起一个 QQ API 服务进程，后端 HTTP 转调；② 引入第三方 QQ API npm 库；③ 自研最小适配器（`fetch` 直连若干端点）。
 - 决策：③，且**全程无签名**（`platform:'h5'`）。经真实环境逐一实测：
@@ -432,7 +432,7 @@
 ## ADR-029：QQ 音乐也提供「发现」（免登录歌单；无排行榜）
 
 - 日期：2026-10-06
-- 状态：已采纳
+- 状态：~~已采纳~~ **已废弃**（QQ 音源已整体移除，见 ADR-033）
 - 背景：ADR-027 后搜索/推荐都跟随活动源，故 QQ 也需提供首页「为你推荐」与浏览页各分区，否则登 QQ 后这些区域空白。
 - 决策：`SourceAdapter` 新增**可选能力** `recommendPlaylists / toplists / topPlaylists`；`/api/discover/*` 加 `?source=`，并新增 `/api/discover/capabilities?source=` 返回 `{recommend, playlists, toplists}` 供前端隐藏不支持的 tab。QQ 侧用免签接口 `c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg`（歌单列表；`sortId` 区分排序）：`recommendPlaylists`（sortId=5，**以热门歌单近似个性化推荐**，QQ 的个性化推荐需登录/上下文）、`topPlaylists`（sortId=2）。
 - 为什么选这个：该接口免签、实测可用、结构与 `normalizeQqPlaylist` 吻合；`capabilities` 让"某源缺某分区"成为显式语义而非 500/空。
@@ -445,7 +445,7 @@
 ## ADR-030：按活动平台展示——`Plan N/T` 标签、QQ 绿色主题、QQ 昵称与头像来源
 
 - 日期：2026-10-06
-- 状态：已采纳
+- 状态：~~已采纳~~ **已废弃**（QQ 源与其主题色 / `Plan T` 随 ADR-033 移除）
 - 背景：单活动账号（ADR-027）下，头像菜单原固定显示「Pterosaur+」，看不出当前用的是哪个平台；主题强调色固定为 Apple Music 红；QQ 登录后**昵称为空**（显示成 `QQ <号>`）、**头像不显示**。
 - 决策：
   1. **计划标签**：该位置按活动源显示 **`Plan N`**（网易云）/ **`Plan T`**（QQ）——N=NetEase、T=Tencent。
@@ -488,7 +488,7 @@
 ## ADR-032：接入咪咕音乐（第三音源）——无登录源的登录能力可选化、主题随「当前源」、封面不降档
 
 - 日期：2026-10-06
-- 状态：已采纳（v1 **无登录**；`MIGU_COOKIE` VIP 路径待实测）
+- 状态：~~已采纳~~ **已废弃**（咪咕音源已整体移除，见 ADR-033；「扫码能力可选」的设计保留在 `SourceAdapter` 中）
 - 背景：多源地基（ADR-022）落地后接入第三源**咪咕音乐**。实测确认咪咕音频是 `freetyst.nf.migu.cn` 上的**明文 MP3/FLAC**（带 Range、完整曲长），与 QQ 同构、**无 DRM**，可沿用既有 `/stream` 明文代理（详见 `docs/researches/migu-source.md`）。但咪咕有两点与既有源不同：(1) **无扫码登录**（其登录是手机号/短信），而 `SourceAdapter` 原把 `qrKey/qrCreate/qrCheck` 设为**必选**、没有「不支持登录」的表达；(2) 主题色原由**活动账号**驱动（ADR-030），而无登录的咪咕永远不会成为活动账号 → 洋红主题无处触发。
 - 考虑过的方案：
   - 登录：① 一并实现短信登录；② **不实现登录，把扫码能力改为可选**。
@@ -509,3 +509,46 @@
   - **封面不降档**：列表缩略图拉大图（相对 ADR-031 偏差）；`d.musicapp.migu.cn` 稳定故不做 URL 规范化。
   - 咪咕对匿名请求有**频控**；VIP 曲匿名不可播（`needLogin`）。
 - 何时重新审视：若实现短信登录（应去除 `loginable` 隐藏、把咪咕纳入单活动账号）；若咪咕封面提供尺寸参数（可恢复 `coverAt` 降档）；若 `MIGU_COOKIE` 路径实测失败（调整 `copyrightId` 传递）。
+
+## ADR-033：移除 QQ / 咪咕音源；新增「MV」渠道（B 站，只放音频）
+
+- 日期：2026-10-06
+- 状态：已采纳（**废止** ADR-024 / ADR-029 / ADR-030 / ADR-032；**部分修订** ADR-022 / ADR-026 / ADR-031）
+- 背景：实测 QQ 音乐与咪咕音乐的可用性 / 稳定性明显不足（QQ 频控 + 私有 API 易碎、咪咕曲库与体验有限），维护成本高于收益。同时制作人希望搜索时能一并搜到 B 站视频、并**只解析其音频**播放（B 站为 DASH 音视频分轨，取 `dash.audio` 即可，无需解析视频）。
+- 考虑过的方案：
+  - 源收敛：① 保留三源；② **移除 QQ / 咪咕，仅留网易云**。
+  - MV 定位：③ 把 B 站做成与网易云并列的**可浏览音源**；④ **做成独立「MV 渠道」**，只出现在搜索页的分类 tab 里（「歌曲」右侧）。
+- 决策：
+  1. **移除 QQ / 咪咕**：删适配器、注册表项、`MusicSource` 分支、主题色块（`tokens.css` 的 `[data-source='qq'|'migu']`）、CLI 分支、`QQ_COOKIE`/`MIGU_COOKIE` 及各自单测；相关 ADR 标注废弃。
+  2. **源清单双名单**（`packages/shared/src/types.ts`）：`MUSIC_SOURCES = ['netease']`（可浏览 / 发现）、`MV_SOURCES = ['bilibili']`（MV 渠道）、`ALL_SOURCES = [...MUSIC_SOURCES, ...MV_SOURCES]` 且 `MusicSource = (typeof ALL_SOURCES)[number]`。**B 站是一等账号**：`activeSource`（顶栏账户菜单 / 云同步锚点）、`/api/auth/*` 的「单活动账号」清理、后端 `requireIdentity`（云同步身份）**都遍历 `ALL_SOURCES`**；而「可浏览内容」的页面（首页 / 浏览 / 电台 / 搜索默认源 / 源主题）改用 **`activeMusicSource`**（仅 `MUSIC_SOURCES`），以免这些需要发现 / 歌单 / 排行榜能力的页面被 B 站带偏。
+  3. **B 站适配器**（`apps/server/src/sources/bilibili.ts`）：搜索走 `x/web-interface/search/all/v2`（**实测未被风控**；`x/web-interface/wbi/search/type` 会回 `v_voucher` 人机验证）；取音频 `x/player/pagelist → x/player/playurl(fnval=16) → dash.audio`，按抽象档挑最接近的码率；`streamHeaders` 带上 `Referer`（必需，否则 403）；扫码登录走 `passport-login/web/qrcode/{generate,poll}`（**URL 即 key**，无状态）。`sessionCookieNames = logoutCookieNames` 覆盖 `SESSDATA/bili_jct/DedeUserID/buvid3/bili_ticket`。
+  4. **前端 MV tab**：搜索页分类行「歌曲」右侧加「MV」，**与音乐结果并行取数**（不惰性加载）；源 tab 行移除（只剩一个音乐源，无需切换器）。
+  5. **音频响应 Content-Type 依直链后缀回写**（`app.ts` 的 `audioContentTypeFromUrl`）：网易云 CDN 对 `.flac` 谎报 `audio/mpeg`、B 站 m4s 为 `application/octet-stream`——按 URL 后缀纠正后，下载能落正确后缀、SW 也能按 `audio/*` 入缓存。
+  6. **分P 一对多**：B 站分P 视频入队时展开为多项——新增 `/api/parts/:source/:id`（适配器可选能力 `parts`），每分P 一项、`id` 为 `<bvid>:<cid>`（`songUrl` 据此直接定位，无需再查 cid）。**MV tab 点一个 → 队列 = 该视频的分P**；其它列表（含歌单）点击 → 队列 = 该列表、其中 B 站条目**就地展开**。展开出的都是普通 `Track`，可与歌曲混排 / 收藏 / 排序。
+  7. **封面防盗链**：B 站图床对**异域 `Referer` 返回 403**（无 Referer 才 200），故封面 `<img>` 与 SW 图片回源均带 `referrerPolicy: 'no-referrer'`。
+  8. **匿名解析重试**：B 站匿名接口偶发抽风。适配器请求层（`bGet`）**只要任何一次请求失败就重试**——网络错误 / 非 2xx / 上游 `code !== 0` **与具体错误码无关**——按固定 **333ms** 间隔连试 5 次，覆盖搜索 / `view` / `pagelist` / `playurl` / `nav` 全部解析调用，以免把「播放出错，请检查网络后重试」这类失败透给用户。网易云解析原有实现无重试，保持不动；**前端**播放重试则所有音源**统一**沿用网易云的退避模式（见 ADR-021）。
+  9. **登录 cookie 必须保持原始百分号编码**：B 站 `SESSDATA` 自身含 `%2C`，若从回跳 URL 用 `searchParams.get` 取值会被**解码成逗号** → 写出非法 cookie（RFC 6265 的 cookie-value 不允许逗号，浏览器拒存）或错误值 → 表现为**「登录成功但一刷新登录就掉」**。故 `collectLoginCookies` 改走 `rawQueryValue`（按 `&`/`=` 原始切分、**不解码**），并优先用 poll 的 `Set-Cookie`、缺失才从 URL 补齐（同名不重复）。
+- 为什么选这个：②移除低价值源可显著减少维护面；④把 B 站做成独立渠道而非可浏览源，避免其（无专辑 / 歌单 / 排行榜）污染既有页面的能力假设；⑤在服务端一处收口，同时修好「无损下载后缀错为 .mp3」与「B 站音频不入 SW 缓存」两个问题。
+- 为什么不选其他：①保留三源需持续跟进 QQ / 咪咕的私有 API 与频控，收益为负；③会让 B 站出现在首页 / 浏览的源切换里，但那些页面需要的能力它一概不具备。
+- 后果 / 已知边界：
+  - `keyOf` / 缓存键 / `/stream/:source/:id` 等**多源地基原样保留**（`bilibili` 即第三种 `source`），未来接新源仍只需注册一个适配器。
+  - B 站**匿名**即可拿 `dash.audio`（实测最高 ~204kbps）；带 SESSDATA（扫码登录或 `BILIBILI_COOKIE`）可提升码率与稳定性。
+  - B 站搜索与音频直链来自**非官方接口**，上游一变即需适配；搜索端点存在**风控**可能（换 IP 触发人机验证）。
+  - B 站登录态**不进入**单活动账号 / 云同步身份（独立于音乐源）。
+  - 旧的 `qq` / `migu` 持久化数据（收藏 / 最近 / 队列）在 UI 上不再可达；`keyOf` 仍能解析，不崩溃。
+- 何时重新审视：若 B 站接口风控收紧到不可用；若需要「B 站登录并入单活动账号」；若重新引入其它音乐源。
+
+## ADR-034：登录 / 退出登录时清空全部缓存
+
+- 日期：2026-10-06
+- 状态：已采纳
+- 背景：媒体缓存**不带登录身份维度**——前端 SW 的音频键是 `source:id|level`（ADR-025）；后端 URL 缓存虽带凭证指纹，但前端那一层会跨凭证复用。于是「匿名时缓存的 30 秒试听」在登录之后仍被播放（反之亦然），表现为「登录 / 退出登录后播放没有变化」。App 外壳（Cache Storage）与若干内存缓存（歌词 / 封面就绪登记 / `useAsync` 取数）同样跨凭证复用旧结果。
+- 考虑过的方案：① 把凭证指纹并入 SW 音频缓存键；② **在凭证变化（登入 / 登出）时清空全部缓存**。
+- 决策：②。新增 `apps/web/src/lib/clearCaches.ts` 的 `clearAllAppCaches()`：清 IDB 媒体池（音频 + 封面）+ 通知 SW 清内存元数据索引 + 清 Cache Storage（外壳 / 图标）+ 清内存缓存（`clearLyricCache` / `clearCoverRegistry` / 新增 `clearAsyncCache`）。在 `store/auth.ts` 的 `finishQrLogin`（登录成功）与 `logout`（退出）各调用一次。**不动**资料库（收藏 / 歌单）与登录态本身。
+- 为什么选这个：清缓存是「凭证变化」这一低频事件的合理代价，且一处收口、无需改缓存键形或 DB 版本；同时覆盖「匿名缓存被登录后复用」与「登录缓存被登出后复用」两个方向。
+- 为什么不选其他：① SW 侧拿不到可靠的凭证状态（session cookie 可能 httpOnly、SW 也无法读 document.cookie），键里加什么都会漂移；且会 bump DB 版本、清空一次既有缓存。
+- 后果 / 已知边界：
+  - 登入 / 登出会**重新下载应用外壳**（Cache Storage 被清），下次导航多一次网络往返；若想保留外壳缓存，可去掉 `clearCacheStorage()` 只清媒体池。
+  - 清媒体池为异步且可能较慢（大量 IDB 删除），但发生在登录 / 退出这类低频操作上，可接受。
+  - **不改动**资料库（IDB 的 favorites / recent / playlists）与云同步数据。
+- 何时重新审视：若未来把凭证指纹纳入 SW 缓存键（缓存键本身能区分身份），本清空可降级为「仅登出时清」或取消。

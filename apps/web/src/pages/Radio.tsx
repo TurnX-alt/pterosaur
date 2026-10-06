@@ -3,7 +3,7 @@ import { Radio as RadioIcon, Shuffle } from 'lucide-react'
 import { api } from '../api/client.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
-import { useAuth, activeSource } from '../store/auth.js'
+import { useAuth, activeMusicSource } from '../store/auth.js'
 import type { Playlist, Track } from '@pterosaur/shared/types'
 import { DEFAULT_SOURCE } from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
@@ -14,7 +14,7 @@ import { ErrorState } from '../components/States.js'
  *
  * 点击「开始随机播放」会从一个热门歌单抽取曲目、开启随机模式并立即播放，
  * 模拟电台「不知道下一首是什么」的体验；同时提供最近播放作为快速入口。
- * 曲库跟随**活动账号**；无排行榜的源（如 QQ）退回「热门歌单」。
+ * 曲库跟随**活动账号**；无排行榜能力的源退回「热门歌单」。
  */
 export function Radio() {
   const playTracks = usePlayer((s) => s.playTracks)
@@ -22,7 +22,7 @@ export function Radio() {
   const shuffle = usePlayer((s) => s.shuffle)
   const recent = useLibrary((s) => s.recent)
   const status = useAuth((s) => s.status)
-  const source = activeSource(status) ?? DEFAULT_SOURCE
+  const source = activeMusicSource(status) ?? DEFAULT_SOURCE
 
   const [pool, setPool] = useState<Track[] | null>(null)
   const [loading, setLoading] = useState(false)
