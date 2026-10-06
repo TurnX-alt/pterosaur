@@ -39,7 +39,7 @@ async function seedLibrary(
   await page.evaluate(
     ({ db, store, key, value }) =>
       new Promise<void>((resolve, reject) => {
-        const req = indexedDB.open(db, 2)
+        const req = indexedDB.open(db)
         req.onupgradeneeded = () => {
           const d = req.result
           if (!d.objectStoreNames.contains('library'))
@@ -77,7 +77,7 @@ async function clearLibrary(page: Page): Promise<void> {
   await page.evaluate(
     ({ db, store, key }) =>
       new Promise<void>((resolve) => {
-        const req = indexedDB.open(db, 2)
+        const req = indexedDB.open(db)
         req.onsuccess = () => {
           const d = req.result
           const tx = d.transaction(store, 'readwrite')
@@ -108,7 +108,7 @@ async function waitForLibraryPersisted(
         page.evaluate(
           ({ db, store, key, field }) =>
             new Promise<number>((resolve) => {
-              const req = indexedDB.open(db, 2)
+              const req = indexedDB.open(db)
               req.onsuccess = () => {
                 const d = req.result
                 const tx = d.transaction(store, 'readonly')
@@ -1064,7 +1064,7 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
           page.evaluate(
             ({ db }) =>
               new Promise<number>((resolve) => {
-                const req = indexedDB.open(db, 2)
+                const req = indexedDB.open(db)
                 req.onupgradeneeded = () => resolve(0)
                 req.onsuccess = () => {
                   const d = req.result
@@ -1095,6 +1095,43 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
       .toBeGreaterThan(0)
   })
 
+  test('未命中缓存时 seek 型 Range 请求透传上游（206 而非 200 全量）', async ({
+    page,
+    request,
+  }) => {
+    await page.goto('/')
+    // 等 SW 就绪并 reload，确保 fetch 自始即受 SW 控制
+    await page.evaluate(() => navigator.serviceWorker?.ready)
+    await page.reload()
+
+    const s = await request.get('/api/search', {
+      params: { keywords: FREE_SONG_KEYWORD, limit: 1 },
+    })
+    const id = (await s.json()).data[0].id
+
+    // 用独立档位取一个不受其它用例影响的缓存 key；带 Range 的请求不得被 SW 接管，
+    // 须由浏览器直发后端/CDN 并收到 206——否则 200 全量应答会让媒体内核中止/重启加载
+    // （拖动进度条无法跳转、启停循环）
+    const res = await page.evaluate(
+      async ({ id }) => {
+        const r = await fetch(`/stream/netease/${id}?level=standard`, {
+          headers: { Range: 'bytes=1000-1099' },
+        })
+        const buf = await r.arrayBuffer()
+        return {
+          status: r.status,
+          contentRange: r.headers.get('content-range'),
+          bytes: buf.byteLength,
+        }
+      },
+      { id },
+    )
+
+    expect(res.status).toBe(206)
+    expect(res.contentRange).toMatch(/^bytes 1000-1099\//)
+    expect(res.bytes).toBe(100)
+  })
+
   test('封面图片经 SW 缓存进 IndexedDB（与音频共用存储）', async ({ page }) => {
     await page.goto('/')
     // 等 SW 就绪并 reload，确保图片请求自始即受 SW 控制
@@ -1114,7 +1151,7 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
           page.evaluate(
             ({ db }) =>
               new Promise<number>((resolve) => {
-                const req = indexedDB.open(db, 2)
+                const req = indexedDB.open(db)
                 req.onsuccess = () => {
                   const d = req.result
                   if (!d.objectStoreNames.contains('mediaMeta')) {
