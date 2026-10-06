@@ -6,10 +6,10 @@
  */
 
 /** 音源服务器。 */
-export type MusicSource = 'netease' | 'qq'
+export type MusicSource = 'netease' | 'qq' | 'migu'
 
 /** 全部音源（顺序即 UI 展示顺序：网易云优先）。 */
-export const MUSIC_SOURCES = ['netease', 'qq'] as const
+export const MUSIC_SOURCES = ['netease', 'qq', 'migu'] as const
 
 /** 缺省音源：旧数据回填、URL 缺源段时的兜底。 */
 export const DEFAULT_SOURCE: MusicSource = 'netease'
@@ -19,7 +19,7 @@ export const DEFAULT_SOURCE: MusicSource = 'netease'
  * 本地自建歌单 id 形如 `pl-xxx`，须确保不被误判为源。
  */
 export function isMusicSource(v: unknown): v is MusicSource {
-  return v === 'netease' || v === 'qq'
+  return v === 'netease' || v === 'qq' || v === 'migu'
 }
 
 /** 读取实体所属源；旧持久化数据（收藏 / 最近 / 队列 / 云同步载荷）缺失时回填缺省源。 */
@@ -218,6 +218,12 @@ export interface LoginStatus {
   userId?: string
   /** 是否 VIP。 */
   vip?: boolean
+  /**
+   * 该源是否**支持登录**（= 适配器是否实现了扫码能力）。
+   * 缺省视为支持；显式 `false` 表示该源没有登录入口（如咪咕无扫码登录），
+   * 前端据此隐藏登录 UI 与「登录解锁」引导（见 ADR-032）。
+   */
+  loginable?: boolean
 }
 
 /** 后端 API 基础路径前缀。 */

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { createApp } from './app.js'
+import { miguAdapter } from './sources/migu.js'
 import { neteaseAdapter } from './sources/netease.js'
 import { qqAdapter } from './sources/qq.js'
 
@@ -160,7 +161,10 @@ describe('服务端缺省凭证（NETEASE_COOKIE）', () => {
     loginStatusMock.mockResolvedValue({ logged: false })
 
     const res = await app.request('/api/auth/status')
-    expect(await res.json()).toEqual({ ok: true, data: { logged: false } })
+    expect(await res.json()).toEqual({
+      ok: true,
+      data: { logged: false, loginable: true },
+    })
     // 身份判断没有把缺省凭证透传进去
     expect(loginStatusMock.mock.calls.at(-1)?.[0]).toBeUndefined()
   })
@@ -194,5 +198,29 @@ describe('多源路由：源段与缺省源', () => {
     const qq = await app.request('/api/search?keywords=x&source=qq')
     expect(qq.status).toBe(200)
     expect(qqSearch).toHaveBeenCalledWith('x', expect.any(Number), undefined)
+  })
+})
+
+describe('咪咕音源（无登录，见 ADR-032）', () => {
+  it('/auth/migu/status 标记 loginable:false', async () => {
+    const res = await app.request('/api/auth/migu/status')
+    expect(await res.json()).toEqual({
+      ok: true,
+      data: { logged: false, loginable: false },
+    })
+  })
+
+  it('无扫码登录：/auth/migu/qr 与 /qr/check 回 501（而非 404/502）', async () => {
+    expect((await app.request('/api/auth/migu/qr')).status).toBe(501)
+    expect((await app.request('/api/auth/migu/qr/check?key=k')).status).toBe(
+      501,
+    )
+  })
+
+  it('/stream/migu/:id 解析失败回 403 且 needLogin', async () => {
+    vi.spyOn(miguAdapter, 'songUrl').mockResolvedValue(null)
+    const res = await app.request('/stream/migu/600929000000096577')
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ ok: false, needLogin: true })
   })
 })

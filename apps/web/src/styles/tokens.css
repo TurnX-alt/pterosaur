@@ -56,6 +56,14 @@
   --accent-soft: rgba(49, 194, 124, 0.16);
 }
 
+/* 咪咕音乐：强调色改为洋红（当前源为 migu 时由 `<html data-source="migu">` 触发，见 ADR-032） */
+:root[data-source='migu'] {
+  --accent: #e4007f;
+  --accent-hover: #ff2e9a;
+  --accent-press: #c20069;
+  --accent-soft: rgba(228, 0, 127, 0.16);
+}
+
 /* 深色（默认） */
 :root,
 :root[data-theme='dark'] {

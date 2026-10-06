@@ -19,6 +19,8 @@ export function PlayErrorToast() {
   // 出错曲目所属源：决定「登录解锁」引导到哪个源的登录页
   const src = playErrorSource ?? 'netease'
   const logged = status[src]?.logged ?? false
+  // 该源是否支持登录——无登录能力的源（如咪咕）不显示「登录解锁」（见 ADR-032）
+  const loginable = status[src]?.loginable !== false
 
   useEffect(() => {
     if (!playError) return
@@ -32,7 +34,7 @@ export function PlayErrorToast() {
     <div className="toast" role="alert">
       <AlertCircle size={18} className="toast__icon" />
       <span className="toast__text">{playError}</span>
-      {!logged && playErrorNeedLogin && (
+      {!logged && loginable && playErrorNeedLogin && (
         <button
           type="button"
           className="toast__action"

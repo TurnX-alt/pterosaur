@@ -484,3 +484,28 @@
   - 画质两档使同图 300 与 1200 各占一条封面缓存，**条目与流量翻倍**（预期代价）；小图由原 600 降为 300，列表缩略图略降。
   - 换档会触发整段重新拉流（SW 未命中新档键）；`higher` 在 QQ 落 `exhigh` 链。
 - 何时重新审视：QQ 若强制 `musics.fcg` 的 `sign`+AES-GCM（ADR-024 已留回退路径），或提供稳定的按档 `filename` 契约；若引入音频分片缓存（ADR-012），换档续播可免整段重拉；若未来要画质用户可选，再评估引入第三档。
+
+## ADR-032：接入咪咕音乐（第三音源）——无登录源的登录能力可选化、主题随「当前源」、封面不降档
+
+- 日期：2026-10-06
+- 状态：已采纳（v1 **无登录**；`MIGU_COOKIE` VIP 路径待实测）
+- 背景：多源地基（ADR-022）落地后接入第三源**咪咕音乐**。实测确认咪咕音频是 `freetyst.nf.migu.cn` 上的**明文 MP3/FLAC**（带 Range、完整曲长），与 QQ 同构、**无 DRM**，可沿用既有 `/stream` 明文代理（详见 `docs/researches/migu-source.md`）。但咪咕有两点与既有源不同：(1) **无扫码登录**（其登录是手机号/短信），而 `SourceAdapter` 原把 `qrKey/qrCreate/qrCheck` 设为**必选**、没有「不支持登录」的表达；(2) 主题色原由**活动账号**驱动（ADR-030），而无登录的咪咕永远不会成为活动账号 → 洋红主题无处触发。
+- 考虑过的方案：
+  - 登录：① 一并实现短信登录；② **不实现登录，把扫码能力改为可选**。
+  - 主题驱动：③ 维持只看活动账号（咪咕主题永不触发）；④ **改由「当前所处源」驱动**（路由显式带源时以路由为准，否则跟随活动账号）。
+  - 封面：⑤ 新增 `coverAt` 的咪咕分支；⑥ **取大图一档、不降档**。
+- 决策：
+  1. **登录可选化**：`SourceAdapter` 的 `qrKey/qrCreate/qrCheck` 改为**可选**；`app.ts` 的 `/api/auth/:source/qr` 与 `/qr/check` 对缺失者回 **501**；`/api/auth/:source/status` 响应新增 `loginable`（= 是否有 `qrKey`），落到 `LoginStatus.loginable?`。前端 `LoginModal` 只列 `loginable` 的源、`PlayErrorToast` 对 `loginable===false` 不显示「登录解锁」。
+  2. **咪咕适配器**（`server/sources/migu.ts`）：搜索（歌曲/专辑/歌手/歌单）、专辑/歌手/歌单详情、批量曲目、取流（`toneFlag` 候选链逐级降级）、歌词（`lrcUrl` 明文）、发现（推荐歌单 + 排行榜）；`sessionCookieNames`/`logoutCookieNames` 均为空。**排行榜 id 加 `rank:` 前缀**，`playlistTracks` 据此分派到 `rank-info`。
+  3. **主题随当前源**：`useSourceTheme` 由「只看活动账号」改为「路由显式带源优先（`/playlist|artist|album/:source`、`/search?source=`），否则活动账号，未登录回落缺省源」；`<html data-source="migu">` 触发 `tokens.css` 的洋红 `--accent` 系列；`Topbar` 的 `Plan` 标签加 `migu→M`。
+  4. **缺省凭证**：`defaultCredential` 由二元改映射 `{netease:NETEASE_COOKIE, qq:QQ_COOKIE, migu:MIGU_COOKIE}`。
+  5. **封面取大图一档**（`imgSizeType='03'`，800²），`coverAt` 对咪咕 URL 原样返回。
+- 为什么选这个：②把「不支持登录」变成**一等能力**（对齐 `SourceAdapter` 既有的「能力可缺」哲学），既最小又通用；④让主题反映**你在看哪个平台**，是唯一能让无登录源拿到自身主题色的方式；⑥因三档封面是**三个不同文件**（不同 hash），改写尺寸段不可行，取大图是无额外结构的正确做法。
+- 为什么不选其他：①短信登录是独立大功能（发码/校验/会话保持 + 非扫码 UI），应单独立项；③会让咪咕主题永不出现、用户诉求落空；⑤技术不可行（三档无参数化关系）。
+- 后果 / 已知边界：
+  - **第三音源扩展点**：`MusicSource` 加 `'migu'`；`MUSIC_SOURCES` 顺序 `['netease','qq','migu']`；注册表加 `migu`。级联到各 `Record<MusicSource,…>`。
+  - 新增 `MIGU_COOKIE` 环境变量；`pnpm log-in --source=migu` 明确报错（无扫码）。
+  - 主题：实体路由 / 搜索带源时**即使已登录其它源也按路由源**着色（ADR-030 的**部分修订**）。
+  - **封面不降档**：列表缩略图拉大图（相对 ADR-031 偏差）；`d.musicapp.migu.cn` 稳定故不做 URL 规范化。
+  - 咪咕对匿名请求有**频控**；VIP 曲匿名不可播（`needLogin`）。
+- 何时重新审视：若实现短信登录（应去除 `loginable` 隐藏、把咪咕纳入单活动账号）；若咪咕封面提供尺寸参数（可恢复 `coverAt` 降档）；若 `MIGU_COOKIE` 路径实测失败（调整 `copyrightId` 传递）。

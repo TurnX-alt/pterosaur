@@ -7,6 +7,7 @@ const st = (
 ): Record<MusicSource, LoginStatus> => ({
   netease: { logged: Boolean(sources.netease) },
   qq: { logged: Boolean(sources.qq) },
+  migu: { logged: Boolean(sources.migu) },
 })
 
 describe('activeSource / isLoggedAny（单活动账号）', () => {

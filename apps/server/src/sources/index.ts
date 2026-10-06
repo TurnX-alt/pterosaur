@@ -1,4 +1,5 @@
 import type { MusicSource } from '@pterosaur/shared/types'
+import { miguAdapter } from './migu.js'
 import { neteaseAdapter } from './netease.js'
 import { qqAdapter } from './qq.js'
 import type { SourceAdapter } from './types.js'
@@ -14,6 +15,7 @@ export type { SourceAdapter, QrCheckResult } from './types.js'
 export const sources: Partial<Record<MusicSource, SourceAdapter>> = {
   netease: neteaseAdapter,
   qq: qqAdapter,
+  migu: miguAdapter,
 }
 
 /** 取某源适配器；未注册返回 undefined。 */

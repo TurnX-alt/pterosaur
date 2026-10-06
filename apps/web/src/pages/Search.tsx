@@ -29,6 +29,7 @@ const TABS: { key: SearchTab; label: string }[] = [
 const SOURCE_LABELS: Record<MusicSource, string> = {
   netease: '网易云',
   qq: 'QQ 音乐',
+  migu: '咪咕音乐',
 }
 
 const EMPTY_RESULTS: SearchResults = {

@@ -84,11 +84,15 @@ function cookieOf(c: Context, adapter: SourceAdapter): string | undefined {
 
 /**
  * 服务端缺省凭证：由 `pnpm log-in --source=<源>` 写入仓库根 `.env`
- * （`NETEASE_COOKIE` / `QQ_COOKIE`）。供**未登录访客**解析会员资源，不代表访客身份。
+ * （`NETEASE_COOKIE` / `QQ_COOKIE` / `MIGU_COOKIE`）。供**未登录访客**解析会员资源，不代表访客身份。
  */
+const DEFAULT_CREDENTIAL_ENV: Record<MusicSource, string> = {
+  netease: 'NETEASE_COOKIE',
+  qq: 'QQ_COOKIE',
+  migu: 'MIGU_COOKIE',
+}
 function defaultCredential(source: MusicSource): string | undefined {
-  const key = source === 'netease' ? 'NETEASE_COOKIE' : 'QQ_COOKIE'
-  const v = process.env[key]?.trim()
+  const v = process.env[DEFAULT_CREDENTIAL_ENV[source]]?.trim()
   return v || undefined
 }
 
@@ -470,14 +474,17 @@ export function createApp() {
   const authStatusHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
+    // 该源是否支持登录（有扫码能力）——前端据此隐藏登录入口（无登录源如咪咕，见 ADR-032）
+    const loginable = Boolean(ctx.adapter.qrKey)
     try {
       return c.json(
-        ok<LoginStatus>(
-          await ctx.adapter.loginStatus(cookieOf(c, ctx.adapter)),
-        ),
+        ok<LoginStatus>({
+          ...(await ctx.adapter.loginStatus(cookieOf(c, ctx.adapter))),
+          loginable,
+        }),
       )
     } catch {
-      return c.json(ok<LoginStatus>({ logged: false }))
+      return c.json(ok<LoginStatus>({ logged: false, loginable }))
     }
   }
   app.get('/api/auth/:source/status', authStatusHandler)
@@ -487,6 +494,8 @@ export function createApp() {
   const authQrHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
+    if (!ctx.adapter.qrKey || !ctx.adapter.qrCreate)
+      return c.json(fail('该音源暂不支持登录'), 501)
     try {
       const cookie = cookieOf(c, ctx.adapter)
       const key = await ctx.adapter.qrKey(cookie)
@@ -507,6 +516,7 @@ export function createApp() {
   const authQrCheckHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
+    if (!ctx.adapter.qrCheck) return c.json(fail('该音源暂不支持登录'), 501)
     const key = c.req.query('key')
     if (!key) return c.json(fail('缺少 key'), 400)
     try {

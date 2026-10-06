@@ -28,8 +28,13 @@ interface TopbarProps {
   searchRef: React.RefObject<HTMLInputElement | null>
 }
 
-/** 会员计划标签：网易云 → `Plan N`，QQ → `Plan T`。 */
-const planOf = (src: MusicSource): string => `Plan ${src === 'qq' ? 'T' : 'N'}`
+/** 会员计划标签：网易云 → `Plan N`，QQ → `Plan T`，咪咕 → `Plan M`。 */
+const PLAN_LETTER: Record<MusicSource, string> = {
+  netease: 'N',
+  qq: 'T',
+  migu: 'M',
+}
+const planOf = (src: MusicSource): string => `Plan ${PLAN_LETTER[src]}`
 
 /**
  * 顶部栏：前进/后退、全局搜索、主题切换、账户菜单。

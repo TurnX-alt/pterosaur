@@ -111,7 +111,7 @@ function shutdown(code: number): void {
 }
 
 /** 解析 `--source=<源>`（默认 netease）。 */
-function parseSource(): 'netease' | 'qq' {
+function parseSource(): 'netease' | 'qq' | 'migu' {
   const args = process.argv.slice(2)
   const inline = args.find((a) => a.startsWith('--source='))
   const idx = args.indexOf('--source')
@@ -120,19 +120,29 @@ function parseSource(): 'netease' | 'qq' {
     : idx >= 0
       ? args[idx + 1]
       : undefined
-  return val === 'qq' ? 'qq' : 'netease'
+  return val === 'qq' ? 'qq' : val === 'migu' ? 'migu' : 'netease'
 }
 
 async function main(): Promise<void> {
   const source = parseSource()
   if (source !== 'netease') {
-    // QQ 的二维码是上游直接返回的 PNG 图片，没有可渲染的「内容字符串」，终端无法出图。
-    console.error(
-      '\n[pterosaur] QQ 音乐缺省凭证暂不支持命令行扫码（二维码为图片，无法在终端渲染）。',
-    )
-    console.error(
-      '[pterosaur] 请在应用内「登录」处选择 QQ 音乐扫码；网易云缺省凭证请用 pnpm log-in。\n',
-    )
+    if (source === 'migu') {
+      // 咪咕无扫码登录（其登录为手机号/短信）。
+      console.error(
+        '\n[pterosaur] 咪咕音乐无扫码登录，无法用命令行获取缺省凭证。',
+      )
+      console.error(
+        '[pterosaur] 如需解锁 VIP，请手工把咪咕会话写入仓库根 .env 的 MIGU_COOKIE。\n',
+      )
+    } else {
+      // QQ 的二维码是上游直接返回的 PNG 图片，没有可渲染的「内容字符串」，终端无法出图。
+      console.error(
+        '\n[pterosaur] QQ 音乐缺省凭证暂不支持命令行扫码（二维码为图片，无法在终端渲染）。',
+      )
+      console.error(
+        '[pterosaur] 请在应用内「登录」处选择 QQ 音乐扫码；网易云缺省凭证请用 pnpm log-in。\n',
+      )
+    }
     shutdown(1)
     return
   }

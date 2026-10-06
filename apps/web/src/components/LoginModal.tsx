@@ -14,6 +14,7 @@ type QrStage = 'loading' | 'waiting' | 'scanned' | 'expired' | 'done'
 const SOURCE_LABELS: Record<MusicSource, string> = {
   netease: '网易云音乐',
   qq: 'QQ 音乐',
+  migu: '咪咕音乐',
 }
 
 /**
@@ -47,8 +48,12 @@ export function LoginModal() {
   const error = useAuth((s) => s.error)
   const setError = useAuth((s) => s.setError)
   const modalSource = useAuth((s) => s.modalSource)
+  const status = useAuth((s) => s.status)
 
   const [source, setSource] = useState<MusicSource>(modalSource)
+
+  // 仅列出**支持登录**的源——无登录能力的源（如咪咕）不出现（见 ADR-032）
+  const loggableSources = MUSIC_SOURCES.filter((s) => status[s]?.loginable)
 
   // 扫码状态
   const [qrimg, setQrimg] = useState('')
@@ -160,7 +165,7 @@ export function LoginModal() {
         <p className="login-modal__hint">登录后可享用免费云同步服务。</p>
 
         <div className="login-modal__tabs" role="tablist" aria-label="音源">
-          {MUSIC_SOURCES.map((s) => (
+          {loggableSources.map((s) => (
             <button
               key={s}
               type="button"
