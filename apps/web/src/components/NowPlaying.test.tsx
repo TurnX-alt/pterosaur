@@ -56,7 +56,9 @@ function bgLayers(container: HTMLElement) {
 
 function bgUrls(container: HTMLElement) {
   // jsdom 会把 url(...) 序列化为带引号的形式，这里统一去掉引号再比较
-  return bgLayers(container).map((el) => el.style.backgroundImage.replace(/["']/g, ''))
+  return bgLayers(container).map((el) =>
+    el.style.backgroundImage.replace(/["']/g, ''),
+  )
 }
 
 function lastImage() {

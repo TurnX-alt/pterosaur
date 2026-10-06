@@ -6,7 +6,11 @@ import { useViewNavigate } from '../hooks/useViewNavigate.js'
 import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import type { Album, Artist, Track } from '@pterosaur/shared/types'
-import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
+import {
+  DEFAULT_SOURCE,
+  isMusicSource,
+  type MusicSource,
+} from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { AlbumCard } from '../components/EntityCards.js'
 import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
@@ -26,7 +30,9 @@ interface ArtistDetail {
 export function ArtistPage() {
   const params = useParams()
   const [search] = useSearchParams()
-  const source: MusicSource = isMusicSource(params.source) ? params.source : DEFAULT_SOURCE
+  const source: MusicSource = isMusicSource(params.source)
+    ? params.source
+    : DEFAULT_SOURCE
   const id = params.id ?? ''
   // 名字供 QQ 等「无按-mid 取歌手」的源按名搜索（见 sources/qq.ts 的 artistDetail）
   const name = search.get('name') ?? undefined
@@ -70,18 +76,28 @@ export function ArtistPage() {
     )
   }
 
-  const meta = [artist.musicSize ? `${artist.musicSize} 首单曲` : '', artist.albumSize ? `${artist.albumSize} 张专辑` : '']
+  const meta = [
+    artist.musicSize ? `${artist.musicSize} 首单曲` : '',
+    artist.albumSize ? `${artist.albumSize} 张专辑` : '',
+  ]
     .filter(Boolean)
     .join(' · ')
 
   return (
     <div className="detail" aria-busy={loading}>
       <header className="detail__hero detail__hero--artist">
-        <Cover src={coverAt(artist.avatar, COVER_LARGE)} alt={artist.name} rounded className="detail__cover" />
+        <Cover
+          src={coverAt(artist.avatar, COVER_LARGE)}
+          alt={artist.name}
+          rounded
+          className="detail__cover"
+        />
         <div className="detail__info">
           <span className="detail__type">艺人</span>
           <h1 className="detail__name">{artist.name}</h1>
-          {artist.alias?.length ? <p className="detail__desc">{artist.alias.join(' / ')}</p> : null}
+          {artist.alias?.length ? (
+            <p className="detail__desc">{artist.alias.join(' / ')}</p>
+          ) : null}
           {meta && (
             <p className="detail__meta">
               <span>{meta}</span>
@@ -91,11 +107,21 @@ export function ArtistPage() {
       </header>
 
       <div className="detail__actions">
-        <button type="button" className="detail__play" onClick={() => handlePlay(false)} disabled={!tracks.length}>
+        <button
+          type="button"
+          className="detail__play"
+          onClick={() => handlePlay(false)}
+          disabled={!tracks.length}
+        >
           <Play size={18} fill="currentColor" strokeWidth={0} />
           播放
         </button>
-        <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!tracks.length}>
+        <IconButton
+          label="随机播放"
+          size="lg"
+          onClick={() => handlePlay(true)}
+          disabled={!tracks.length}
+        >
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
         <IconButton
@@ -104,7 +130,11 @@ export function ArtistPage() {
           active={isSaved}
           onClick={() => toggleSaveArtist(artist)}
         >
-          <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          <Heart
+            size={20}
+            strokeWidth={2}
+            fill={isSaved ? 'currentColor' : 'none'}
+          />
         </IconButton>
       </div>
 
@@ -119,7 +149,11 @@ export function ArtistPage() {
           </div>
           <div className="card-grid">
             {albums.map((album) => (
-              <AlbumCard key={album.id} album={album} onClick={() => navigate(`/album/${album.source}/${album.id}`)} />
+              <AlbumCard
+                key={album.id}
+                album={album}
+                onClick={() => navigate(`/album/${album.source}/${album.id}`)}
+              />
             ))}
           </div>
         </section>

@@ -1,6 +1,10 @@
 import { useEffect, useLayoutEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { saveCurrentScroll, savedScroll, setCurrentScrollKey } from '../lib/scrollMemory.js'
+import {
+  saveCurrentScroll,
+  savedScroll,
+  setCurrentScrollKey,
+} from '../lib/scrollMemory.js'
 
 /** 内容区滚动容器（与 `lib/viewTransition.ts` 的 `contentEl` 指向同一元素）。 */
 function contentEl(): HTMLElement | null {

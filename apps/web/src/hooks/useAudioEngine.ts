@@ -5,7 +5,11 @@ import { usePlayer, audioSrc, advanceOnEnd } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { useSettings } from '../store/settings.js'
 import { audioEl } from './audioElement.js'
-import { createWatchdog, isPrematureEnd, type Watchdog } from '../lib/playbackWatchdog.js'
+import {
+  createWatchdog,
+  isPrematureEnd,
+  type Watchdog,
+} from '../lib/playbackWatchdog.js'
 
 /** 起播超时（毫秒）：弱网下 play() 长期既不 resolve 也不 reject 时的兜底。 */
 const PLAY_START_TIMEOUT_MS = 12_000
@@ -85,7 +89,10 @@ export function useAudioEngine(): void {
       return
     }
     // 元素处于错误态（如上次请求失败）时直接 play() 不会重新拉流，先 reset 再播
-    if (audio.error || audio.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+    if (
+      audio.error ||
+      audio.networkState === HTMLMediaElement.NETWORK_NO_SOURCE
+    ) {
       audio.load()
     }
     // 起播超时兜底：弱网下 play() 可能长时间不 settle，超时后回到暂停态并提示，
@@ -105,7 +112,9 @@ export function useAudioEngine(): void {
         const msg = e instanceof Error ? e.message : String(e)
         getState().setPlaying(false)
         // 浏览器自动播放策略：静默暂停，等待用户手势，不报错
-        if (!/NotAllowedError|user didn't interact|play\(\) failed/i.test(msg)) {
+        if (
+          !/NotAllowedError|user didn't interact|play\(\) failed/i.test(msg)
+        ) {
           getState().setPlayError('播放出错，请检查网络后重试')
         }
       })
@@ -299,7 +308,8 @@ export function useAudioEngine(): void {
 
   // 媒体会话（系统级控制 / 锁屏信息）
   useEffect(() => {
-    if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+    if (typeof navigator === 'undefined' || !('mediaSession' in navigator))
+      return
     if (!current) {
       navigator.mediaSession.metadata = null
       return
@@ -308,7 +318,15 @@ export function useAudioEngine(): void {
       title: current.title,
       artist: current.artist,
       album: current.album,
-      artwork: current.cover ? [{ src: current.cover, sizes: `${COVER_LARGE}x${COVER_LARGE}`, type: 'image/jpeg' }] : [],
+      artwork: current.cover
+        ? [
+            {
+              src: current.cover,
+              sizes: `${COVER_LARGE}x${COVER_LARGE}`,
+              type: 'image/jpeg',
+            },
+          ]
+        : [],
     })
     const s = getState()
     navigator.mediaSession.setActionHandler('play', () => s.setPlaying(true))

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { usePlayer, advanceOnEnd, shuffledIndexes, currentPlayMode, audioSrc } from './player.js'
+import {
+  usePlayer,
+  advanceOnEnd,
+  shuffledIndexes,
+  currentPlayMode,
+  audioSrc,
+} from './player.js'
 import type { Track } from '@pterosaur/shared/types'
 
 /** 构造测试用曲目。 */
@@ -41,7 +47,9 @@ beforeEach(() => {
 
 describe('audioSrc（音质档位）', () => {
   it('带档位时以 ?level= 形式拼入流地址', () => {
-    expect(audioSrc(track('7'), 'lossless')).toBe('/stream/netease/7?level=lossless')
+    expect(audioSrc(track('7'), 'lossless')).toBe(
+      '/stream/netease/7?level=lossless',
+    )
   })
 
   it('缺省档位时不带 level（由后端兜底）；空曲目返回空串', () => {
@@ -142,7 +150,13 @@ describe('usePlayer.playTracks', () => {
 
   it('baseQueue 保存原始顺序', () => {
     usePlayer.getState().playTracks(SONGS, 0)
-    expect(usePlayer.getState().baseQueue.map((t) => t.id)).toEqual(['1', '2', '3', '4', '5'])
+    expect(usePlayer.getState().baseQueue.map((t) => t.id)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+    ])
   })
 })
 
@@ -380,7 +394,13 @@ describe('usePlayer 队列管理', () => {
 
 describe('usePlayer toggle', () => {
   it('无当前曲目时 toggle 从队列头开始播放', () => {
-    usePlayer.setState({ queue: SONGS, baseQueue: SONGS, current: null, index: -1, isPlaying: false })
+    usePlayer.setState({
+      queue: SONGS,
+      baseQueue: SONGS,
+      current: null,
+      index: -1,
+      isPlaying: false,
+    })
     usePlayer.getState().toggle()
     const s = usePlayer.getState()
     expect(s.current?.id).toBe('1')

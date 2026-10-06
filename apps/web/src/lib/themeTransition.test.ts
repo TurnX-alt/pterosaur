@@ -22,7 +22,9 @@ function installFakeVT(): { spy: ReturnType<typeof vi.fn>; list: FakeVT[] } {
       .then(() => settle())
     return vt
   })
-  ;(document as unknown as { startViewTransition: unknown }).startViewTransition = spy
+  ;(
+    document as unknown as { startViewTransition: unknown }
+  ).startViewTransition = spy
   return { spy, list }
 }
 
@@ -50,14 +52,16 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (document as unknown as { startViewTransition?: unknown }).startViewTransition
+  delete (document as unknown as { startViewTransition?: unknown })
+    .startViewTransition
   delete root().dataset.themeVt
   setReducedMotion(false)
 })
 
 describe('startThemeTransition', () => {
   it('不支持 View Transitions 时直接切换、不设 data-theme-vt', () => {
-    delete (document as unknown as { startViewTransition?: unknown }).startViewTransition
+    delete (document as unknown as { startViewTransition?: unknown })
+      .startViewTransition
     let applied = false
     startThemeTransition({ x: 0, y: 0 }, () => {
       applied = true

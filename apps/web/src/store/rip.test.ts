@@ -8,10 +8,18 @@ beforeEach(() => {
 describe('rip store 生命周期', () => {
   it('start → setProgress → finish', () => {
     useRip.getState().start('album:1', 5)
-    expect(useRip.getState().job).toEqual({ key: 'album:1', current: 0, total: 5 })
+    expect(useRip.getState().job).toEqual({
+      key: 'album:1',
+      current: 0,
+      total: 5,
+    })
 
     useRip.getState().setProgress(3, 5)
-    expect(useRip.getState().job).toEqual({ key: 'album:1', current: 3, total: 5 })
+    expect(useRip.getState().job).toEqual({
+      key: 'album:1',
+      current: 3,
+      total: 5,
+    })
 
     useRip.getState().finish()
     expect(useRip.getState().job).toBeNull()

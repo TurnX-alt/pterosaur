@@ -334,7 +334,7 @@
 - 状态：已采纳
 - 背景：项目原为单一音源（网易云），`Track` 的 `id` 是**全局唯一身份**，贯穿搜索产出 → 卡片 key / 跳转 → URL path → 页面取数 → 收藏/最近/歌单成员去重 → 队列定位 → 音频/歌词缓存键 → 后端 `/stream` 与 urlCache（约 60 个判等点位）。需求是接入第二个源（QQ 音乐）并支持多平台混合。若不引入「源」维度，两源共享同一原始 id 时会**互相覆盖**（收藏串源、队列定位错、缓存命中到错误音频）。
 - 考虑过的方案：① 把源编码进 `id` 字符串（`qq:mid`）而不加字段；② 给实体加必填 `source` 字段 + 组合键助手 `keyOf`；③ 只加可选 `source` 字段。
-- 决策：②。`MusicSource = 'netease' | 'qq'`；`Track`/`Artist`/`Album`/`Playlist` 各加**必填** `source`；新增 `sourceOf(e)`（旧数据回填 `'netease'`）与 `keyOf(e) = \`${sourceOf(e)}:${e.id}\``；全仓所有「认曲 / 认实体」的比对一律改用 `keyOf`；`streamUrl(source, id)` 与便捷式 `streamUrlOf(track)`；后端抽 `SourceAdapter` 接口（`sources/{types,netease,qq,index}.ts`），路由 `/stream/:source/:id`、`/api/artist|album|playlist|lyric/:source/:id`，另**保留 2 段式别名**（视为缺省源，兼容 SW 外壳 7 天缓存下的旧页面）。
+- 决策：②。`MusicSource = 'netease' | 'qq'`；`Track`/`Artist`/`Album`/`Playlist` 各加**必填** `source`；新增 `sourceOf(e)`（旧数据回填 `'netease'`）与 `keyOf(e) = \`${sourceOf(e)}:${e.id}\``；全仓所有「认曲 / 认实体」的比对一律改用 `keyOf`；`streamUrl(source, id)`与便捷式`streamUrlOf(track)`；后端抽 `SourceAdapter` 接口（`sources/{types,netease,qq,index}.ts`），路由 `/stream/:source/:id`、`/api/artist|album|playlist|lyric/:source/:id`，另**保留 2 段式别名**（视为缺省源，兼容 SW 外壳 7 天缓存下的旧页面）。
 - 为什么选这个：`keyOf` 产物是普通字符串，可直接当 React key / Map key / Set 成员 / 缓存键前缀，**零结构改动**就让「收藏 / 最近 / 歌单成员 / 队列定位 / 缓存」跨源安全；必填 `source` 让所有产出点与构造点在 `tsc` 下**一次性报错、被迫处理**（尤其防止「QQ 曲目被当网易云解析」这类静默错误）；`SourceAdapter` 让「能力可缺」成为显式语义（缺失成员 → 路由回 501、前端隐藏入口），便于分阶段上线。
 - 为什么不选其他：① 把源塞进 id 字符串会让 URL 不透明、且 `encodeURIComponent` 后不可读，且仍有「忘记加前缀」的漏网点；③ 可选字段无法在编译期拦截漏设 `source` 的产出点（正是最危险的错误）。
 - 后果 / 已知边界：
@@ -367,7 +367,7 @@
   - **歌手详情**：`music.musichallSinger.SingerInfoInter.GetSingerDetail` **恒返回 104400**（无按-mid 取法），改用**按歌手名搜索**（演唱者页跳转携带 `?name=`，见路由 `artistDetail(id, cred, name)`）+ 按 mid 过滤；无名字时退化为最小档案。
   - **登录** QQ PT 扫码（`ptqrshow` → `ptqrlogin`，`hash33` 算 `ptqrtoken`），成功码映射为网易云 800/801/802/803 契约。
   - 另**保留**自研经典 `zzc` 签名 `qqSign` 及单测（当前请求**并不需要**，作为 h5 平台若被锁时的回退）。
-  完整能力面：`searchSongs/Albums/Artists/Playlists`、`albumDetail`、`artistDetail`、`playlistTracks`、`songUrl`、`getLyric`、`qr*`。
+    完整能力面：`searchSongs/Albums/Artists/Playlists`、`albumDetail`、`artistDetail`、`playlistTracks`、`songUrl`、`getLyric`、`qr*`。
 - 为什么选这个：与既有 `netease.ts` 的「归一化 + https 改写 + Set-Cookie 收敛」三段式同构；零新进程，保持「单进程同源」；QQ 私有 API 无论用不用第三方都存在「上游一变即碎」的风险，自研至少可控可调。
 - 为什么不选其他：① 引入第二个进程/端口/生命周期，违背 ADR-002「以函数形式调用，省掉一层进程与端口」的精神，部署变复杂；② 这类包多为薄封装且维护不稳，引入后仍要自己写归一化（`Track/Album/Artist` 是本项目专属形态），收益仅剩「签名」一处。
 - 现状与已知边界（**已实测校准**）：

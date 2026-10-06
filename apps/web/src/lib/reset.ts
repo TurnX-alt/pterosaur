@@ -1,5 +1,10 @@
 import { clearAllCaches, unregisterServiceWorkers } from './pwa.js'
-import { LIBRARY_STORE, MEDIA_META_STORE, MEDIA_STORE, idbClear } from './idb.js'
+import {
+  LIBRARY_STORE,
+  MEDIA_META_STORE,
+  MEDIA_STORE,
+  idbClear,
+} from './idb.js'
 
 /**
  * 「重置」：清空**本机**的全部内容 —— IndexedDB（资料库 + 媒体缓存）、Cache Storage
@@ -16,10 +21,16 @@ import { LIBRARY_STORE, MEDIA_META_STORE, MEDIA_STORE, idbClear } from './idb.js
  *
  * `reload` 可注入以便单测（jsdom 无法真实 reload）。
  */
-export async function resetAll(opts: { reload?: () => void } = {}): Promise<void> {
+export async function resetAll(
+  opts: { reload?: () => void } = {},
+): Promise<void> {
   // 任一清理失败都不阻断其余清理与最终刷新
   await Promise.allSettled([
-    Promise.allSettled([idbClear(LIBRARY_STORE), idbClear(MEDIA_STORE), idbClear(MEDIA_META_STORE)]),
+    Promise.allSettled([
+      idbClear(LIBRARY_STORE),
+      idbClear(MEDIA_STORE),
+      idbClear(MEDIA_META_STORE),
+    ]),
     clearAllCaches(),
     unregisterServiceWorkers(),
   ])

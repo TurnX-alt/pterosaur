@@ -40,7 +40,9 @@
  * 同一时刻只能有一个元素持名——展开态下本侧按钮加 `--vt-hidden` 让出此名（见 PlayerBar.tsx）。
  * `:not([data-theme-vt])`：主题转场期间只让根参与快照，封面让名、随整页一起被揭示。
  */
-:root[data-vt='on']:not([data-theme-vt]) .playerbar__cover-btn:not(.playerbar__cover-btn--vt-hidden) .cover {
+:root[data-vt='on']:not([data-theme-vt])
+  .playerbar__cover-btn:not(.playerbar__cover-btn--vt-hidden)
+  .cover {
   view-transition-name: np-cover;
 }
 
@@ -150,7 +152,7 @@
 @media (max-width: 860px) {
   .playerbar {
     grid-template-columns: 1fr auto;
-    grid-template-areas: "left right";
+    grid-template-areas: 'left right';
     grid-template-rows: auto;
     height: auto;
     padding: 8px 12px;
@@ -179,8 +181,8 @@
     display: none;
   }
 
-  .playerbar__right .icon-btn[aria-label="静音"],
-  .playerbar__right .icon-btn[aria-label="取消静音"] {
+  .playerbar__right .icon-btn[aria-label='静音'],
+  .playerbar__right .icon-btn[aria-label='取消静音'] {
     display: none;
   }
 

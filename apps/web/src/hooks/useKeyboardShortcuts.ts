@@ -23,7 +23,8 @@ export function useKeyboardShortcuts(onFocusSearch?: () => void): void {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
       const tag = target?.tagName
-      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable
+      const isTyping =
+        tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable
 
       // Esc 总是生效（关闭浮层）
       if (e.key === 'Escape') {

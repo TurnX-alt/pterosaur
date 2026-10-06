@@ -7,7 +7,10 @@ import {
 } from './playbackWatchdog.js'
 
 /** 构造「播放中」快照；默认 readyState 就绪。 */
-const playing = (currentTime: number, readyState = HAVE_FUTURE_DATA): PlaybackSnapshot => ({
+const playing = (
+  currentTime: number,
+  readyState = HAVE_FUTURE_DATA,
+): PlaybackSnapshot => ({
   paused: false,
   currentTime,
   readyState,
@@ -38,8 +41,12 @@ describe('isPrematureEnd（截断流导致的提前结束判定）', () => {
 describe('createWatchdog（停滞看门狗）', () => {
   it('暂停期间恒为 none 且不计数', () => {
     const w = createWatchdog()
-    expect(w.tick(0, { paused: true, currentTime: 10, readyState: 0 })).toBe('none')
-    expect(w.tick(100_000, { paused: true, currentTime: 10, readyState: 0 })).toBe('none')
+    expect(w.tick(0, { paused: true, currentTime: 10, readyState: 0 })).toBe(
+      'none',
+    )
+    expect(
+      w.tick(100_000, { paused: true, currentTime: 10, readyState: 0 }),
+    ).toBe('none')
     expect(w.retries()).toBe(0)
   })
 
@@ -53,14 +60,22 @@ describe('createWatchdog（停滞看门狗）', () => {
   })
 
   it('尚未起播（位置为 0）时不介入，交由起播超时兜底', () => {
-    const w = createWatchdog({ stallMs: 5000, maxRetries: 3, backoffMs: [10_000] })
+    const w = createWatchdog({
+      stallMs: 5000,
+      maxRetries: 3,
+      backoffMs: [10_000],
+    })
     expect(w.tick(0, playing(0, 0))).toBe('none')
     expect(w.tick(60_000, playing(0, 0))).toBe('none')
     expect(w.retries()).toBe(0)
   })
 
   it('停滞达到阈值后触发恢复，并遵守递增退避与次数上限', () => {
-    const w = createWatchdog({ stallMs: 5000, maxRetries: 3, backoffMs: [10_000, 15_000, 20_000] })
+    const w = createWatchdog({
+      stallMs: 5000,
+      maxRetries: 3,
+      backoffMs: [10_000, 15_000, 20_000],
+    })
     expect(w.tick(0, playing(30, 2))).toBe('none') // 初始化
     expect(w.tick(4000, playing(30, 2))).toBe('none') // 未达 5s
     expect(w.tick(5000, playing(30, 2))).toBe('recover') // 首次恢复
@@ -74,7 +89,11 @@ describe('createWatchdog（停滞看门狗）', () => {
   })
 
   it('恢复成功后计数清零（位置显著超过恢复点）', () => {
-    const w = createWatchdog({ stallMs: 5000, maxRetries: 3, backoffMs: [10_000] })
+    const w = createWatchdog({
+      stallMs: 5000,
+      maxRetries: 3,
+      backoffMs: [10_000],
+    })
     expect(w.tick(0, playing(30, 2))).toBe('none')
     expect(w.tick(5000, playing(30, 2))).toBe('recover')
     expect(w.retries()).toBe(1)
@@ -83,7 +102,11 @@ describe('createWatchdog（停滞看门狗）', () => {
   })
 
   it('暂停会复位恢复预算', () => {
-    const w = createWatchdog({ stallMs: 5000, maxRetries: 3, backoffMs: [10_000] })
+    const w = createWatchdog({
+      stallMs: 5000,
+      maxRetries: 3,
+      backoffMs: [10_000],
+    })
     expect(w.tick(0, playing(30, 2))).toBe('none')
     expect(w.tick(5000, playing(30, 2))).toBe('recover')
     expect(w.retries()).toBe(1)
@@ -92,7 +115,11 @@ describe('createWatchdog（停滞看门狗）', () => {
   })
 
   it('noteInterrupt 在预算内允许恢复，超限后拒绝', () => {
-    const w = createWatchdog({ stallMs: 5000, maxRetries: 3, backoffMs: [10_000] })
+    const w = createWatchdog({
+      stallMs: 5000,
+      maxRetries: 3,
+      backoffMs: [10_000],
+    })
     expect(w.noteInterrupt(0)).toBe(true)
     expect(w.noteInterrupt(0)).toBe(true)
     expect(w.noteInterrupt(0)).toBe(true)

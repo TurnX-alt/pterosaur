@@ -14,7 +14,10 @@ import { useSync } from '../store/sync.js'
  */
 
 /** LWW 决策：无云端数据 → 推送；云端更新 → 采用云端；否则推送本地。 */
-export function decideSync(localUpdatedAt: number, server: SyncEnvelope | null): 'push' | 'pull' {
+export function decideSync(
+  localUpdatedAt: number,
+  server: SyncEnvelope | null,
+): 'push' | 'pull' {
   if (!server) return 'push'
   return server.updatedAt > localUpdatedAt ? 'pull' : 'push'
 }
@@ -34,7 +37,14 @@ export function snapshotLibrary(): LibraryData {
 
 /** 空 library（重置时用于清空云端副本）。 */
 export function emptyLibrary(): LibraryData {
-  return { favorites: [], recent: [], playlists: [], savedPlaylists: [], savedArtists: [], savedAlbums: [] }
+  return {
+    favorites: [],
+    recent: [],
+    playlists: [],
+    savedPlaylists: [],
+    savedArtists: [],
+    savedAlbums: [],
+  }
 }
 
 /**
@@ -44,7 +54,10 @@ export function emptyLibrary(): LibraryData {
 let applying = false
 
 /** 把云端载荷写入本地 library（随 persist 落盘），期间抑制变更回推。 */
-export function applyPayload(state: Partial<LibraryData>, updatedAt: number): void {
+export function applyPayload(
+  state: Partial<LibraryData>,
+  updatedAt: number,
+): void {
   applying = true
   try {
     // 以空库为底、用云端载荷覆盖：云端可能来自旧版本、缺后续新增字段，缺省处即回落空值。
@@ -99,7 +112,9 @@ export function startLibrarySync(delayMs = 1500): () => void {
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => {
       timer = null
-      void pushLibrary().catch((e) => console.warn('[sync] 推送 library 失败', e))
+      void pushLibrary().catch((e) =>
+        console.warn('[sync] 推送 library 失败', e),
+      )
     }, delayMs)
   })
   return () => {

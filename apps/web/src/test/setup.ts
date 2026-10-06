@@ -1,12 +1,21 @@
 import '@testing-library/jest-dom/vitest'
-import { IDBKeyRange as FDBKeyRange, indexedDB as fakeIndexedDB } from 'fake-indexeddb'
+import {
+  IDBKeyRange as FDBKeyRange,
+  indexedDB as fakeIndexedDB,
+} from 'fake-indexeddb'
 import { afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 // jsdom 未实现 IndexedDB：注入 fake-indexeddb，供 library 持久化与音频缓存单测覆盖真实路径。
 // 必须在任何间接打开 IndexedDB 的模块被求值前完成（setup 先于测试文件执行）。
-Object.defineProperty(globalThis, 'indexedDB', { value: fakeIndexedDB, configurable: true })
-Object.defineProperty(globalThis, 'IDBKeyRange', { value: FDBKeyRange, configurable: true })
+Object.defineProperty(globalThis, 'indexedDB', {
+  value: fakeIndexedDB,
+  configurable: true,
+})
+Object.defineProperty(globalThis, 'IDBKeyRange', {
+  value: FDBKeyRange,
+  configurable: true,
+})
 
 // 每个测试后卸载 React 树，避免相互污染
 afterEach(() => {

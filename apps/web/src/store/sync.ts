@@ -46,7 +46,12 @@ export const useSync = create<SyncStore>()(
     }),
     {
       name: 'pterosaur-sync',
-      partialize: (s) => ({ enabled: s.enabled, source: s.source, accountId: s.accountId, updatedAt: s.updatedAt }),
+      partialize: (s) => ({
+        enabled: s.enabled,
+        source: s.source,
+        accountId: s.accountId,
+        updatedAt: s.updatedAt,
+      }),
     },
   ),
 )

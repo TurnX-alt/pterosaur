@@ -15,7 +15,13 @@ export function ConfirmDialog() {
   const settle = useConfirmDialog((s) => s.settle)
   const confirmRef = useRef<HTMLButtonElement | null>(null)
 
-  const { title, message, confirmText = '确定', cancelText = '取消', danger } = options
+  const {
+    title,
+    message,
+    confirmText = '确定',
+    cancelText = '取消',
+    danger,
+  } = options
 
   // 打开时聚焦确认按钮；Esc 视为取消
   useEffect(() => {
@@ -34,13 +40,26 @@ export function ConfirmDialog() {
   if (!open) return null
 
   return (
-    <div className="confirm-dialog" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="confirm-dialog__scrim" onClick={() => settle(false)} aria-hidden />
+    <div
+      className="confirm-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div
+        className="confirm-dialog__scrim"
+        onClick={() => settle(false)}
+        aria-hidden
+      />
       <div className="confirm-dialog__card">
         <h2 className="confirm-dialog__title">{title}</h2>
         {message && <p className="confirm-dialog__message">{message}</p>}
         <div className="confirm-dialog__actions">
-          <button type="button" className="confirm-dialog__btn confirm-dialog__btn--ghost" onClick={() => settle(false)}>
+          <button
+            type="button"
+            className="confirm-dialog__btn confirm-dialog__btn--ghost"
+            onClick={() => settle(false)}
+          >
             {cancelText}
           </button>
           <button

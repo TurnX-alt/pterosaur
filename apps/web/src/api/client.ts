@@ -13,7 +13,10 @@ import type {
 import { API_BASE } from '@pterosaur/shared/types'
 
 /** 统一的 GET JSON 请求，解析后端 `ApiResult` 包裹。 */
-async function get<T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> {
+async function get<T>(
+  path: string,
+  query?: Record<string, string | number | undefined>,
+): Promise<T> {
   const url = new URL(path, window.location.origin)
   if (query) {
     for (const [k, v] of Object.entries(query)) {
@@ -23,7 +26,9 @@ async function get<T>(path: string, query?: Record<string, string | number | und
   const res = await fetch(url.toString(), { credentials: 'include' })
   const json = (await res.json().catch(() => null)) as ApiResult<T> | null
   if (!json || !json.ok) {
-    const err = new Error(json?.error ?? `请求失败（${res.status}）`) as Error & {
+    const err = new Error(
+      json?.error ?? `请求失败（${res.status}）`,
+    ) as Error & {
       needLogin?: boolean
       status?: number
     }
@@ -35,7 +40,11 @@ async function get<T>(path: string, query?: Record<string, string | number | und
 }
 
 /** 带 JSON body 的写请求（POST / PUT），解析后端 `ApiResult` 包裹。 */
-async function send<T>(method: 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {
+async function send<T>(
+  method: 'POST' | 'PUT',
+  path: string,
+  body?: unknown,
+): Promise<T> {
   const res = await fetch(path, {
     method,
     credentials: 'include',
@@ -44,15 +53,19 @@ async function send<T>(method: 'POST' | 'PUT', path: string, body?: unknown): Pr
   })
   const json = (await res.json().catch(() => null)) as ApiResult<T> | null
   if (!json || !json.ok) {
-    const err = new Error(json?.error ?? `请求失败（${res.status}）`) as Error & { needLogin?: boolean }
+    const err = new Error(
+      json?.error ?? `请求失败（${res.status}）`,
+    ) as Error & { needLogin?: boolean }
     err.needLogin = json?.needLogin
     throw err
   }
   return json.data as T
 }
 
-const post = <T>(path: string, body?: unknown): Promise<T> => send<T>('POST', path, body)
-const put = <T>(path: string, body?: unknown): Promise<T> => send<T>('PUT', path, body)
+const post = <T>(path: string, body?: unknown): Promise<T> =>
+  send<T>('POST', path, body)
+const put = <T>(path: string, body?: unknown): Promise<T> =>
+  send<T>('PUT', path, body)
 
 export const api = {
   search: (source: MusicSource, keywords: string, limit = 30) =>
@@ -71,13 +84,18 @@ export const api = {
 
   /** 专辑详情：档案 + 曲目。 */
   album: (source: MusicSource, id: string) =>
-    get<{ album: Album; tracks: Track[] }>(`${API_BASE}/album/${source}/${encodeURIComponent(id)}`),
+    get<{ album: Album; tracks: Track[] }>(
+      `${API_BASE}/album/${source}/${encodeURIComponent(id)}`,
+    ),
 
   /** 某源支持的发现能力：`{ recommend, playlists, toplists }`（供前端隐藏不支持的 tab）。 */
   discoverCapabilities: (source: MusicSource) =>
-    get<{ recommend: boolean; playlists: boolean; toplists: boolean }>(`${API_BASE}/discover/capabilities`, {
-      source,
-    }),
+    get<{ recommend: boolean; playlists: boolean; toplists: boolean }>(
+      `${API_BASE}/discover/capabilities`,
+      {
+        source,
+      },
+    ),
 
   recommend: (source: MusicSource, limit = 12) =>
     get<Playlist[]>(`${API_BASE}/discover/recommend`, { limit, source }),
@@ -89,29 +107,41 @@ export const api = {
     get<Playlist[]>(`${API_BASE}/discover/playlists`, { limit, cat, source }),
 
   playlist: (source: MusicSource, id: string) =>
-    get<{ playlist: Playlist; tracks: Track[] }>(`${API_BASE}/playlist/${source}/${encodeURIComponent(id)}`),
+    get<{ playlist: Playlist; tracks: Track[] }>(
+      `${API_BASE}/playlist/${source}/${encodeURIComponent(id)}`,
+    ),
 
-  songs: (source: MusicSource, ids: string[]) => get<Track[]>(`${API_BASE}/songs`, { ids: ids.join(','), source }),
+  songs: (source: MusicSource, ids: string[]) =>
+    get<Track[]>(`${API_BASE}/songs`, { ids: ids.join(','), source }),
 
   lyric: (source: MusicSource, id: string) =>
     get<Lyric>(`${API_BASE}/lyric/${source}/${encodeURIComponent(id)}`),
 
-  authStatus: (source: MusicSource) => get<LoginStatus>(`${API_BASE}/auth/${source}/status`),
+  authStatus: (source: MusicSource) =>
+    get<LoginStatus>(`${API_BASE}/auth/${source}/status`),
 
-  qrCreate: (source: MusicSource) => get<{ key: string; qrimg: string }>(`${API_BASE}/auth/${source}/qr`),
+  qrCreate: (source: MusicSource) =>
+    get<{ key: string; qrimg: string }>(`${API_BASE}/auth/${source}/qr`),
 
   qrCheck: (source: MusicSource, key: string) =>
-    get<LoginStatus & { code?: number; message?: string }>(`${API_BASE}/auth/${source}/qr/check`, { key }),
+    get<LoginStatus & { code?: number; message?: string }>(
+      `${API_BASE}/auth/${source}/qr/check`,
+      { key },
+    ),
 
-  logout: (source: MusicSource) => post<LoginStatus>(`${API_BASE}/auth/${source}/logout`),
+  logout: (source: MusicSource) =>
+    post<LoginStatus>(`${API_BASE}/auth/${source}/logout`),
 
-  userPlaylists: (uid?: string) => get<Playlist[]>(`${API_BASE}/user/playlists`, { uid }),
+  userPlaylists: (uid?: string) =>
+    get<Playlist[]>(`${API_BASE}/user/playlists`, { uid }),
 
   /** 读取本人 library 的云端副本；`payload` 为 null 表示云端尚无数据。 */
-  syncGet: () => get<{ payload: SyncEnvelope | null }>(`${API_BASE}/sync/library`),
+  syncGet: () =>
+    get<{ payload: SyncEnvelope | null }>(`${API_BASE}/sync/library`),
 
   /** 覆盖写入本人 library 的云端副本（LWW）。 */
-  syncPut: (envelope: SyncEnvelope) => put<SyncEnvelope>(`${API_BASE}/sync/library`, envelope),
+  syncPut: (envelope: SyncEnvelope) =>
+    put<SyncEnvelope>(`${API_BASE}/sync/library`, envelope),
 }
 
 export type Api = typeof api

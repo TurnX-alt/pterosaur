@@ -37,11 +37,21 @@ export function RecentPage() {
       </header>
 
       <div className="detail__actions">
-        <button type="button" className="detail__play" onClick={() => handlePlay(false)} disabled={!recent.length}>
+        <button
+          type="button"
+          className="detail__play"
+          onClick={() => handlePlay(false)}
+          disabled={!recent.length}
+        >
           <Play size={18} fill="currentColor" strokeWidth={0} />
           播放
         </button>
-        <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!recent.length}>
+        <IconButton
+          label="随机播放"
+          size="lg"
+          onClick={() => handlePlay(true)}
+          disabled={!recent.length}
+        >
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
         {recent.length > 0 && (
@@ -65,7 +75,10 @@ export function RecentPage() {
 
       <div className="detail__list">
         {recent.length === 0 ? (
-          <Empty text="还没有播放记录，去发现一些好音乐吧" icon={<Clock size={32} strokeWidth={1.5} />} />
+          <Empty
+            text="还没有播放记录，去发现一些好音乐吧"
+            icon={<Clock size={32} strokeWidth={1.5} />}
+          />
         ) : (
           <TrackList tracks={recent} />
         )}

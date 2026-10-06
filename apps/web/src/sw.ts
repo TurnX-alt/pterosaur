@@ -33,7 +33,11 @@ import {
   touchCached,
 } from './lib/mediaCache.js'
 import { registerShellRoutes } from './lib/shellCache.js'
-import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
+import {
+  DEFAULT_SOURCE,
+  isMusicSource,
+  type MusicSource,
+} from '@pterosaur/shared/types'
 
 // —— 最小化 SW 全局类型声明：避免引入 `webworker` lib 与既有 `DOM` lib 产生重复标识符冲突 ——
 interface ExtendableEventLike extends Event {
@@ -47,9 +51,15 @@ interface MessageEventLike {
   data: unknown
 }
 interface ServiceWorkerGlobalScopeLike {
-  addEventListener(type: 'install' | 'activate', listener: (e: ExtendableEventLike) => void): void
+  addEventListener(
+    type: 'install' | 'activate',
+    listener: (e: ExtendableEventLike) => void,
+  ): void
   addEventListener(type: 'fetch', listener: (e: FetchEventLike) => void): void
-  addEventListener(type: 'message', listener: (e: MessageEventLike) => void): void
+  addEventListener(
+    type: 'message',
+    listener: (e: MessageEventLike) => void,
+  ): void
   readonly location: Location
   readonly clients: {
     claim(): Promise<void>
@@ -90,7 +100,9 @@ async function loadState(): Promise<void> {
   if (stale.length) {
     await deleteCached(stale)
     const staleSet = new Set(stale)
-    metaByKey = new Map(metas.filter((m) => !staleSet.has(m.key)).map((m) => [m.key, m]))
+    metaByKey = new Map(
+      metas.filter((m) => !staleSet.has(m.key)).map((m) => [m.key, m]),
+    )
   } else {
     metaByKey = new Map(metas.map((m) => [m.key, m]))
   }
@@ -100,7 +112,9 @@ async function loadState(): Promise<void> {
  * 从 `/stream/:source/:id?level=` 解析出源 / 曲目 id / 档位 / 缓存 key；
  * 非音频代理路径返回 null。2 段式 `/stream/:id`（旧格式）视为缺省源。
  */
-function keyFromStreamUrl(url: URL): { source: MusicSource; id: string; level: string; key: string } | null {
+function keyFromStreamUrl(
+  url: URL,
+): { source: MusicSource; id: string; level: string; key: string } | null {
   if (!url.pathname.startsWith(STREAM_PREFIX)) return null
   const rest = url.pathname.slice(STREAM_PREFIX.length)
   if (!rest) return null
@@ -121,7 +135,10 @@ function keyFromStreamUrl(url: URL): { source: MusicSource; id: string; level: s
 }
 
 /** 未命中时把整文件写入缓存并做 LRU 淘汰（音频与封面共用同一预算）。 */
-async function storeResponse(base: Omit<MediaMeta, 'size' | 'lastAccess'>, response: Response): Promise<void> {
+async function storeResponse(
+  base: Omit<MediaMeta, 'size' | 'lastAccess'>,
+  response: Response,
+): Promise<void> {
   const key = base.key
   if (inflight.has(key)) return
   inflight.add(key)
@@ -136,7 +153,12 @@ async function storeResponse(base: Omit<MediaMeta, 'size' | 'lastAccess'>, respo
     }
 
     const now = Date.now()
-    const meta: MediaMeta = { ...base, size: blob.size, lastAccess: now, cachedAt: now }
+    const meta: MediaMeta = {
+      ...base,
+      size: blob.size,
+      lastAccess: now,
+      cachedAt: now,
+    }
     await putCached(meta, blob)
     metaByKey.set(key, meta)
   } catch (err) {
@@ -147,7 +169,10 @@ async function storeResponse(base: Omit<MediaMeta, 'size' | 'lastAccess'>, respo
 }
 
 /** 命中缓存即返回其切片，并刷新 LRU 时间戳；已过期（封面超 7 天）则清除并按未命中处理。 */
-async function serveCached(key: string, rangeHeader: string | null): Promise<Response | null> {
+async function serveCached(
+  key: string,
+  rangeHeader: string | null,
+): Promise<Response | null> {
   const cached = await getCached(key)
   if (!cached) return null
   if (isExpired(cached.meta)) {
@@ -164,8 +189,12 @@ async function serveCached(key: string, rangeHeader: string | null): Promise<Res
 
 /** 通知受控页面：某曲目因 VIP / 版权受限需要登录（后端以 403 表达），并带上曲目所属源。 */
 async function notifyNeedLogin(source: MusicSource): Promise<void> {
-  const clients = await sw.clients.matchAll({ type: 'window', includeUncontrolled: true })
-  for (const client of clients) client.postMessage({ type: 'STREAM_NEED_LOGIN', source })
+  const clients = await sw.clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true,
+  })
+  for (const client of clients)
+    client.postMessage({ type: 'STREAM_NEED_LOGIN', source })
 }
 
 /** `/stream/*`：音频代理（Range 分段、整文件缓存）。 */
@@ -182,10 +211,16 @@ async function handleStream(
 
   // 未命中：取整文件（不转发 Range），失败则交由浏览器报错（响应头阶段带超时）
   const controller = new AbortController()
-  const headersTimer = setTimeout(() => controller.abort(), UPSTREAM_HEADERS_TIMEOUT_MS)
+  const headersTimer = setTimeout(
+    () => controller.abort(),
+    UPSTREAM_HEADERS_TIMEOUT_MS,
+  )
   let upstream: Response
   try {
-    upstream = await fetch(url.href, { credentials: 'same-origin', signal: controller.signal })
+    upstream = await fetch(url.href, {
+      credentials: 'same-origin',
+      signal: controller.signal,
+    })
   } catch {
     return Response.error()
   } finally {
@@ -202,19 +237,28 @@ async function handleStream(
   const contentType = upstream.headers.get('content-type') ?? ''
   if (!upstream.ok || !contentType.startsWith('audio/')) return upstream
 
-  void storeResponse({ key, kind: 'audio', source, trackId: id, level, mime: contentType }, upstream.clone())
+  void storeResponse(
+    { key, kind: 'audio', source, trackId: id, level, mime: contentType },
+    upstream.clone(),
+  )
   return upstream
 }
 
 /** 封面图片：命中即返；未命中以 CORS 拉取可读字节写入同一 IDB 池，失败则原样放行。 */
-async function handleImage(request: Request, url: URL, key: string): Promise<Response> {
+async function handleImage(
+  request: Request,
+  url: URL,
+  key: string,
+): Promise<Response> {
   const cached = await serveCached(key, null)
   if (cached) return cached
 
   // 原请求是 no-cors（`<img>`），其响应不可读；改以 CORS 重新拉取才能拿到字节写 IDB。
   let upstream: Response
   try {
-    upstream = await fetch(new Request(url.href, { mode: 'cors', credentials: 'omit' }))
+    upstream = await fetch(
+      new Request(url.href, { mode: 'cors', credentials: 'omit' }),
+    )
   } catch {
     return fetch(request)
   }
@@ -229,7 +273,10 @@ async function handleImage(request: Request, url: URL, key: string): Promise<Res
     }
   }
 
-  void storeResponse({ key, kind: 'image', mime: contentType }, upstream.clone())
+  void storeResponse(
+    { key, kind: 'image', mime: contentType },
+    upstream.clone(),
+  )
   return upstream
 }
 
@@ -266,7 +313,16 @@ sw.addEventListener('fetch', (event) => {
 
   const parsed = keyFromStreamUrl(url)
   if (parsed) {
-    event.respondWith(handleStream(request, url, parsed.source, parsed.id, parsed.level, parsed.key))
+    event.respondWith(
+      handleStream(
+        request,
+        url,
+        parsed.source,
+        parsed.id,
+        parsed.level,
+        parsed.key,
+      ),
+    )
     return
   }
 

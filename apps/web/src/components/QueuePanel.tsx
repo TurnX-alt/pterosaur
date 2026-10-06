@@ -21,12 +21,26 @@ export function QueuePanel() {
 
   return (
     <>
-      {open && <div className="queue-scrim" onClick={() => setOpen(false)} aria-hidden />}
-      <aside className={`queue-panel${open ? ' queue-panel--open' : ''}`} aria-hidden={!open} aria-label="播放队列">
+      {open && (
+        <div
+          className="queue-scrim"
+          onClick={() => setOpen(false)}
+          aria-hidden
+        />
+      )}
+      <aside
+        className={`queue-panel${open ? ' queue-panel--open' : ''}`}
+        aria-hidden={!open}
+        aria-label="播放队列"
+      >
         <div className="queue-panel__head">
           <h2>播放队列</h2>
           {queue.length > 0 && (
-            <button type="button" className="queue-panel__clear" onClick={clearQueue}>
+            <button
+              type="button"
+              className="queue-panel__clear"
+              onClick={clearQueue}
+            >
               <Trash2 size={14} /> 清空
             </button>
           )}
@@ -57,10 +71,17 @@ export function QueuePanel() {
                   <div className="queue-item__index">
                     {active ? <Play size={13} fill="currentColor" /> : i + 1}
                   </div>
-                  <Cover src={coverAt(t.cover, COVER_SMALL)} alt={t.title} radius="sm" size={40} />
+                  <Cover
+                    src={coverAt(t.cover, COVER_SMALL)}
+                    alt={t.title}
+                    radius="sm"
+                    size={40}
+                  />
                   <div className="queue-item__meta">
                     <div className="queue-item__title ellipsis">{t.title}</div>
-                    <div className="queue-item__artist ellipsis">{t.artist}</div>
+                    <div className="queue-item__artist ellipsis">
+                      {t.artist}
+                    </div>
                   </div>
                   <IconButton
                     label="从队列移除"

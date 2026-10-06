@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { formatTime, streamUrl, sourceOf, keyOf, isMusicSource } from './types.js'
+import {
+  formatTime,
+  streamUrl,
+  sourceOf,
+  keyOf,
+  isMusicSource,
+} from './types.js'
 import type { MusicSource } from './types.js'
 
 describe('formatTime', () => {
@@ -36,7 +42,9 @@ describe('streamUrl', () => {
   })
 
   it('附带 level 参数', () => {
-    expect(streamUrl('netease', '123', { level: 'lossless' })).toBe('/stream/netease/123?level=lossless')
+    expect(streamUrl('netease', '123', { level: 'lossless' })).toBe(
+      '/stream/netease/123?level=lossless',
+    )
   })
 
   it('附带 token 参数', () => {
@@ -56,7 +64,9 @@ describe('sourceOf / keyOf', () => {
   it('两源共享原始 id 产生不同身份键', () => {
     expect(keyOf({ source: 'netease', id: '1' })).toBe('netease:1')
     expect(keyOf({ source: 'qq', id: '1' })).toBe('qq:1')
-    expect(keyOf({ source: 'netease', id: '1' })).not.toBe(keyOf({ source: 'qq', id: '1' }))
+    expect(keyOf({ source: 'netease', id: '1' })).not.toBe(
+      keyOf({ source: 'qq', id: '1' }),
+    )
   })
 })
 

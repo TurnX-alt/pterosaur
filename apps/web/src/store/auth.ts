@@ -29,9 +29,14 @@ export type AuthStore = AuthState & AuthActions
 
 /** 生成「每源一份」的全假登录态 / 加载态。 */
 const emptyStatus = (): Record<MusicSource, LoginStatus> =>
-  Object.fromEntries(MUSIC_SOURCES.map((s) => [s, { logged: false }])) as Record<MusicSource, LoginStatus>
+  Object.fromEntries(
+    MUSIC_SOURCES.map((s) => [s, { logged: false }]),
+  ) as Record<MusicSource, LoginStatus>
 const emptyLoaded = (): Record<MusicSource, boolean> =>
-  Object.fromEntries(MUSIC_SOURCES.map((s) => [s, false])) as Record<MusicSource, boolean>
+  Object.fromEntries(MUSIC_SOURCES.map((s) => [s, false])) as Record<
+    MusicSource,
+    boolean
+  >
 
 export const useAuth = create<AuthStore>()((set) => ({
   status: emptyStatus(),
@@ -50,19 +55,29 @@ export const useAuth = create<AuthStore>()((set) => ({
         } catch {
           st = { logged: false }
         }
-        set((state) => ({ status: { ...state.status, [s]: st }, loaded: { ...state.loaded, [s]: true } }))
+        set((state) => ({
+          status: { ...state.status, [s]: st },
+          loaded: { ...state.loaded, [s]: true },
+        }))
       }),
     )
   },
 
-  openModal: (source) => set({ modalOpen: true, modalSource: source ?? DEFAULT_SOURCE, error: null }),
+  openModal: (source) =>
+    set({
+      modalOpen: true,
+      modalSource: source ?? DEFAULT_SOURCE,
+      error: null,
+    }),
   closeModal: () => set({ modalOpen: false, error: null }),
 
   logout: async (source) => {
     try {
       await api.logout(source)
     } finally {
-      set((state) => ({ status: { ...state.status, [source]: { logged: false } } }))
+      set((state) => ({
+        status: { ...state.status, [source]: { logged: false } },
+      }))
     }
   },
 
@@ -95,7 +110,9 @@ export function isLoggedAny(status: Record<MusicSource, LoginStatus>): boolean {
  * 当前**活动源**——最多一个源登录；未登录返回 `null`。
  * 退出 / 云同步锚点 / 搜索默认源 / 首页·浏览推荐都跟随它。
  */
-export function activeSource(status: Record<MusicSource, LoginStatus>): MusicSource | null {
+export function activeSource(
+  status: Record<MusicSource, LoginStatus>,
+): MusicSource | null {
   for (const s of MUSIC_SOURCES) if (status[s]?.logged) return s
   return null
 }

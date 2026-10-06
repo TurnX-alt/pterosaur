@@ -22,12 +22,18 @@ export function FavoritesPage() {
   // 翻录进度：从全局 store 认领「我喜欢的音乐」那份（切走再回自动恢复）
   const ripKey = 'favorites'
   const ripJob = useRip((s) => s.job)
-  const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
+  const myRip =
+    ripJob?.key === ripKey
+      ? { current: ripJob.current, total: ripJob.total }
+      : null
 
   const handlePlay = (shuffle = false) => {
     if (!favorites.length) return
     if (shuffle && !usePlayer.getState().shuffle) toggleShuffle()
-    playTracks(favorites, shuffle ? Math.floor(Math.random() * favorites.length) : 0)
+    playTracks(
+      favorites,
+      shuffle ? Math.floor(Math.random() * favorites.length) : 0,
+    )
   }
 
   const handleDownloadPlaylist = async () => {
@@ -40,7 +46,12 @@ export function FavoritesPage() {
       confirmText: '开始翻录',
     })
     if (!ok) return
-    await runRip({ key: ripKey, tracks: favorites, zipName: '我喜欢的音乐', level })
+    await runRip({
+      key: ripKey,
+      tracks: favorites,
+      zipName: '我喜欢的音乐',
+      level,
+    })
   }
 
   const totalDuration = favorites.reduce((sum, t) => sum + (t.duration || 0), 0)
@@ -56,29 +67,46 @@ export function FavoritesPage() {
           <h1 className="detail__name">我喜欢的音乐</h1>
           <p className="detail__meta">
             <span>{favorites.length} 首</span>
-            {totalDuration > 0 && <span> · 约 {Math.round(totalDuration / 60)} 分钟</span>}
+            {totalDuration > 0 && (
+              <span> · 约 {Math.round(totalDuration / 60)} 分钟</span>
+            )}
           </p>
         </div>
       </header>
 
       <div className="detail__actions">
-        <button type="button" className="detail__play" onClick={() => handlePlay(false)} disabled={!favorites.length}>
+        <button
+          type="button"
+          className="detail__play"
+          onClick={() => handlePlay(false)}
+          disabled={!favorites.length}
+        >
           <Play size={18} fill="currentColor" strokeWidth={0} />
           播放
         </button>
-        <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!favorites.length}>
+        <IconButton
+          label="随机播放"
+          size="lg"
+          onClick={() => handlePlay(true)}
+          disabled={!favorites.length}
+        >
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
         <RipButton
           progress={myRip}
-          disabled={!favorites.length || (ripJob !== null && ripJob.key !== ripKey)}
+          disabled={
+            !favorites.length || (ripJob !== null && ripJob.key !== ripKey)
+          }
           onClick={handleDownloadPlaylist}
         />
       </div>
 
       <div className="detail__list">
         {favorites.length === 0 ? (
-          <Empty text="还没有喜欢的音乐，点击曲目行的红心收藏" icon={<Heart size={32} strokeWidth={1.5} />} />
+          <Empty
+            text="还没有喜欢的音乐，点击曲目行的红心收藏"
+            icon={<Heart size={32} strokeWidth={1.5} />}
+          />
         ) : (
           <TrackList tracks={favorites} />
         )}

@@ -18,7 +18,15 @@ interface CoverProps {
 /**
  * 封面图。带加载占位、失败兜底（显示唱片图标）。
  */
-export function Cover({ src, alt, radius = 'md', rounded, className, size, draggable }: CoverProps) {
+export function Cover({
+  src,
+  alt,
+  radius = 'md',
+  rounded,
+  className,
+  size,
+  draggable,
+}: CoverProps) {
   // 已预取 / 已展示过的封面：首帧即视为就绪、直接显色，供 View Transition 同步快照拍到成图
   const [loaded, setLoaded] = useState(() => isCoverReady(src))
   const [failed, setFailed] = useState(false)

@@ -62,17 +62,29 @@ export interface Watchdog {
  * 判断 `ended` 是否由「流被截断」引起：`audio.duration` 被钳短到实际收到的时长，
  * 因而显著短于曲目元数据时长即视为截断。元数据缺失、或差异未达双阈值时不干预，避免误判。
  */
-export function isPrematureEnd(audioDuration: number, trackDuration: number | undefined): boolean {
+export function isPrematureEnd(
+  audioDuration: number,
+  trackDuration: number | undefined,
+): boolean {
   if (!Number.isFinite(audioDuration) || audioDuration <= 0) return false
-  if (typeof trackDuration !== 'number' || !Number.isFinite(trackDuration) || trackDuration <= 0) {
+  if (
+    typeof trackDuration !== 'number' ||
+    !Number.isFinite(trackDuration) ||
+    trackDuration <= 0
+  ) {
     return false
   }
   const diff = trackDuration - audioDuration
-  return diff > PREMATURE_END_MIN_DIFF && diff / trackDuration > PREMATURE_END_MIN_RATIO
+  return (
+    diff > PREMATURE_END_MIN_DIFF &&
+    diff / trackDuration > PREMATURE_END_MIN_RATIO
+  )
 }
 
 /** 创建看门狗状态机（无副作用，时间由调用方注入以便测试）。 */
-export function createWatchdog(config: WatchdogConfig = DEFAULT_WATCHDOG_CONFIG): Watchdog {
+export function createWatchdog(
+  config: WatchdogConfig = DEFAULT_WATCHDOG_CONFIG,
+): Watchdog {
   let retries = 0
   /** 上次确认「有进展」的时刻；-1 表示尚未初始化。 */
   let lastProgressAt = -1
@@ -84,7 +96,9 @@ export function createWatchdog(config: WatchdogConfig = DEFAULT_WATCHDOG_CONFIG)
   let nextRetryAt = 0
 
   const backoffFor = (n: number): number =>
-    config.backoffMs.length ? config.backoffMs[Math.min(n - 1, config.backoffMs.length - 1)] : 0
+    config.backoffMs.length
+      ? config.backoffMs[Math.min(n - 1, config.backoffMs.length - 1)]
+      : 0
 
   const clearRecovery = () => {
     retries = 0
@@ -115,12 +129,14 @@ export function createWatchdog(config: WatchdogConfig = DEFAULT_WATCHDOG_CONFIG)
         return 'none'
       }
       // 有进展：readyState 足够或时间在前进
-      const progressed = s.readyState >= HAVE_FUTURE_DATA || s.currentTime > lastTime + 0.01
+      const progressed =
+        s.readyState >= HAVE_FUTURE_DATA || s.currentTime > lastTime + 0.01
       lastTime = s.currentTime
       if (progressed) {
         lastProgressAt = now
         // 恢复成功：位置显著超过恢复点，清零重试预算
-        if (recoverBaseline >= 0 && s.currentTime > recoverBaseline + 1) clearRecovery()
+        if (recoverBaseline >= 0 && s.currentTime > recoverBaseline + 1)
+          clearRecovery()
         return 'none'
       }
       // 停滞：静默与退避都满足后才动作

@@ -142,7 +142,12 @@ export function LoginModal() {
   }, [closeModal])
 
   return (
-    <div className="login-modal" role="dialog" aria-modal="true" aria-label={joinLabel('登录', source)}>
+    <div
+      className="login-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label={joinLabel('登录', source)}
+    >
       <div className="login-modal__scrim" onClick={closeModal} aria-hidden />
       <div className="login-modal__card">
         <header className="login-modal__head">
@@ -179,7 +184,11 @@ export function LoginModal() {
               <Loader2 size={28} className="spinner" />
             )}
             {stage === 'expired' && (
-              <button type="button" className="login-modal__qr-refresh" onClick={() => void startQr(source)}>
+              <button
+                type="button"
+                className="login-modal__qr-refresh"
+                onClick={() => void startQr(source)}
+              >
                 点击刷新
               </button>
             )}
@@ -192,7 +201,11 @@ export function LoginModal() {
           <p className="login-modal__qr-text">{stageText(source)[stage]}</p>
         </div>
 
-        {error && <p className="login-modal__error" role="alert">{error}</p>}
+        {error && (
+          <p className="login-modal__error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   )

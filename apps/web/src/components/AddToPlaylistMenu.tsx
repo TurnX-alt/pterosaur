@@ -12,7 +12,10 @@ interface AddToPlaylistMenuProps {
   /** 菜单展开方向：默认向下；位于屏幕底部（如播放条）时用 `up` 向上弹出。 */
   direction?: 'down' | 'up'
   /** 触发按钮的渲染（由调用方决定外观），点击后打开菜单 */
-  children: (props: { onClick: (e: React.MouseEvent) => void; open: boolean }) => React.ReactNode
+  children: (props: {
+    onClick: (e: React.MouseEvent) => void
+    open: boolean
+  }) => React.ReactNode
 }
 
 /**
@@ -21,7 +24,11 @@ interface AddToPlaylistMenuProps {
  * 点击某歌单一次为加入，再点一次为从中移除（切换态）。
  * 采用受控浮层 + 点击外部关闭；菜单锚定在触发按钮附近。
  */
-export function AddToPlaylistMenu({ track, direction = 'down', children }: AddToPlaylistMenuProps) {
+export function AddToPlaylistMenu({
+  track,
+  direction = 'down',
+  children,
+}: AddToPlaylistMenuProps) {
   const [open, setOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<string | null>(null)
@@ -34,7 +41,8 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
+        setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -63,9 +71,20 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
 
   return (
     <div className={`atp${direction === 'up' ? ' atp--up' : ''}`} ref={wrapRef}>
-      {children({ onClick: (e) => { e.stopPropagation(); setDownloadError(null); setOpen((v) => !v) }, open })}
+      {children({
+        onClick: (e) => {
+          e.stopPropagation()
+          setDownloadError(null)
+          setOpen((v) => !v)
+        },
+        open,
+      })}
       {open && (
-        <div className="atp__menu" role="menu" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="atp__menu"
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
             role="menuitem"
@@ -73,7 +92,11 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
             onClick={handleDownload}
             disabled={downloading}
           >
-            {downloading ? <Loader2 size={16} className="atp__spin" /> : <Download size={16} />}
+            {downloading ? (
+              <Loader2 size={16} className="atp__spin" />
+            ) : (
+              <Download size={16} />
+            )}
             <span>{downloading ? '正在下载…' : '下载到本地'}</span>
           </button>
 
@@ -97,7 +120,11 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
                         else addToPlaylist(p.id, track)
                       }}
                     >
-                      {inList ? <Check size={16} className="atp__check" /> : <Plus size={16} />}
+                      {inList ? (
+                        <Check size={16} className="atp__check" />
+                      ) : (
+                        <Plus size={16} />
+                      )}
                       <span className="ellipsis">{p.name}</span>
                     </button>
                   )
@@ -107,7 +134,9 @@ export function AddToPlaylistMenu({ track, direction = 'down', children }: AddTo
           )}
 
           {playlists.length === 0 && (
-            <div className="atp__empty">还没有歌单，可在侧边栏「资料库」处新建</div>
+            <div className="atp__empty">
+              还没有歌单，可在侧边栏「资料库」处新建
+            </div>
           )}
         </div>
       )}

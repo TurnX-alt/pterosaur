@@ -1,6 +1,14 @@
 import { canonicalNeteaseImage } from '@pterosaur/shared/image'
 import { DEFAULT_AUDIO_LEVEL, type MusicSource } from '@pterosaur/shared/types'
-import { MEDIA_META_STORE, MEDIA_STORE, idbClear, idbDelete, idbGet, idbGetAll, idbPut } from './idb.js'
+import {
+  MEDIA_META_STORE,
+  MEDIA_STORE,
+  idbClear,
+  idbDelete,
+  idbGet,
+  idbGetAll,
+  idbPut,
+} from './idb.js'
 
 /**
  * 媒体缓存（音频 + 封面）的领域逻辑与 IndexedDB 存取。
@@ -59,7 +67,11 @@ export interface CachedMedia {
  * 前缀带源（`<source>:<id>`，与 `keyOf` 同形）：不同源的曲目可能共享同一原始 id，
  * 不带源会让源 A 的缓存被源 B 命中、播放/下载到**完全错误的音频**。
  */
-export function audioKey(source: MusicSource, id: string, level: string = DEFAULT_LEVEL): string {
+export function audioKey(
+  source: MusicSource,
+  id: string,
+  level: string = DEFAULT_LEVEL,
+): string {
   return `${source}:${id}|${level}`
 }
 
@@ -71,7 +83,10 @@ export function audioKey(source: MusicSource, id: string, level: string = DEFAUL
  * 新数据还是旧持久化数据，都落在同一条缓存上。
  */
 export function imageKey(url: string | URL): string {
-  return IMAGE_PREFIX + canonicalNeteaseImage(typeof url === 'string' ? url : url.href)
+  return (
+    IMAGE_PREFIX +
+    canonicalNeteaseImage(typeof url === 'string' ? url : url.href)
+  )
 }
 
 /** 结合浏览器配额计算有效容量上限。 */
@@ -84,7 +99,10 @@ export function effectiveCap(quota: number | null | undefined): number {
  * 解析 HTTP Range 头，返回闭区间 `[start, end]`；不可满足时返回 `null`。
  * 支持 `bytes=start-end`、`bytes=start-`、`bytes=-suffix` 三种形式。
  */
-export function parseRange(header: string, size: number): { start: number; end: number } | null {
+export function parseRange(
+  header: string,
+  size: number,
+): { start: number; end: number } | null {
   const m = /^bytes=(\d*)-(\d*)$/.exec(header.trim())
   if (!m) return null
   const startRaw = m[1]
@@ -109,7 +127,11 @@ export function parseRange(header: string, size: number): { start: number; end: 
 }
 
 /** 基于缓存的 blob 构造响应：无 Range 返回 200，有 Range 返回 206 切片。 */
-export function responseFromBlob(meta: MediaMeta, blob: Blob, rangeHeader: string | null): Response {
+export function responseFromBlob(
+  meta: MediaMeta,
+  blob: Blob,
+  rangeHeader: string | null,
+): Response {
   const baseHeaders: Record<string, string> = {
     'Content-Type': meta.mime,
     'Accept-Ranges': 'bytes',
@@ -140,7 +162,11 @@ export function responseFromBlob(meta: MediaMeta, blob: Blob, rangeHeader: strin
  * 音频与封面共用同一份元数据，故淘汰在同一预算内跨类别进行。
  * 纯函数，便于单测；SW 侧再据此删除对应 blob 与元数据。
  */
-export function pickEvictions(metas: MediaMeta[], capBytes: number, incomingSize: number): string[] {
+export function pickEvictions(
+  metas: MediaMeta[],
+  capBytes: number,
+  incomingSize: number,
+): string[] {
   const total = metas.reduce((sum, m) => sum + m.size, 0)
   if (total + incomingSize <= capBytes) return []
   const sorted = [...metas].sort((a, b) => a.lastAccess - b.lastAccess)
@@ -166,7 +192,10 @@ export function isExpired(meta: MediaMeta, now: number = Date.now()): boolean {
 }
 
 /** 从元数据列表筛出所有已过期的缓存 key（供启动期清扫）。 */
-export function expiredKeys(metas: MediaMeta[], now: number = Date.now()): string[] {
+export function expiredKeys(
+  metas: MediaMeta[],
+  now: number = Date.now(),
+): string[] {
   return metas.filter((m) => isExpired(m, now)).map((m) => m.key)
 }
 
@@ -189,7 +218,10 @@ export async function putCached(meta: MediaMeta, blob: Blob): Promise<void> {
 }
 
 /** 更新某条缓存的最后访问时间。 */
-export async function touchCached(key: string, now: number = Date.now()): Promise<void> {
+export async function touchCached(
+  key: string,
+  now: number = Date.now(),
+): Promise<void> {
   const meta = await idbGet<MediaMeta>(MEDIA_META_STORE, key)
   if (!meta) return
   meta.lastAccess = now
@@ -243,7 +275,8 @@ export async function mediaUsage(): Promise<MediaUsage> {
 
 /** 申请持久化存储并读取浏览器配额（不可用时返回 null）。 */
 export async function requestPersistentQuota(): Promise<number | null> {
-  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate)
+    return null
   try {
     await navigator.storage.persist?.()
     const { quota } = await navigator.storage.estimate()

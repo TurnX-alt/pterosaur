@@ -15,7 +15,8 @@ if (!rootEl) throw new Error('找不到 #root 挂载点')
  * 该 SW 只拦截 `/stream/*`（音频代理），其余请求原样放行，故对路由与 HMR 无影响。
  */
 function registerServiceWorker(): void {
-  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator))
+    return
   const isProd = import.meta.env.PROD
   const url = isProd ? '/sw.js' : '/src/sw.ts'
   // 生产：经典 SW（injectManifest 以 IIFE 产出），禁用 HTTP 缓存以免注册脚本本身陈旧；
@@ -34,11 +35,14 @@ function registerServiceWorker(): void {
  * 音频元素的 error 事件无法区分「网络失败」与「版权受限」，故登录引导只据此后端信号。
  */
 function listenServiceWorkerMessages(): void {
-  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator))
+    return
   navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
     const data = event.data as { type?: string; source?: MusicSource } | null
     if (data?.type === 'STREAM_NEED_LOGIN') {
-      usePlayer.getState().setPlayError('该曲目暂不可播放', true, data.source ?? null)
+      usePlayer
+        .getState()
+        .setPlayError('该曲目暂不可播放', true, data.source ?? null)
     }
   })
 }

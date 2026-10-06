@@ -8,7 +8,13 @@
  * 变化；二维码过期会自动换一张新码。只依赖 Node 内置 + 现有 `netease.ts` 与 `qrcode`。
  */
 import QRCode from 'qrcode'
-import { cookieHeaderFromSetCookies, loginStatus, qrCheck, qrKey, qrLoginUrl } from '../sources/netease.js'
+import {
+  cookieHeaderFromSetCookies,
+  loginStatus,
+  qrCheck,
+  qrKey,
+  qrLoginUrl,
+} from '../sources/netease.js'
 import { ENV_PATH, upsertEnv } from '../env.js'
 
 const TIMEOUT_MS = 5 * 60 * 1000
@@ -46,7 +52,9 @@ async function showQr(): Promise<void> {
   lastLogged = ''
 
   const art = await QRCode.toString(url, { type: 'terminal', small: true })
-  console.log('\n[pterosaur] 用网易云音乐 App 扫描下方二维码，并在手机上确认：\n')
+  console.log(
+    '\n[pterosaur] 用网易云音乐 App 扫描下方二维码，并在手机上确认：\n',
+  )
   console.log(art)
   resetTimeout()
 }
@@ -73,7 +81,9 @@ async function poll(): Promise<void> {
     const st = await loginStatus(cookie)
     console.log(`\n[pterosaur] 登录成功：${st.nickname ?? '（未知）'}`)
     console.log(`[pterosaur] 凭证已写入 ${ENV_PATH}`)
-    console.log('[pterosaur] 重启服务（pnpm dev / pnpm start）后对未登录访客生效。\n')
+    console.log(
+      '[pterosaur] 重启服务（pnpm dev / pnpm start）后对未登录访客生效。\n',
+    )
     shutdown(0)
     return
   }
@@ -105,7 +115,11 @@ function parseSource(): 'netease' | 'qq' {
   const args = process.argv.slice(2)
   const inline = args.find((a) => a.startsWith('--source='))
   const idx = args.indexOf('--source')
-  const val = inline ? inline.split('=')[1] : idx >= 0 ? args[idx + 1] : undefined
+  const val = inline
+    ? inline.split('=')[1]
+    : idx >= 0
+      ? args[idx + 1]
+      : undefined
   return val === 'qq' ? 'qq' : 'netease'
 }
 
@@ -113,8 +127,12 @@ async function main(): Promise<void> {
   const source = parseSource()
   if (source !== 'netease') {
     // QQ 的二维码是上游直接返回的 PNG 图片，没有可渲染的「内容字符串」，终端无法出图。
-    console.error('\n[pterosaur] QQ 音乐缺省凭证暂不支持命令行扫码（二维码为图片，无法在终端渲染）。')
-    console.error('[pterosaur] 请在应用内「登录」处选择 QQ 音乐扫码；网易云缺省凭证请用 pnpm log-in。\n')
+    console.error(
+      '\n[pterosaur] QQ 音乐缺省凭证暂不支持命令行扫码（二维码为图片，无法在终端渲染）。',
+    )
+    console.error(
+      '[pterosaur] 请在应用内「登录」处选择 QQ 音乐扫码；网易云缺省凭证请用 pnpm log-in。\n',
+    )
     shutdown(1)
     return
   }

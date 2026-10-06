@@ -26,7 +26,10 @@ const emptyState = (): LibraryState => ({
   savedAlbums: [],
 })
 
-const envelope = (state: LibraryState): StorageValue<LibraryState> => ({ state, version: 0 })
+const envelope = (state: LibraryState): StorageValue<LibraryState> => ({
+  state,
+  version: 0,
+})
 
 beforeEach(async () => {
   localStorage.clear()

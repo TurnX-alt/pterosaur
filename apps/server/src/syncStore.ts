@@ -36,7 +36,13 @@ function sanitizeId(userId: string): string {
 }
 
 /** 形状校验要求的基础集合字段（自首个版本即存在，缺失即视为非法载荷）。 */
-const COLLECTIONS = ['favorites', 'recent', 'playlists', 'savedPlaylists', 'savedAlbums'] as const
+const COLLECTIONS = [
+  'favorites',
+  'recent',
+  'playlists',
+  'savedPlaylists',
+  'savedAlbums',
+] as const
 
 /**
  * 形状校验：`{ state: LibraryData, updatedAt: number }`。
@@ -57,7 +63,10 @@ export function isSyncEnvelope(v: unknown): v is SyncEnvelope {
 }
 
 /** 读取某用户的 library；不存在或损坏时返回 `null`。 */
-export async function readLibrary(userId: string, dir?: string): Promise<SyncEnvelope | null> {
+export async function readLibrary(
+  userId: string,
+  dir?: string,
+): Promise<SyncEnvelope | null> {
   try {
     const raw = await readFile(fileFor(userId, dir), 'utf8')
     const parsed: unknown = JSON.parse(raw)
@@ -72,10 +81,15 @@ export async function readLibrary(userId: string, dir?: string): Promise<SyncEnv
  *
  * @throws 当载荷非法或超过 {@link MAX_PAYLOAD_BYTES} 时抛出，供路由层回 400。
  */
-export async function writeLibrary(userId: string, envelope: SyncEnvelope, dir?: string): Promise<void> {
+export async function writeLibrary(
+  userId: string,
+  envelope: SyncEnvelope,
+  dir?: string,
+): Promise<void> {
   if (!isSyncEnvelope(envelope)) throw new Error('非法的同步载荷')
   const json = JSON.stringify(envelope)
-  if (Buffer.byteLength(json, 'utf8') > MAX_PAYLOAD_BYTES) throw new Error('同步载荷过大')
+  if (Buffer.byteLength(json, 'utf8') > MAX_PAYLOAD_BYTES)
+    throw new Error('同步载荷过大')
 
   const target = fileFor(userId, dir)
   const tmp = `${target}.tmp`
@@ -85,6 +99,9 @@ export async function writeLibrary(userId: string, envelope: SyncEnvelope, dir?:
 }
 
 /** 清空某用户的 library（删除文件）；不存在时静默。 */
-export async function clearLibrary(userId: string, dir?: string): Promise<void> {
+export async function clearLibrary(
+  userId: string,
+  dir?: string,
+): Promise<void> {
   await rm(fileFor(userId, dir), { force: true })
 }

@@ -1,4 +1,13 @@
-import type { Album, Artist, AudioLevel, LoginStatus, Lyric, MusicSource, Playlist, Track } from '@pterosaur/shared/types'
+import type {
+  Album,
+  Artist,
+  AudioLevel,
+  LoginStatus,
+  Lyric,
+  MusicSource,
+  Playlist,
+  Track,
+} from '@pterosaur/shared/types'
 
 /** 扫码轮询结果，`code` 沿用网易云契约：800 过期 / 801 等待 / 802 待确认 / 803 成功。 */
 export interface QrCheckResult {
@@ -23,7 +32,10 @@ export interface SourceAdapter {
 
   /* ---- 内容（必选） ---- */
   searchSongs(keywords: string, limit: number, cred?: string): Promise<Track[]>
-  albumDetail(id: string, cred?: string): Promise<{ album: Album; tracks: Track[] }>
+  albumDetail(
+    id: string,
+    cred?: string,
+  ): Promise<{ album: Album; tracks: Track[] }>
   /** 解析播放地址；`level` 为**抽象音质档位**（见 shared `AudioLevel`），各源自行映射/降级。 */
   songUrl(id: string, cred?: string, level?: AudioLevel): Promise<string | null>
   getLyric(id: string, cred?: string): Promise<Lyric>
@@ -38,11 +50,30 @@ export interface SourceAdapter {
   streamHeaders?(id: string): Record<string, string>
 
   /* ---- 内容（可选能力） ---- */
-  searchArtists?(keywords: string, limit: number, cred?: string): Promise<Artist[]>
-  searchAlbums?(keywords: string, limit: number, cred?: string): Promise<Album[]>
-  searchPlaylists?(keywords: string, limit: number, cred?: string): Promise<Playlist[]>
-  artistDetail?(id: string, cred?: string, name?: string): Promise<{ artist: Artist; tracks: Track[]; albums: Album[] }>
-  playlistTracks?(id: string, cred?: string): Promise<{ playlist: Playlist; tracks: Track[] }>
+  searchArtists?(
+    keywords: string,
+    limit: number,
+    cred?: string,
+  ): Promise<Artist[]>
+  searchAlbums?(
+    keywords: string,
+    limit: number,
+    cred?: string,
+  ): Promise<Album[]>
+  searchPlaylists?(
+    keywords: string,
+    limit: number,
+    cred?: string,
+  ): Promise<Playlist[]>
+  artistDetail?(
+    id: string,
+    cred?: string,
+    name?: string,
+  ): Promise<{ artist: Artist; tracks: Track[]; albums: Album[] }>
+  playlistTracks?(
+    id: string,
+    cred?: string,
+  ): Promise<{ playlist: Playlist; tracks: Track[] }>
   songDetail?(ids: string[], cred?: string): Promise<Track[]>
 
   /* ---- 发现（可选能力；首页/浏览的推荐） ---- */

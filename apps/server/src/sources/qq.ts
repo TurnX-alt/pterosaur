@@ -16,7 +16,16 @@
  */
 import { createHash } from 'node:crypto'
 import { LRUCache } from 'lru-cache'
-import { DEFAULT_AUDIO_LEVEL, type Album, type Artist, type AudioLevel, type LoginStatus, type Lyric, type Playlist, type Track } from '@pterosaur/shared/types'
+import {
+  DEFAULT_AUDIO_LEVEL,
+  type Album,
+  type Artist,
+  type AudioLevel,
+  type LoginStatus,
+  type Lyric,
+  type Playlist,
+  type Track,
+} from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
 import { COVER_LARGE } from '@pterosaur/shared/image'
 import type { QrCheckResult, SourceAdapter } from './types.js'
@@ -27,8 +36,10 @@ const REFERER = 'https://y.qq.com/'
 
 const ALBUM_API = 'https://c.y.qq.com/v8/fcg-bin/fcg_v8_album_info_cp.fcg'
 const LYRIC_API = 'https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg'
-const PLAYLIST_API = 'https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg'
-const DISS_TAG_API = 'https://c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg'
+const PLAYLIST_API =
+  'https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg'
+const DISS_TAG_API =
+  'https://c.y.qq.com/splcloud/fcgi-bin/fcg_get_diss_by_tag.fcg'
 const MUSICU = 'https://u.y.qq.com/cgi-bin/musicu.fcg'
 const SONG_BASE = 'https://ws.stream.qqmusic.qq.com/'
 const LOGIN_QR_SHOW = 'https://ssl.ptlogin2.qq.com/ptqrshow'
@@ -64,7 +75,8 @@ export const QQ_SESSION_COOKIE_NAMES = [
 
 /** 经典 `zzc` 签名的混淆常量（20 项）。 */
 const SCRAMBLE_VALUES = [
-  89, 39, 179, 150, 218, 82, 58, 252, 177, 52, 186, 123, 120, 64, 242, 133, 143, 161, 121, 179,
+  89, 39, 179, 150, 218, 82, 58, 252, 177, 52, 186, 123, 120, 64, 242, 133, 143,
+  161, 121, 179,
 ]
 const PART_1_INDEXES = [23, 14, 6, 36, 16, 7, 19]
 const PART_2_INDEXES = [16, 1, 32, 12, 19, 27, 8, 5]
@@ -76,7 +88,10 @@ const PART_2_INDEXES = [16, 1, 32, 12, 19, 27, 8, 5]
  * 20 字节摘要与 {@link SCRAMBLE_VALUES} 逐字节异或后 base64（去 `/+ =`）→ 拼 `zzc{part1}{b64}{part2}` 转小写。
  */
 export function qqSign(data: string): string {
-  const hex = createHash('sha1').update(data, 'utf8').digest('hex').toUpperCase()
+  const hex = createHash('sha1')
+    .update(data, 'utf8')
+    .digest('hex')
+    .toUpperCase()
   const part1 = PART_1_INDEXES.map((i) => hex[i]).join('')
   const part2 = PART_2_INDEXES.map((i) => hex[i]).join('')
   const bytes = Buffer.alloc(SCRAMBLE_VALUES.length)
@@ -106,7 +121,12 @@ interface QqResponse {
 /** 发一次请求，返回解析后的 JSON 与 Set-Cookie 数组。 */
 async function qqFetch(
   url: string,
-  opts: { cookie?: string; body?: string; method?: string; referer?: string } = {},
+  opts: {
+    cookie?: string
+    body?: string
+    method?: string
+    referer?: string
+  } = {},
 ): Promise<QqResponse> {
   const headers: Record<string, string> = {
     'User-Agent': UA,
@@ -128,8 +148,13 @@ async function qqFetch(
     body = text
   }
   // 开发期诊断：非 JSON 或上游报错时把原文打出来（生产不刷屏）
-  if (process.env.NODE_ENV !== 'production' && (typeof body !== 'object' || body === null)) {
-    console.warn(`[qq] 非 JSON 响应（HTTP ${res.status}）${url}\n  → ${text.slice(0, 500)}`)
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    (typeof body !== 'object' || body === null)
+  ) {
+    console.warn(
+      `[qq] 非 JSON 响应（HTTP ${res.status}）${url}\n  → ${text.slice(0, 500)}`,
+    )
   }
   return { body, text, setCookies: readSetCookies(res) }
 }
@@ -137,13 +162,17 @@ async function qqFetch(
 /** 取出响应头的全部 Set-Cookie。 */
 function readSetCookies(res: Response): string[] {
   const anyHeaders = res.headers as Headers & { getSetCookie?: () => string[] }
-  if (typeof anyHeaders.getSetCookie === 'function') return anyHeaders.getSetCookie()
+  if (typeof anyHeaders.getSetCookie === 'function')
+    return anyHeaders.getSetCookie()
   const raw = res.headers.get('set-cookie')
   return raw ? [raw] : []
 }
 
 /** 从 Set-Cookie 数组中提取某 cookie 的值。 */
-export function readCookieValue(cookies: string[] | undefined, name: string): string | undefined {
+export function readCookieValue(
+  cookies: string[] | undefined,
+  name: string,
+): string | undefined {
   if (!cookies) return undefined
   for (const c of cookies) {
     const m = c.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))
@@ -153,14 +182,17 @@ export function readCookieValue(cookies: string[] | undefined, name: string): st
 }
 
 /** 把 Set-Cookie 数组收敛为可直接透传给上游的 Cookie 请求头（仅白名单项）。 */
-export function cookieHeaderFromSetCookies(cookies?: string[]): string | undefined {
+export function cookieHeaderFromSetCookies(
+  cookies?: string[],
+): string | undefined {
   if (!cookies?.length) return undefined
   const parts: string[] = []
   for (const c of cookies) {
     const kv = c.split(';')[0]?.trim()
     if (!kv) continue
     const name = kv.slice(0, kv.indexOf('='))
-    if ((QQ_SESSION_COOKIE_NAMES as readonly string[]).includes(name)) parts.push(kv)
+    if ((QQ_SESSION_COOKIE_NAMES as readonly string[]).includes(name))
+      parts.push(kv)
   }
   return parts.length ? parts.join('; ') : undefined
 }
@@ -205,7 +237,12 @@ interface RawQqSong {
   album?: { mid?: string; name?: string }
   interval?: number
   /** 版权：新式 `pay_play`/`pay_down`（搜索），老式 `payplay`/`paydownload`（专辑/歌单）。 */
-  pay?: { payplay?: number; paydownload?: number; pay_play?: number; pay_down?: number }
+  pay?: {
+    payplay?: number
+    paydownload?: number
+    pay_play?: number
+    pay_down?: number
+  }
 }
 
 /** QQ 图片基准尺寸段（产出大图，前端按使用场景经 `coverAt` 降到小图；见 shared/image）。 */
@@ -232,13 +269,20 @@ export function normalizeQqTrack(raw: RawQqSong): Track {
   const singers = (raw.singer ?? []).filter(Boolean)
   const albumMid = raw.albummid ?? raw.album?.mid ?? ''
   const artistRefs = singers
-    .filter((s): s is RawQqSinger & { mid: string; name: string } => !!s?.mid && !!s?.name)
+    .filter(
+      (s): s is RawQqSinger & { mid: string; name: string } =>
+        !!s?.mid && !!s?.name,
+    )
     .map((s) => ({ id: s.mid, name: s.name }))
   return {
     source: 'qq',
     id: mid,
     title: raw.songname ?? raw.name ?? '未知曲目',
-    artist: singers.map((s) => s?.name).filter(Boolean).join(' / ') || '未知艺人',
+    artist:
+      singers
+        .map((s) => s?.name)
+        .filter(Boolean)
+        .join(' / ') || '未知艺人',
     album: raw.albumname ?? raw.album?.name ?? '',
     cover: canonicalQqImage(albumMid),
     duration: raw.interval ?? 0,
@@ -251,7 +295,10 @@ export function normalizeQqTrack(raw: RawQqSong): Track {
 /* ============================ 归一化（专辑 / 歌手 / 歌单） ============================ */
 
 /** 松散读取：按候选键名取第一个非空值（QQ 各接口字段命名不统一，如 `albumMID`/`albumMid`/`albummid`）。 */
-function pick<T = unknown>(obj: Record<string, unknown> | undefined, ...keys: string[]): T | undefined {
+function pick<T = unknown>(
+  obj: Record<string, unknown> | undefined,
+  ...keys: string[]
+): T | undefined {
   if (!obj) return undefined
   for (const k of keys) {
     const v = obj[k]
@@ -284,14 +331,24 @@ export function canonicalQqSingerImage(singerMid: string | undefined): string {
 
 /** 将 QQ 原始专辑归一化为共享 Album。 */
 export function normalizeQqAlbum(raw: Record<string, unknown>): Album {
-  const mid = pick<string>(raw, 'albumMID', 'albumMid', 'albummid', 'mid', 'album_mid') ?? ''
+  const mid =
+    pick<string>(raw, 'albumMID', 'albumMid', 'albummid', 'mid', 'album_mid') ??
+    ''
   return {
     source: 'qq',
     id: mid,
     name: pick<string>(raw, 'albumName', 'albumname', 'name') ?? '未命名专辑',
     cover: canonicalQqImage(mid),
-    artist: pick<string>(raw, 'singerName', 'singername', 'singer_name') ?? '未知艺人',
-    artistId: pick<string>(raw, 'singerMID', 'singerMid', 'singermid', 'singer_mid'),
+    artist:
+      pick<string>(raw, 'singerName', 'singername', 'singer_name') ??
+      '未知艺人',
+    artistId: pick<string>(
+      raw,
+      'singerMID',
+      'singerMid',
+      'singermid',
+      'singer_mid',
+    ),
     year: yearOf(pick(raw, 'pubTime', 'publicTime', 'publishTime')),
     trackCount: pick<number>(raw, 'songCount', 'song_count', 'total_song_num'),
   }
@@ -299,7 +356,8 @@ export function normalizeQqAlbum(raw: Record<string, unknown>): Album {
 
 /** 将 QQ 原始歌手归一化为共享 Artist。 */
 export function normalizeQqArtist(raw: Record<string, unknown>): Artist {
-  const mid = pick<string>(raw, 'singerMID', 'singer_mid', 'singerMid', 'mid') ?? ''
+  const mid =
+    pick<string>(raw, 'singerMID', 'singer_mid', 'singerMid', 'mid') ?? ''
   const alias = pick<string>(raw, 'otherName', 'other_name')
   return {
     source: 'qq',
@@ -321,11 +379,27 @@ export function normalizeQqPlaylist(raw: Record<string, unknown>): Playlist {
     // 搜索来源则只有 `dissid`（且为正确字符串）。
     id: String(pick(raw, 'disstid', 'dissid', 'dissId', 'disstid_str') ?? ''),
     name: pick<string>(raw, 'dissname', 'dissName', 'title') ?? '未命名歌单',
-    cover: https(pick<string>(raw, 'imgurl', 'logo', 'picUrl', 'cover', 'diss_cover')),
-    description: pick<string>(raw, 'introduction', 'desc', 'description', 'diss_desc'),
+    cover: https(
+      pick<string>(raw, 'imgurl', 'logo', 'picUrl', 'cover', 'diss_cover'),
+    ),
+    description: pick<string>(
+      raw,
+      'introduction',
+      'desc',
+      'description',
+      'diss_desc',
+    ),
     trackCount: pick<number>(raw, 'songnum', 'song_count', 'songCount'),
-    playCount: pick<number>(raw, 'visitnum', 'listennum', 'listenCount', 'play_count', 'listen_num'),
-    creator: pick<string>(raw, 'nickname') ?? pick<string>(creator, 'name', 'nick'),
+    playCount: pick<number>(
+      raw,
+      'visitnum',
+      'listennum',
+      'listenCount',
+      'play_count',
+      'listen_num',
+    ),
+    creator:
+      pick<string>(raw, 'nickname') ?? pick<string>(creator, 'name', 'nick'),
   }
 }
 
@@ -333,7 +407,8 @@ export function normalizeQqPlaylist(raw: Record<string, unknown>): Playlist {
 function unwrapSong(item: unknown): RawQqSong {
   if (item && typeof item === 'object') {
     const obj = item as Record<string, unknown>
-    if (obj.musicData && typeof obj.musicData === 'object') return obj.musicData as RawQqSong
+    if (obj.musicData && typeof obj.musicData === 'object')
+      return obj.musicData as RawQqSong
     return obj as RawQqSong
   }
   return {}
@@ -391,53 +466,88 @@ async function qqSearchBody(
   })
   const url = `${MUSICU}?format=json&data=${encodeURIComponent(payload)}`
   const { body, text } = await qqFetch(url, { cookie })
-  const out = (body as { req_0?: { data?: { body?: Record<string, unknown> } } })?.req_0?.data?.body ?? {}
+  const out =
+    (body as { req_0?: { data?: { body?: Record<string, unknown> } } })?.req_0
+      ?.data?.body ?? {}
   // 开发期诊断：所有 list 都空时打印原文（键名不符 / 上游变更 / 被风控）
-  const anyList = Object.keys(out).some((k) => Array.isArray((out[k] as { list?: unknown[] })?.list))
+  const anyList = Object.keys(out).some((k) =>
+    Array.isArray((out[k] as { list?: unknown[] })?.list),
+  )
   if (process.env.NODE_ENV !== 'production' && !anyList) {
-    console.warn(`[qq] 搜索无结果（type=${type}）${url}\n  → ${text.slice(0, 400)}`)
+    console.warn(
+      `[qq] 搜索无结果（type=${type}）${url}\n  → ${text.slice(0, 400)}`,
+    )
   }
   return out
 }
 
 /** 取 `body[key].list`。 */
 function listOf(body: Record<string, unknown>, key: string): unknown[] {
-  return ((body[key] as { list?: unknown[] } | undefined)?.list ?? []) as unknown[]
+  return ((body[key] as { list?: unknown[] } | undefined)?.list ??
+    []) as unknown[]
 }
 
 /** 搜索单曲。 */
-export async function searchSongs(keywords: string, limit = 30, cookie?: string): Promise<Track[]> {
+export async function searchSongs(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Track[]> {
   const body = await qqSearchBody(keywords, 'song', limit, cookie)
   return listOf(body, 'song').map((it) => normalizeQqTrack(it as RawQqSong))
 }
 
 /** 搜索专辑。 */
-export async function searchAlbums(keywords: string, limit = 30, cookie?: string): Promise<Album[]> {
+export async function searchAlbums(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Album[]> {
   const body = await qqSearchBody(keywords, 'album', limit, cookie)
-  return listOf(body, 'album').map((it) => normalizeQqAlbum(it as Record<string, unknown>))
+  return listOf(body, 'album').map((it) =>
+    normalizeQqAlbum(it as Record<string, unknown>),
+  )
 }
 
 /** 搜索歌手。 */
-export async function searchArtists(keywords: string, limit = 30, cookie?: string): Promise<Artist[]> {
+export async function searchArtists(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Artist[]> {
   const body = await qqSearchBody(keywords, 'singer', limit, cookie)
-  return listOf(body, 'singer').map((it) => normalizeQqArtist(it as Record<string, unknown>))
+  return listOf(body, 'singer').map((it) =>
+    normalizeQqArtist(it as Record<string, unknown>),
+  )
 }
 
 /** 搜索歌单（响应对应 `body.songlist.list`，非 `playlist`）。 */
-export async function searchPlaylists(keywords: string, limit = 30, cookie?: string): Promise<Playlist[]> {
+export async function searchPlaylists(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Playlist[]> {
   const body = await qqSearchBody(keywords, 'playlist', limit, cookie)
-  return listOf(body, 'songlist').map((it) => normalizeQqPlaylist(it as Record<string, unknown>))
+  return listOf(body, 'songlist').map((it) =>
+    normalizeQqPlaylist(it as Record<string, unknown>),
+  )
 }
 
 /* ============================ 发现 ============================ */
 
 /** 按分类/排序取歌单列表（`fcg_get_diss_by_tag`，免签，实测可用）。 */
-async function qqPlaylistByTag(categoryId: number, sortId: number, limit: number, cookie?: string): Promise<Playlist[]> {
+async function qqPlaylistByTag(
+  categoryId: number,
+  sortId: number,
+  limit: number,
+  cookie?: string,
+): Promise<Playlist[]> {
   const url =
     `${DISS_TAG_API}?categoryId=${categoryId}&sortId=${sortId}&sin=0&ein=${limit}` +
     `&format=json&g_tk=5381&loginUin=0&hostUin=0&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0`
   const { body } = await qqFetch(url, { cookie })
-  const list = (body as { data?: { list?: Record<string, unknown>[] } })?.data?.list ?? []
+  const list =
+    (body as { data?: { list?: Record<string, unknown>[] } })?.data?.list ?? []
   return list.map(normalizeQqPlaylist)
 }
 
@@ -445,33 +555,49 @@ async function qqPlaylistByTag(categoryId: number, sortId: number, limit: number
  * 「为你推荐」：QQ **无免登录的个性化推荐端点**（其推荐需登录/上下文），以**热门歌单**近似。
  * 前端不再为 QQ 标注「个性化」。
  */
-export async function recommendPlaylists(limit = 12, cookie?: string): Promise<Playlist[]> {
+export async function recommendPlaylists(
+  limit = 12,
+  cookie?: string,
+): Promise<Playlist[]> {
   return qqPlaylistByTag(10000000, 5, limit, cookie)
 }
 
 /** 精品歌单：同接口换排序（`cat` 暂不细分，恒取「全部」分类）。 */
-export async function topPlaylists(limit = 12, _cat = '全部', cookie?: string): Promise<Playlist[]> {
+export async function topPlaylists(
+  limit = 12,
+  _cat = '全部',
+  cookie?: string,
+): Promise<Playlist[]> {
   return qqPlaylistByTag(10000000, 2, limit, cookie)
 }
 
 /** 专辑详情：档案 + 曲目（`fcg_v8_album_info_cp`，无签名，实测可用）。 */
-export async function albumDetail(id: string, cookie?: string): Promise<{ album: Album; tracks: Track[] }> {
+export async function albumDetail(
+  id: string,
+  cookie?: string,
+): Promise<{ album: Album; tracks: Track[] }> {
   const url = `${ALBUM_API}?albummid=${encodeURIComponent(id)}&format=json&inCharset=utf8&outCharset=utf-8`
   const { body } = await qqFetch(url, { cookie })
-  const d = ((body as { data?: Record<string, unknown> }).data ?? {}) as Record<string, unknown>
+  const d = ((body as { data?: Record<string, unknown> }).data ?? {}) as Record<
+    string,
+    unknown
+  >
   const album: Album = {
     source: 'qq',
     id: pick<string>(d, 'mid', 'albumMID', 'albumMid') ?? id,
     name: pick<string>(d, 'name', 'albumName', 'albumname') ?? '未命名专辑',
     cover: canonicalQqImage(id),
-    artist: pick<string>(d, 'singername', 'singerName', 'singer_name') ?? '未知艺人',
+    artist:
+      pick<string>(d, 'singername', 'singerName', 'singer_name') ?? '未知艺人',
     artistId: pick<string>(d, 'singermid', 'singerMID', 'singerMid'),
     year: yearOf(pick(d, 'aDate', 'publicTime', 'pubTime')),
     trackCount:
       pick<number>(d, 'cur_song_num', 'song_count', 'songCount') ??
       (Array.isArray(d.list) ? (d.list as unknown[]).length : undefined),
   }
-  const tracks = ((d.list as unknown[] | undefined) ?? []).map((it) => normalizeQqTrack(unwrapSong(it)))
+  const tracks = ((d.list as unknown[] | undefined) ?? []).map((it) =>
+    normalizeQqTrack(unwrapSong(it)),
+  )
   return { album, tracks }
 }
 
@@ -488,29 +614,51 @@ export async function artistDetail(
   name?: string,
 ): Promise<{ artist: Artist; tracks: Track[]; albums: Album[] }> {
   if (!name) {
-    return { artist: { source: 'qq', id, name: id, avatar: canonicalQqSingerImage(id) }, tracks: [], albums: [] }
+    return {
+      artist: {
+        source: 'qq',
+        id,
+        name: id,
+        avatar: canonicalQqSingerImage(id),
+      },
+      tracks: [],
+      albums: [],
+    }
   }
   const [singers, songs, albums] = await Promise.all([
     searchArtists(name, 20, cookie),
     searchSongs(name, 60, cookie),
     searchAlbums(name, 40, cookie),
   ])
-  const artist = singers.find((a) => a.id === id) ?? { source: 'qq', id, name, avatar: canonicalQqSingerImage(id) }
-  const tracks = songs.filter((t) => (t.artistRefs ?? []).some((r) => r.id === id))
+  const artist = singers.find((a) => a.id === id) ?? {
+    source: 'qq',
+    id,
+    name,
+    avatar: canonicalQqSingerImage(id),
+  }
+  const tracks = songs.filter((t) =>
+    (t.artistRefs ?? []).some((r) => r.id === id),
+  )
   const filteredAlbums = albums.filter((a) => a.artistId === id)
   return { artist, tracks, albums: filteredAlbums }
 }
 
 /** 歌单详情：档案 + 曲目（`fcg_ucc_getcdinfo`，无签名）。 */
-export async function playlistTracks(id: string, cookie?: string): Promise<{ playlist: Playlist; tracks: Track[] }> {
+export async function playlistTracks(
+  id: string,
+  cookie?: string,
+): Promise<{ playlist: Playlist; tracks: Track[] }> {
   const url =
     `${PLAYLIST_API}?type=1&json=1&utf8=1&onlysong=0&disstid=${encodeURIComponent(id)}` +
     `&format=json&g_tk=5381&loginUin=0&hostUin=0&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0`
   const { body } = await qqFetch(url, { cookie })
-  const cdlist = ((body as { cdlist?: Record<string, unknown>[] }).cdlist ?? []) as Record<string, unknown>[]
+  const cdlist = ((body as { cdlist?: Record<string, unknown>[] }).cdlist ??
+    []) as Record<string, unknown>[]
   const cd = cdlist[0] ?? {}
   const playlist = normalizeQqPlaylist(cd)
-  const tracks = ((cd.songlist as unknown[] | undefined) ?? []).map((it) => normalizeQqTrack(unwrapSong(it)))
+  const tracks = ((cd.songlist as unknown[] | undefined) ?? []).map((it) =>
+    normalizeQqTrack(unwrapSong(it)),
+  )
   return { playlist, tracks }
 }
 
@@ -554,16 +702,34 @@ export interface QqQuality {
  * QQ 无真 192k，故 `higher` 与 `exhigh` 同链；不可得时逐级降级，链末档保证免费曲可播。
  */
 const QQ_QUALITY_CANDIDATES: Record<AudioLevel, QqQuality[]> = {
-  standard: [{ prefix: 'M500', ext: '.mp3' }, { prefix: 'C400', ext: '.m4a' }],
-  higher: [{ prefix: 'M800', ext: '.mp3' }, { prefix: 'M500', ext: '.mp3' }],
-  exhigh: [{ prefix: 'M800', ext: '.mp3' }, { prefix: 'M500', ext: '.mp3' }],
-  lossless: [{ prefix: 'F000', ext: '.flac' }, { prefix: 'M800', ext: '.mp3' }],
-  hires: [{ prefix: 'Q000', ext: '.flac' }, { prefix: 'F000', ext: '.flac' }, { prefix: 'M800', ext: '.mp3' }],
+  standard: [
+    { prefix: 'M500', ext: '.mp3' },
+    { prefix: 'C400', ext: '.m4a' },
+  ],
+  higher: [
+    { prefix: 'M800', ext: '.mp3' },
+    { prefix: 'M500', ext: '.mp3' },
+  ],
+  exhigh: [
+    { prefix: 'M800', ext: '.mp3' },
+    { prefix: 'M500', ext: '.mp3' },
+  ],
+  lossless: [
+    { prefix: 'F000', ext: '.flac' },
+    { prefix: 'M800', ext: '.mp3' },
+  ],
+  hires: [
+    { prefix: 'Q000', ext: '.flac' },
+    { prefix: 'F000', ext: '.flac' },
+    { prefix: 'M800', ext: '.mp3' },
+  ],
 }
 
 /** 取某抽象档的 QQ 候选链（由高到低）。 */
 export function qqLevelToCandidates(level: AudioLevel): QqQuality[] {
-  return QQ_QUALITY_CANDIDATES[level] ?? QQ_QUALITY_CANDIDATES[DEFAULT_AUDIO_LEVEL]
+  return (
+    QQ_QUALITY_CANDIDATES[level] ?? QQ_QUALITY_CANDIDATES[DEFAULT_AUDIO_LEVEL]
+  )
 }
 
 /**
@@ -574,15 +740,26 @@ export function qqLevelToCandidates(level: AudioLevel): QqQuality[] {
  *
  * ⚠️ 拼接式（`prefix+media_mid+ext` 与变体的取舍）以**联网实测**为准——见 ADR-031 风险节。
  */
-export function buildVkeyFilename(prefix: string, ext: string, mid: string, mediaMid?: string): string {
+export function buildVkeyFilename(
+  prefix: string,
+  ext: string,
+  mid: string,
+  mediaMid?: string,
+): string {
   return `${prefix}${mediaMid || mid + mid}${ext}`
 }
 
 /** 曲目 `media_mid` 缓存（几乎不变，长 TTL；失败以空串标记，避免反复打上游）。 */
-const mediaMidCache = new LRUCache<string, string>({ max: 4000, ttl: 6 * 60 * 60 * 1000 })
+const mediaMidCache = new LRUCache<string, string>({
+  max: 4000,
+  ttl: 6 * 60 * 60 * 1000,
+})
 
 /** 取曲目 `media_mid`（best-effort）：失败返回 undefined，不影响取流（走 double-mid 兜底）。 */
-async function qqMediaMid(mid: string, cookie?: string): Promise<string | undefined> {
+async function qqMediaMid(
+  mid: string,
+  cookie?: string,
+): Promise<string | undefined> {
   const cached = mediaMidCache.get(mid)
   if (cached !== undefined) return cached || undefined
   try {
@@ -591,12 +768,22 @@ async function qqMediaMid(mid: string, cookie?: string): Promise<string | undefi
       req_0: {
         module: 'music.trackInfo.UniformRuleCtrl',
         method: 'CgiGetTrackInfo',
-        param: { ctx: 0, client: 1, types: [0], modify_stamp: [0], mids: [mid] },
+        param: {
+          ctx: 0,
+          client: 1,
+          types: [0],
+          modify_stamp: [0],
+          mids: [mid],
+        },
       },
     })
     const url = `${MUSICU}?format=json&data=${encodeURIComponent(payload)}`
     const { body } = await qqFetch(url, { cookie })
-    const track = (body as { req_0?: { data?: { tracks?: { file?: { media_mid?: string } }[] } } })?.req_0?.data?.tracks?.[0]
+    const track = (
+      body as {
+        req_0?: { data?: { tracks?: { file?: { media_mid?: string } }[] } }
+      }
+    )?.req_0?.data?.tracks?.[0]
     const mediaMid = track?.file?.media_mid
     mediaMidCache.set(mid, mediaMid ?? '')
     return mediaMid
@@ -617,7 +804,11 @@ interface VkeyData {
  * 同一 mid 重复 N 次、配 N 个候选 filename，可一次拿回 N 条 `midurlinfo[i]`。
  * `filenames` 缺省时不带该字段（旧兜底路径——由 QQ 按 `media_mid` 返回默认档）。
  */
-async function qqVkey(ids: string[], filenames: string[] | undefined, cookie?: string): Promise<VkeyData | null> {
+async function qqVkey(
+  ids: string[],
+  filenames: string[] | undefined,
+  cookie?: string,
+): Promise<VkeyData | null> {
   const uin = uinOf(cookie)
   const authst = musickeyOf(cookie)
   const param: Record<string, unknown> = {
@@ -640,7 +831,10 @@ async function qqVkey(ids: string[], filenames: string[] | undefined, cookie?: s
 
 /** 从 sip 列表挑域名并拼 purl，一律改写为 https。 */
 function sipUrl(data: VkeyData | null, purl: string): string {
-  const sip = (data?.sip ?? []).find((s) => s.includes('stream.qqmusic.qq.com')) ?? data?.sip?.[0] ?? SONG_BASE
+  const sip =
+    (data?.sip ?? []).find((s) => s.includes('stream.qqmusic.qq.com')) ??
+    data?.sip?.[0] ??
+    SONG_BASE
   return `${sip}${purl}`.replace(/^http:\/\//, 'https://')
 }
 
@@ -651,7 +845,11 @@ function sipUrl(data: VkeyData | null, purl: string): string {
  * （即选用「≤ 目标档的最高可得档」，天然实现降级）；候选全落空则退化为**不带 `filename`** 的
  * 旧路径以**零回归**。付费曲匿名返回空 purl → `null`（前端提示登录）。`media_mid` 另行缓存，避免放大请求。
  */
-export async function songUrl(id: string, cookie?: string, level: AudioLevel = DEFAULT_AUDIO_LEVEL): Promise<string | null> {
+export async function songUrl(
+  id: string,
+  cookie?: string,
+  level: AudioLevel = DEFAULT_AUDIO_LEVEL,
+): Promise<string | null> {
   try {
     const mediaMid = await qqMediaMid(id, cookie)
     const candidates = qqLevelToCandidates(level)
@@ -703,19 +901,33 @@ export async function qrCreate(key: string): Promise<string> {
 }
 
 /** 解析 `ptuiCB('0','0','<url>','0','<msg>','<nick>')`（第 6 参为昵称）。 */
-function parsePtuiCB(text: string): { code: number; url: string; message: string; nick: string } {
+function parsePtuiCB(text: string): {
+  code: number
+  url: string
+  message: string
+  nick: string
+} {
   const m = text.match(/ptuiCB\(([^)]*)\)/)
   if (!m) return { code: -1, url: '', message: '', nick: '' }
   const args = m[1].split(',').map((a) => a.trim().replace(/^'|'$/g, ''))
-  return { code: Number(args[0]), url: args[2] ?? '', message: args[4] ?? '', nick: args[5] ?? '' }
+  return {
+    code: Number(args[0]),
+    url: args[2] ?? '',
+    message: args[4] ?? '',
+    nick: args[5] ?? '',
+  }
 }
 
 /** QQ 互联 OAuth 回跳地址（换取 code 用）。 */
-const OAUTH_REDIRECT = 'https://y.qq.com/portal/wx_redirect.html?login_type=1&surl=https%3A%2F%2Fy.qq.com%2F'
+const OAUTH_REDIRECT =
+  'https://y.qq.com/portal/wx_redirect.html?login_type=1&surl=https%3A%2F%2Fy.qq.com%2F'
 
 /** 由 Set-Cookie 数组拼一个请求 Cookie 头（登录多步之间手动携带 cookie）。 */
 function cookieHeaderOf(cookies: string[]): string {
-  return cookies.map((c) => c.split(';')[0]?.trim()).filter(Boolean).join('; ')
+  return cookies
+    .map((c) => c.split(';')[0]?.trim())
+    .filter(Boolean)
+    .join('; ')
 }
 
 /**
@@ -737,7 +949,11 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
     `&ptqrtoken=${ptqrtoken}&ptredirect=0&h=1&t=1&g=1&from_ui=1&ptlang=2052&action=0-0-${ts}` +
     `&js_ver=10233&js_type=1&login_sig=&pt_uistyle=40&aid=${APPID}&daid=383&pt_3rd_aid=${PT_3RD_AID}`
   const res = await fetch(url, {
-    headers: { 'User-Agent': UA, Referer: 'https://xui.ptlogin2.qq.com/', Cookie: `qrsig=${key}` },
+    headers: {
+      'User-Agent': UA,
+      Referer: 'https://xui.ptlogin2.qq.com/',
+      Cookie: `qrsig=${key}`,
+    },
   })
   const text = await res.text().catch(() => '')
   const { code, url: redirect, message, nick } = parsePtuiCB(text)
@@ -745,7 +961,8 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
   if (code === 65) return { code: 800, message: message || '二维码已过期' }
   if (code === 66) return { code: 801, message: message || '等待扫码' }
   if (code === 67) return { code: 802, message: message || '已扫码，请确认' }
-  if (code !== 0 || !redirect) return { code: 801, message: message || '等待扫码' }
+  if (code !== 0 || !redirect)
+    return { code: 801, message: message || '等待扫码' }
 
   // 收集 QQ PT cookie，并从回跳 URL 解析 uin / ptsigx（回跳可能被 HTML 转义，先还原 &amp;）
   const jar = [...readSetCookies(res)]
@@ -760,11 +977,18 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
       `https://ssl.ptlogin2.graph.qq.com/check_sig?uin=${uinFromUrl}&ptsigx=${ptsigx}&service=ptqrlogin` +
       `&nodirect=0&s_url=${encodeURIComponent(OAUTH_REDIRECT)}&ptlang=2052&daid=383&pt_3rd_aid=${PT_3RD_AID}`
     const cs = await fetch(csUrl, {
-      headers: { 'User-Agent': UA, Cookie: cookieHeaderOf(jar), Referer: 'https://xui.ptlogin2.qq.com/' },
+      headers: {
+        'User-Agent': UA,
+        Cookie: cookieHeaderOf(jar),
+        Referer: 'https://xui.ptlogin2.qq.com/',
+      },
     })
     const csCookies = readSetCookies(cs)
     jar.push(...csCookies)
-    pSkey = readCookieValue(csCookies, 'p_skey') ?? readCookieValue(jar, 'p_skey') ?? ''
+    pSkey =
+      readCookieValue(csCookies, 'p_skey') ??
+      readCookieValue(jar, 'p_skey') ??
+      ''
   } catch {
     /* 忽略：无 p_skey 则后续步骤多半失败，但仍返回已收集 cookie */
   }
@@ -784,7 +1008,8 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     })
-    oauthCode = (auth.headers.get('location') ?? '').match(/[?&]code=([^&]+)/)?.[1] ?? ''
+    oauthCode =
+      (auth.headers.get('location') ?? '').match(/[?&]code=([^&]+)/)?.[1] ?? ''
   } catch {
     /* 忽略 */
   }
@@ -795,7 +1020,11 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
   try {
     const payload = JSON.stringify({
       comm: { uin: uinFromUrl, format: 'json', ct: 24, cv: 0 },
-      req_0: { module: 'QQConnectLogin.LoginServer', method: 'QQLogin', param: { code: oauthCode } },
+      req_0: {
+        module: 'QQConnectLogin.LoginServer',
+        method: 'QQLogin',
+        param: { code: oauthCode },
+      },
     })
     const r5 = await fetch(`${MUSICU}?format=json`, {
       method: 'POST',
@@ -807,9 +1036,9 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
       },
       body: payload,
     })
-    const j = (await r5.json().catch(() => null)) as
-      | { req_0?: { data?: Record<string, unknown> } }
-      | null
+    const j = (await r5.json().catch(() => null)) as {
+      req_0?: { data?: Record<string, unknown> }
+    } | null
     const d = j?.req_0?.data ?? {}
     musickey = (d.musickey ?? d.musicKey ?? '') as string
     // 注意：musicid 可能超过 JS 安全整数，优先用 str_musicid
@@ -821,7 +1050,11 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
   // 组装下发给浏览器的会话 cookie（带 Max-Age → 持久化，与网易云一致；否则仅会话级、关浏览器即失）。
   // uin 依次回退：QQLogin 的 musicid → 回跳 URL → PT cookie，任一可得即视为可用会话。
   const finalUin =
-    musicid || uinFromUrl || readCookieValue(jar, 'uin') || readCookieValue(jar, 'p_uin') || ''
+    musicid ||
+    uinFromUrl ||
+    readCookieValue(jar, 'uin') ||
+    readCookieValue(jar, 'p_uin') ||
+    ''
   const AGE = 'Max-Age=15552000'
   const session = [...jar]
   if (finalUin) {
@@ -857,7 +1090,9 @@ export async function qrCheck(key: string): Promise<QrCheckResult> {
  * 头像**按 QQ 号直接拼**（`q1.qlogo.cn` 免鉴权，实测 200）——QQ 无免登录的资料查询接口。
  */
 export async function loginStatus(cookie?: string): Promise<LoginStatus> {
-  const uin = cookie ? cookie.match(/(?:^|;\s*)(?:qqmusic_uin|uin|p_uin)=([^;]+)/)?.[1] : undefined
+  const uin = cookie
+    ? cookie.match(/(?:^|;\s*)(?:qqmusic_uin|uin|p_uin)=([^;]+)/)?.[1]
+    : undefined
   if (!uin || uin === '0') return { logged: false }
 
   const rawNick = cookie?.match(/(?:^|;\s*)qq_nick=([^;]*)/)?.[1]
@@ -870,13 +1105,25 @@ export async function loginStatus(cookie?: string): Promise<LoginStatus> {
     }
   }
   const avatarUrl = `https://q1.qlogo.cn/g?b=qq&nk=${uin}&s=100`
-  return { logged: true, nickname, avatarUrl, userId: uin, vip: Boolean(musickeyOf(cookie)) }
+  return {
+    logged: true,
+    nickname,
+    avatarUrl,
+    userId: uin,
+    vip: Boolean(musickeyOf(cookie)),
+  }
 }
 
 /* ============================ 适配器 ============================ */
 
 /** 退出登录需清理的 QQ 会话 cookie。 */
-export const QQ_LOGOUT_COOKIE_NAMES = ['uin', 'qqmusic_uin', 'qqmusic_key', 'qm_keyst', 'qq_nick'] as const
+export const QQ_LOGOUT_COOKIE_NAMES = [
+  'uin',
+  'qqmusic_uin',
+  'qqmusic_key',
+  'qm_keyst',
+  'qq_nick',
+] as const
 
 /** QQ 音乐音源适配器。 */
 export const qqAdapter: SourceAdapter = {

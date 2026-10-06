@@ -18,7 +18,8 @@ async function seedSavedAlbums(page: Page, count: number): Promise<void> {
         const req = indexedDB.open(db, 3)
         req.onupgradeneeded = () => {
           const d = req.result
-          if (!d.objectStoreNames.contains('library')) d.createObjectStore('library')
+          if (!d.objectStoreNames.contains('library'))
+            d.createObjectStore('library')
         }
         req.onsuccess = () => {
           const d = req.result
@@ -30,7 +31,10 @@ async function seedSavedAlbums(page: Page, count: number): Promise<void> {
             artist: `艺人 ${i + 1}`,
           }))
           const tx = d.transaction('library', 'readwrite')
-          tx.objectStore('library').put({ state: { savedAlbums }, version: 0 }, key)
+          tx.objectStore('library').put(
+            { state: { savedAlbums }, version: 0 },
+            key,
+          )
           tx.oncomplete = () => {
             d.close()
             resolve()
@@ -50,7 +54,9 @@ test.describe('内容区滚动位置', () => {
     await page.goto('/crate')
 
     const content = page.locator('.app-content')
-    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.card--album').first()).toBeVisible({
+      timeout: 10000,
+    })
 
     // 把内容区滚下去（真实滚轮事件）
     await page.mouse.move(640, 400)
@@ -71,11 +77,15 @@ test.describe('内容区滚动位置', () => {
     expect(idx).toBeGreaterThanOrEqual(0)
     await page.locator('.card--album').nth(idx).click()
     await expect(page).toHaveURL(/\/album\//)
-    await expect(page.locator('.detail').first()).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.detail').first()).toBeVisible({
+      timeout: 10000,
+    })
 
     // 返回（POP）→ 恢复原滚动位置
     await page.goBack()
     await expect(page).toHaveURL(/\/crate/)
-    await expect.poll(() => content.evaluate((el) => el.scrollTop), { timeout: 3000 }).toBeGreaterThan(before - 60)
+    await expect
+      .poll(() => content.evaluate((el) => el.scrollTop), { timeout: 3000 })
+      .toBeGreaterThan(before - 60)
   })
 })

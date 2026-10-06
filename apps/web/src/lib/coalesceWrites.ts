@@ -20,7 +20,9 @@ export interface CoalescedStorage<S> extends PersistStorage<S> {
   flush: () => Promise<void>
 }
 
-export function coalesceWrites<S>(base: PersistStorage<S>): CoalescedStorage<S> {
+export function coalesceWrites<S>(
+  base: PersistStorage<S>,
+): CoalescedStorage<S> {
   let pendingName: string | null = null
   let pendingValue: StorageValue<S> | null = null
   let queued = false

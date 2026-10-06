@@ -11,7 +11,8 @@ function parseTimestamp(raw: string): number {
   const sec = Number(m[2]) || 0
   const fracRaw = m[3] ?? ''
   // 归一化毫秒：2 位当作厘秒，3 位当作毫秒
-  const frac = fracRaw === '' ? 0 : Number(fracRaw.padEnd(3, '0').slice(0, 3)) / 1000
+  const frac =
+    fracRaw === '' ? 0 : Number(fracRaw.padEnd(3, '0').slice(0, 3)) / 1000
   return min * 60 + sec + frac
 }
 

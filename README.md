@@ -39,7 +39,7 @@ pnpm start        # 默认 http://localhost:8788，可用 PORT 覆盖
 pnpm log-in       # 打开 http://127.0.0.1:8789 扫码，凭证写入仓库根 .env
 ```
 
-  扫码成功后凭证存入 `.env` 的 `NETEASE_COOKIE`，**需重启服务生效**。建议使用**专用账号**（详见 [ADR-014](./docs/DECISIONS.md)）。
+扫码成功后凭证存入 `.env` 的 `NETEASE_COOKIE`，**需重启服务生效**。建议使用**专用账号**（详见 [ADR-014](./docs/DECISIONS.md)）。
 
 - 测试：
 

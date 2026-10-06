@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import type { LoginStatus, MusicSource } from '@pterosaur/shared/types'
 import { activeSource, isLoggedAny } from './auth.js'
 
-const st = (sources: Partial<Record<MusicSource, boolean>>): Record<MusicSource, LoginStatus> => ({
+const st = (
+  sources: Partial<Record<MusicSource, boolean>>,
+): Record<MusicSource, LoginStatus> => ({
   netease: { logged: Boolean(sources.netease) },
   qq: { logged: Boolean(sources.qq) },
 })

@@ -53,7 +53,12 @@ export function CreatePlaylistModal() {
   }
 
   return (
-    <div className="cp-modal" role="dialog" aria-modal="true" aria-label="新建歌单">
+    <div
+      className="cp-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="新建歌单"
+    >
       <div className="cp-modal__scrim" onClick={close} aria-hidden />
       <div className="cp-modal__card">
         <header className="cp-modal__head">
@@ -79,10 +84,18 @@ export function CreatePlaylistModal() {
             <p className="cp-modal__hint">将添加 {tracks.length} 首曲目</p>
           )}
           <div className="cp-modal__actions">
-            <button type="button" className="cp-modal__btn cp-modal__btn--ghost" onClick={close}>
+            <button
+              type="button"
+              className="cp-modal__btn cp-modal__btn--ghost"
+              onClick={close}
+            >
               取消
             </button>
-            <button type="submit" className="cp-modal__btn cp-modal__btn--primary" disabled={!name.trim()}>
+            <button
+              type="submit"
+              className="cp-modal__btn cp-modal__btn--primary"
+              disabled={!name.trim()}
+            >
               创建
             </button>
           </div>

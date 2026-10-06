@@ -1,5 +1,14 @@
 import { createRequire } from 'node:module'
-import { DEFAULT_AUDIO_LEVEL, type Album, type Artist, type LoginStatus, type Playlist, type Track, type Lyric, type AudioLevel } from '@pterosaur/shared/types'
+import {
+  DEFAULT_AUDIO_LEVEL,
+  type Album,
+  type Artist,
+  type LoginStatus,
+  type Playlist,
+  type Track,
+  type Lyric,
+  type AudioLevel,
+} from '@pterosaur/shared/types'
 import { parseLrc } from '@pterosaur/shared/lyric'
 import { canonicalNeteaseImage, COVER_LARGE } from '@pterosaur/shared/image'
 import type { SourceAdapter } from './types.js'
@@ -29,7 +38,10 @@ const api = require('NeteaseCloudMusicApi') as Record<string, NcmFn>
  * 从 Set-Cookie 数组中提取指定 cookie 的值。
  * 用于在不透传原始头的场景（如判断登录态）读取 MUSIC_U。
  */
-export function readCookieValue(cookies: string[] | undefined, name: string): string | undefined {
+export function readCookieValue(
+  cookies: string[] | undefined,
+  name: string,
+): string | undefined {
   if (!cookies) return undefined
   for (const c of cookies) {
     const m = c.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))
@@ -42,7 +54,9 @@ export function readCookieValue(cookies: string[] | undefined, name: string): st
 export const SESSION_COOKIE_NAMES = ['MUSIC_U', '__csrf', 'MUSIC_A', 'NMTID']
 
 /** 把登录相关 cookie（MUSIC_U / __csrf 等）收敛为可直接透传给网易云的字符串。 */
-export function cookieHeaderFromSetCookies(cookies: string[] | undefined): string | undefined {
+export function cookieHeaderFromSetCookies(
+  cookies: string[] | undefined,
+): string | undefined {
   if (!cookies?.length) return undefined
   const parts: string[] = []
   for (const c of cookies) {
@@ -118,7 +132,10 @@ const BASE_COVER_SIZE = `${COVER_LARGE}y${COVER_LARGE}`
  * 网易云会在 p1–pN.music.126.net 间随机轮换主机名（实测同一封面同端点两次调用即不同），
  * 不规范化的话，前端所有以 URL 为键的缓存（SW 媒体池 / 就绪登记表）都会被拆成多条。
  */
-function coverUrl(raw: string | undefined, size: string = BASE_COVER_SIZE): string {
+function coverUrl(
+  raw: string | undefined,
+  size: string = BASE_COVER_SIZE,
+): string {
   if (!raw) return ''
   const canonical = canonicalNeteaseImage(raw)
   try {
@@ -144,7 +161,9 @@ export function normalizeTrack(raw: RawSong): Track {
   const rawArtists = raw.ar ?? raw.artists ?? []
   const artists = rawArtists.map((a) => a?.name).filter(Boolean)
   const artistRefs = rawArtists
-    .filter((a): a is { id: number; name: string } => a?.id != null && !!a?.name)
+    .filter(
+      (a): a is { id: number; name: string } => a?.id != null && !!a?.name,
+    )
     .map((a) => ({ id: String(a.id), name: a.name }))
   const album = raw.al ?? raw.album
   const coverRaw = album?.picUrl ?? album?.blurPicUrl ?? ''
@@ -216,35 +235,54 @@ export function normalizePlaylist(raw: RawPlaylist): Playlist {
  * @param limit 返回数量上限（默认 30）
  * @param cookie 透传的登录 cookie（可选）
  */
-export async function searchSongs(keywords: string, limit = 30, cookie?: string): Promise<Track[]> {
+export async function searchSongs(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Track[]> {
   const res = await api.cloudsearch({ keywords, limit, cookie })
   const songs: RawSong[] = res?.body?.result?.songs ?? []
   return songs.map(normalizeTrack)
 }
 
 /** 搜索艺人（cloudsearch type=100）。 */
-export async function searchArtists(keywords: string, limit = 30, cookie?: string): Promise<Artist[]> {
+export async function searchArtists(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Artist[]> {
   const res = await api.cloudsearch({ keywords, type: 100, limit, cookie })
   const list: RawArtist[] = res?.body?.result?.artists ?? []
   return list.map(normalizeArtist)
 }
 
 /** 搜索专辑（cloudsearch type=10）。 */
-export async function searchAlbums(keywords: string, limit = 30, cookie?: string): Promise<Album[]> {
+export async function searchAlbums(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Album[]> {
   const res = await api.cloudsearch({ keywords, type: 10, limit, cookie })
   const list: RawAlbum[] = res?.body?.result?.albums ?? []
   return list.map(normalizeAlbum)
 }
 
 /** 搜索歌单（cloudsearch type=1000）。 */
-export async function searchPlaylists(keywords: string, limit = 30, cookie?: string): Promise<Playlist[]> {
+export async function searchPlaylists(
+  keywords: string,
+  limit = 30,
+  cookie?: string,
+): Promise<Playlist[]> {
   const res = await api.cloudsearch({ keywords, type: 1000, limit, cookie })
   const list: RawPlaylist[] = res?.body?.result?.playlists ?? []
   return list.map(normalizePlaylist)
 }
 
 /** 首页个性化推荐歌单。 */
-export async function recommendPlaylists(limit = 12, cookie?: string): Promise<Playlist[]> {
+export async function recommendPlaylists(
+  limit = 12,
+  cookie?: string,
+): Promise<Playlist[]> {
   const res = await api.personalized({ limit, cookie })
   const list: RawPlaylist[] = res?.body?.result ?? []
   return list.map(normalizePlaylist)
@@ -261,14 +299,20 @@ export async function toplists(): Promise<Playlist[]> {
 }
 
 /** 精品歌单。 */
-export async function topPlaylists(limit = 12, cat = '全部'): Promise<Playlist[]> {
+export async function topPlaylists(
+  limit = 12,
+  cat = '全部',
+): Promise<Playlist[]> {
   const res = await api.top_playlist({ limit, cat })
   const list: RawPlaylist[] = res?.body?.playlists ?? []
   return list.map(normalizePlaylist)
 }
 
 /** 歌单详情曲目。 */
-export async function playlistTracks(id: string, cookie?: string): Promise<{ playlist: Playlist; tracks: Track[] }> {
+export async function playlistTracks(
+  id: string,
+  cookie?: string,
+): Promise<{ playlist: Playlist; tracks: Track[] }> {
   const res = await api.playlist_detail({ id, cookie })
   const pl = res?.body?.playlist
   const playlist: Playlist = pl
@@ -296,18 +340,33 @@ export async function artistDetail(
     api.artists({ id, cookie }),
     api.artist_album({ id, limit: 50, cookie }),
   ])
-  const artist = normalizeArtist((info?.body?.artist ?? { id, name: '未知艺人' }) as RawArtist)
-  const tracks: Track[] = ((info?.body?.hotSongs ?? []) as RawSong[]).map(normalizeTrack)
-  const rawAlbums: RawAlbum[] = albumRes?.body?.hotAlbums ?? albumRes?.body?.albums ?? []
+  const artist = normalizeArtist(
+    (info?.body?.artist ?? { id, name: '未知艺人' }) as RawArtist,
+  )
+  const tracks: Track[] = ((info?.body?.hotSongs ?? []) as RawSong[]).map(
+    normalizeTrack,
+  )
+  const rawAlbums: RawAlbum[] =
+    albumRes?.body?.hotAlbums ?? albumRes?.body?.albums ?? []
   return { artist, tracks, albums: rawAlbums.map(normalizeAlbum) }
 }
 
 /** 专辑详情：档案 + 曲目。 */
-export async function albumDetail(id: string, cookie?: string): Promise<{ album: Album; tracks: Track[] }> {
+export async function albumDetail(
+  id: string,
+  cookie?: string,
+): Promise<{ album: Album; tracks: Track[] }> {
   const res = await api.album({ id, cookie })
-  const raw = (res?.body?.album ?? { id, name: '未知专辑' }) as RawAlbum & { size?: number }
-  const album = normalizeAlbum({ ...raw, size: raw.size ?? res?.body?.songs?.length })
-  const tracks: Track[] = ((res?.body?.songs ?? []) as RawSong[]).map(normalizeTrack)
+  const raw = (res?.body?.album ?? { id, name: '未知专辑' }) as RawAlbum & {
+    size?: number
+  }
+  const album = normalizeAlbum({
+    ...raw,
+    size: raw.size ?? res?.body?.songs?.length,
+  })
+  const tracks: Track[] = ((res?.body?.songs ?? []) as RawSong[]).map(
+    normalizeTrack,
+  )
   return { album, tracks }
 }
 
@@ -319,7 +378,11 @@ export async function albumDetail(id: string, cookie?: string): Promise<{ album:
  * @param level 音质（exhigh / lossless / hires 等），默认 exhigh
  * @returns 已改写为 https 的可播放地址；无法播放时返回 null
  */
-export async function songUrl(id: string, cookie?: string, level: AudioLevel = DEFAULT_AUDIO_LEVEL): Promise<string | null> {
+export async function songUrl(
+  id: string,
+  cookie?: string,
+  level: AudioLevel = DEFAULT_AUDIO_LEVEL,
+): Promise<string | null> {
   try {
     const res = await api.song_url_v1({ id, level, cookie })
     const url: string | null = res?.body?.data?.[0]?.url ?? null
@@ -330,7 +393,10 @@ export async function songUrl(id: string, cookie?: string, level: AudioLevel = D
 }
 
 /** 曲目详情（用于补全搜索未覆盖的元数据）。 */
-export async function songDetail(ids: string[], cookie?: string): Promise<Track[]> {
+export async function songDetail(
+  ids: string[],
+  cookie?: string,
+): Promise<Track[]> {
   const res = await api.song_detail({ ids: ids.join(','), cookie })
   const songs: RawSong[] = res?.body?.songs ?? []
   return songs.map(normalizeTrack)
@@ -364,7 +430,10 @@ export async function qrCreate(key: string, cookie?: string): Promise<string> {
  * 生成二维码**内容 URL**（形如 `https://music.163.com/login?codekey=<key>`）。
  * 网易云 `login_qr_create` 为本地构造、不请求上游，故可直接用于终端自行渲染二维码。
  */
-export async function qrLoginUrl(key: string, cookie?: string): Promise<string> {
+export async function qrLoginUrl(
+  key: string,
+  cookie?: string,
+): Promise<string> {
   const res = await api.login_qr_create({ key, cookie })
   return res?.body?.data?.qrurl ?? ''
 }
@@ -373,7 +442,10 @@ export async function qrLoginUrl(key: string, cookie?: string): Promise<string> 
  * 检查扫码登录状态。
  * @returns code: 800 过期 / 801 等待扫码 / 802 待确认 / 803 成功（附带原始 Set-Cookie 数组）
  */
-export async function qrCheck(key: string, cookie?: string): Promise<{ code: number; cookies?: string[]; message?: string }> {
+export async function qrCheck(
+  key: string,
+  cookie?: string,
+): Promise<{ code: number; cookies?: string[]; message?: string }> {
   const res = await api.login_qr_check({ key, cookie })
   return {
     code: res?.body?.code ?? 800,
@@ -392,7 +464,9 @@ export async function loginStatus(cookie?: string): Promise<LoginStatus> {
     return {
       logged: true,
       nickname: profile.nickname,
-      avatarUrl: profile.avatarUrl ? coverUrl(profile.avatarUrl, BASE_COVER_SIZE) : undefined,
+      avatarUrl: profile.avatarUrl
+        ? coverUrl(profile.avatarUrl, BASE_COVER_SIZE)
+        : undefined,
       userId: profile.userId != null ? String(profile.userId) : undefined,
       vip: Boolean(profile.vipType),
     }
@@ -402,7 +476,10 @@ export async function loginStatus(cookie?: string): Promise<LoginStatus> {
 }
 
 /** 获取用户歌单。 */
-export async function userPlaylists(uid: string, cookie?: string): Promise<Playlist[]> {
+export async function userPlaylists(
+  uid: string,
+  cookie?: string,
+): Promise<Playlist[]> {
   const res = await api.user_playlist({ uid, cookie })
   const list: RawPlaylist[] = res?.body?.playlist ?? []
   return list.map(normalizePlaylist)

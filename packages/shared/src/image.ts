@@ -68,10 +68,14 @@ const QQ_SIZE_SEGMENT = /(T\d+R)\d+x\d+(M000)/
  *
  * 返回串即缓存稳定身份——「同一图 + 同一尺寸」在 SW 媒体池、就绪登记表等各层得到同一键。
  */
-export function coverAt(url: string | undefined, px: number): string | undefined {
+export function coverAt(
+  url: string | undefined,
+  px: number,
+): string | undefined {
   if (!url) return url
   const size = `${px}x${px}`
-  if (QQ_SIZE_SEGMENT.test(url)) return url.replace(QQ_SIZE_SEGMENT, `$1${size}$2`)
+  if (QQ_SIZE_SEGMENT.test(url))
+    return url.replace(QQ_SIZE_SEGMENT, `$1${size}$2`)
   let u: URL
   try {
     u = new URL(url)

@@ -1,6 +1,9 @@
 import { flushSync } from 'react-dom'
 import { usePlayer } from '../store/player.js'
-import { supportsViewTransition, prefersReducedMotion } from './viewTransition.js'
+import {
+  supportsViewTransition,
+  prefersReducedMotion,
+} from './viewTransition.js'
 
 /**
  * 沉浸播放页（NowPlaying）的共享元素转场。

@@ -30,7 +30,13 @@ interface TrackListProps {
  * - 行内艺人名 / 专辑名可点击，跳转到对应的艺人页 / 专辑页（缺 id 时降级为纯文本）；
  * - 行内提供喜欢、添加到歌单操作。
  */
-export function TrackList({ tracks, showHeader = true, showIndex = true, emptyText = '暂无曲目', className }: TrackListProps) {
+export function TrackList({
+  tracks,
+  showHeader = true,
+  showIndex = true,
+  emptyText = '暂无曲目',
+  className,
+}: TrackListProps) {
   const queue = usePlayer((s) => s.queue)
   const current = usePlayer((s) => s.current)
   const isPlaying = usePlayer((s) => s.isPlaying)
@@ -62,7 +68,11 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
   const handleRowPlay = (index: number) => {
     const track = tracks[index]
     // 若点击的正是当前曲目：切换播放/暂停
-    if (current && keyOf(track) === keyOf(current) && isSameQueue(queue, tracks)) {
+    if (
+      current &&
+      keyOf(track) === keyOf(current) &&
+      isSameQueue(queue, tracks)
+    ) {
       toggle()
       return
     }
@@ -78,7 +88,10 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
   }
 
   return (
-    <div className={`track-list${className ? ` ${className}` : ''}`} role="list">
+    <div
+      className={`track-list${className ? ` ${className}` : ''}`}
+      role="list"
+    >
       {showHeader && (
         <div className="track-list__head">
           {showIndex && <span className="col-index">#</span>}
@@ -104,48 +117,68 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
             tabIndex={0}
             onKeyDown={(e) => {
               // 仅在行本身获得焦点时响应键盘，避免行内链接触发播放
-              if (e.key === 'Enter' && e.target === e.currentTarget) handleRowPlay(i)
+              if (e.key === 'Enter' && e.target === e.currentTarget)
+                handleRowPlay(i)
             }}
           >
             {showIndex && (
               <span className="col-index">
                 {isCurrentPlaying ? (
                   <span className="eq-bars" aria-hidden>
-                    <i /><i /><i /><i />
+                    <i />
+                    <i />
+                    <i />
+                    <i />
                   </span>
                 ) : isCurrent ? (
-                  <Pause size={13} fill="currentColor" className="col-index__pause" />
+                  <Pause
+                    size={13}
+                    fill="currentColor"
+                    className="col-index__pause"
+                  />
                 ) : (
                   <>
                     <span className="col-index__num">{i + 1}</span>
-                    <Play size={13} fill="currentColor" className="col-index__play" />
+                    <Play
+                      size={13}
+                      fill="currentColor"
+                      className="col-index__play"
+                    />
                   </>
                 )}
               </span>
             )}
 
             <span className="col-title">
-              <Cover src={coverAt(t.cover, COVER_SMALL)} alt={t.title} radius="sm" size={40} />
+              <Cover
+                src={coverAt(t.cover, COVER_SMALL)}
+                alt={t.title}
+                radius="sm"
+                size={40}
+              />
               <span className="col-title__text">
                 <span className="col-title__name ellipsis">{t.title}</span>
                 <span className="col-title__artist ellipsis">
-                  {t.artistRefs?.length ? (
-                    t.artistRefs.map((a, ai) => (
-                      <span key={`${a.id}-${ai}`}>
-                        {ai > 0 && ' / '}
-                        <button
-                          type="button"
-                          className="track-link"
-                          onClick={(e) => openEntity(e, `/artist/${t.source}/${a.id}?name=${encodeURIComponent(a.name)}`)}
-                          onKeyDown={stopKey}
-                        >
-                          {a.name}
-                        </button>
-                      </span>
-                    ))
-                  ) : (
-                    t.artist
-                  )}
+                  {t.artistRefs?.length
+                    ? t.artistRefs.map((a, ai) => (
+                        <span key={`${a.id}-${ai}`}>
+                          {ai > 0 && ' / '}
+                          <button
+                            type="button"
+                            className="track-link"
+                            onClick={(e) =>
+                              openEntity(
+                                e,
+                                `/artist/${t.source}/${a.id}?name=${encodeURIComponent(a.name)}`,
+                              )
+                            }
+                            onKeyDown={stopKey}
+                          >
+                            {a.name}
+                          </button>
+                        </span>
+                      ))
+                    : t.artist}
                 </span>
               </span>
             </span>
@@ -155,7 +188,9 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
                 <button
                   type="button"
                   className="track-link"
-                  onClick={(e) => openEntity(e, `/album/${t.source}/${t.albumId}`)}
+                  onClick={(e) =>
+                    openEntity(e, `/album/${t.source}/${t.albumId}`)
+                  }
                   onKeyDown={stopKey}
                 >
                   {t.album}
@@ -165,7 +200,9 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
               )}
             </span>
 
-            <span className="col-duration">{t.duration ? formatTime(t.duration) : '--:--'}</span>
+            <span className="col-duration">
+              {t.duration ? formatTime(t.duration) : '--:--'}
+            </span>
 
             <span className="col-actions" onClick={(e) => e.stopPropagation()}>
               <IconButton
@@ -175,11 +212,20 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
                 className="row-action"
                 onClick={() => toggleFavorite(t)}
               >
-                <Heart size={16} strokeWidth={2} fill={isFav ? 'currentColor' : 'none'} />
+                <Heart
+                  size={16}
+                  strokeWidth={2}
+                  fill={isFav ? 'currentColor' : 'none'}
+                />
               </IconButton>
               <AddToPlaylistMenu track={t}>
                 {({ onClick }) => (
-                  <IconButton label="添加到歌单" size="sm" className="row-action" onClick={onClick}>
+                  <IconButton
+                    label="添加到歌单"
+                    size="sm"
+                    className="row-action"
+                    onClick={onClick}
+                  >
                     <MoreHorizontal size={17} strokeWidth={2} />
                   </IconButton>
                 )}
@@ -195,6 +241,7 @@ export function TrackList({ tracks, showHeader = true, showIndex = true, emptyTe
 /** 判断两个队列是否为同一批曲目（顺序与身份键一致）。 */
 function isSameQueue(a: Track[], b: Track[]): boolean {
   if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) if (keyOf(a[i]) !== keyOf(b[i])) return false
+  for (let i = 0; i < a.length; i++)
+    if (keyOf(a[i]) !== keyOf(b[i])) return false
   return true
 }

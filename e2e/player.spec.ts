@@ -32,15 +32,20 @@ const IDB_STORE = 'library'
 const LIBRARY_KEY = 'pterosaur-library'
 
 /** 种入 library 状态（等待事务完成，规避异步竞态）。 */
-async function seedLibrary(page: Page, state: Record<string, unknown>): Promise<void> {
+async function seedLibrary(
+  page: Page,
+  state: Record<string, unknown>,
+): Promise<void> {
   await page.evaluate(
     ({ db, store, key, value }) =>
       new Promise<void>((resolve, reject) => {
         const req = indexedDB.open(db, 2)
         req.onupgradeneeded = () => {
           const d = req.result
-          if (!d.objectStoreNames.contains('library')) d.createObjectStore('library')
-          if (!d.objectStoreNames.contains('media')) d.createObjectStore('media')
+          if (!d.objectStoreNames.contains('library'))
+            d.createObjectStore('library')
+          if (!d.objectStoreNames.contains('media'))
+            d.createObjectStore('media')
           if (!d.objectStoreNames.contains('mediaMeta')) {
             const m = d.createObjectStore('mediaMeta', { keyPath: 'key' })
             m.createIndex('lastAccess', 'lastAccess')
@@ -58,7 +63,12 @@ async function seedLibrary(page: Page, state: Record<string, unknown>): Promise<
         }
         req.onerror = () => reject(req.error)
       }),
-    { db: IDB_DB, store: IDB_STORE, key: LIBRARY_KEY, value: { state, version: 0 } },
+    {
+      db: IDB_DB,
+      store: IDB_STORE,
+      key: LIBRARY_KEY,
+      value: { state, version: 0 },
+    },
   )
 }
 
@@ -105,7 +115,8 @@ async function waitForLibraryPersisted(
                 const g = tx.objectStore(store).get(key)
                 g.onsuccess = () => {
                   d.close()
-                  const v = g.result as { state?: Record<string, unknown[]> } | undefined
+                  const v = g.result as
+                    { state?: Record<string, unknown[]> } | undefined
                   resolve(v?.state?.[field]?.length ?? 0)
                 }
                 g.onerror = () => {
@@ -138,7 +149,9 @@ test.describe('应用外壳', () => {
     await page.goto('/')
     await page.getByRole('link', { name: '浏览' }).click()
     await expect(page).toHaveURL(/\/browse/)
-    await expect(page.locator('.browse__title', { hasText: '浏览' })).toBeVisible()
+    await expect(
+      page.locator('.browse__title', { hasText: '浏览' }),
+    ).toBeVisible()
 
     await page.getByRole('link', { name: '电台' }).click()
     await expect(page).toHaveURL(/\/radio/)
@@ -155,59 +168,114 @@ test.describe('应用外壳', () => {
     await expect(page).toHaveURL(/\/$/)
   })
 
-  test('立即收听：点击快捷入口本体进入对应页面（而非播放）', async ({ page }) => {
+  test('立即收听：点击快捷入口本体进入对应页面（而非播放）', async ({
+    page,
+  }) => {
     await page.goto('/')
     // 种入一条收藏与一条最近播放，确认「有内容」时点击本体也走导航而非播放
-    const t = { source: 'netease', id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
-    await seedLibrary(page, { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] })
+    const t = {
+      source: 'netease',
+      id: 'seed-1',
+      title: '种子曲目',
+      artist: '艺人',
+      album: '专辑',
+      cover: '',
+      duration: 200,
+      fee: 'free',
+    }
+    await seedLibrary(page, {
+      favorites: [t],
+      recent: [t],
+      playlists: [],
+      savedPlaylists: [],
+      savedAlbums: [],
+    })
     await page.reload()
-    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.home__shortcuts')).toBeVisible({
+      timeout: 15000,
+    })
 
     await page.locator('.shortcut', { hasText: '我喜欢的音乐' }).click()
     await expect(page).toHaveURL(/\/favorites/)
 
     await page.goto('/')
-    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.home__shortcuts')).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.shortcut', { hasText: '最近播放' }).click()
     await expect(page).toHaveURL(/\/recent/)
 
     // 全程未触发播放（audio 仍处于暂停）
-    const paused = await page.evaluate(() => (document.querySelector('audio') as HTMLAudioElement).paused)
+    const paused = await page.evaluate(
+      () => (document.querySelector('audio') as HTMLAudioElement).paused,
+    )
     expect(paused).toBe(true)
   })
 
   test('立即收听：快捷入口的播放按钮直接播放，不跳转', async ({ page }) => {
     await page.goto('/')
-    const t = { source: 'netease', id: 'seed-1', title: '种子曲目', artist: '艺人', album: '专辑', cover: '', duration: 200, fee: 'free' }
-    await seedLibrary(page, { favorites: [t], recent: [t], playlists: [], savedPlaylists: [], savedAlbums: [] })
+    const t = {
+      source: 'netease',
+      id: 'seed-1',
+      title: '种子曲目',
+      artist: '艺人',
+      album: '专辑',
+      cover: '',
+      duration: 200,
+      fee: 'free',
+    }
+    await seedLibrary(page, {
+      favorites: [t],
+      recent: [t],
+      playlists: [],
+      savedPlaylists: [],
+      savedAlbums: [],
+    })
     await page.reload()
-    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.home__shortcuts')).toBeVisible({
+      timeout: 15000,
+    })
 
-    await page.getByRole('button', { name: '播放我喜欢的音乐', exact: true }).click()
+    await page
+      .getByRole('button', { name: '播放我喜欢的音乐', exact: true })
+      .click()
 
     // 未跳转，且底栏出现曲名（已进入播放态）
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.locator('.playerbar__title')).not.toBeEmpty({ timeout: 8000 })
+    await expect(page.locator('.playerbar__title')).not.toBeEmpty({
+      timeout: 8000,
+    })
   })
 
-  test('立即收听：集合为空时 hover 仍出现播放按钮（禁用态）', async ({ page }) => {
+  test('立即收听：集合为空时 hover 仍出现播放按钮（禁用态）', async ({
+    page,
+  }) => {
     await page.goto('/')
     await clearLibrary(page)
     await page.reload()
-    await expect(page.locator('.home__shortcuts')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.home__shortcuts')).toBeVisible({
+      timeout: 15000,
+    })
 
-    const play = page.getByRole('button', { name: '播放我喜欢的音乐', exact: true })
+    const play = page.getByRole('button', {
+      name: '播放我喜欢的音乐',
+      exact: true,
+    })
     // 空集合：按钮存在但禁用
     await expect(play).toBeDisabled()
 
     // hover 后浮现（opacity 由 0 变为 1）
     await page.locator('.shortcut', { hasText: '我喜欢的音乐' }).hover()
     await expect
-      .poll(async () => Number(await play.evaluate((el) => getComputedStyle(el).opacity)))
+      .poll(async () =>
+        Number(await play.evaluate((el) => getComputedStyle(el).opacity)),
+      )
       .toBeGreaterThan(0.5)
   })
 
-  test('侧边栏标题点击切换 commit 哈希，GitHub 图标指向仓库', async ({ page }) => {
+  test('侧边栏标题点击切换 commit 哈希，GitHub 图标指向仓库', async ({
+    page,
+  }) => {
     await page.goto('/')
     const brand = page.locator('.sidebar__name')
     await expect(brand).toHaveText('Pterosaur')
@@ -231,7 +299,11 @@ test.describe('应用外壳', () => {
     const root = page.locator('html')
 
     // 点击主题按钮（aria-label 为「切换到浅色」或「切换到深色」）
-    const toggle = page.locator('button[aria-label="切换到浅色"], button[aria-label="切换到深色"]').first()
+    const toggle = page
+      .locator(
+        'button[aria-label="切换到浅色"], button[aria-label="切换到深色"]',
+      )
+      .first()
     const before = await root.getAttribute('data-theme')
     await toggle.click()
     await expect
@@ -246,7 +318,11 @@ test.describe('应用外壳', () => {
     await page.goto('/')
     const root = page.locator('html')
 
-    const toggle = page.locator('button[aria-label="切换到浅色"], button[aria-label="切换到深色"]').first()
+    const toggle = page
+      .locator(
+        'button[aria-label="切换到浅色"], button[aria-label="切换到深色"]',
+      )
+      .first()
     const before = await root.getAttribute('data-theme')
     await toggle.click()
     await expect
@@ -265,14 +341,18 @@ test.describe('搜索与播放', () => {
     await expect(page).toHaveURL(/\/search\?q=/)
 
     // 结果行应出现
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     const rows = await page.locator('.track-row').count()
     expect(rows).toBeGreaterThan(0)
   })
 
   test('点击结果行开始真实播放（audio 未暂停且时间前进）', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
 
     await page.locator('.track-row').first().click()
 
@@ -281,7 +361,9 @@ test.describe('搜索与播放', () => {
       .poll(
         async () => {
           const s = await audioState(page)
-          return s.exists && !s.paused && s.readyState >= 2 && s.errorCode === null
+          return (
+            s.exists && !s.paused && s.readyState >= 2 && s.errorCode === null
+          )
         },
         { timeout: 20000, message: '音频应开始播放' },
       )
@@ -299,11 +381,15 @@ test.describe('搜索与播放', () => {
 
   test('播放/暂停按钮切换播放状态', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
 
     await expect
-      .poll(async () => (await audioState(page)).paused === false, { timeout: 20000 })
+      .poll(async () => (await audioState(page)).paused === false, {
+        timeout: 20000,
+      })
       .toBe(true)
 
     // 暂停
@@ -315,22 +401,30 @@ test.describe('搜索与播放', () => {
     // 再播放
     await page.getByTestId('play-toggle').click()
     await expect
-      .poll(async () => (await audioState(page)).paused === false, { timeout: 5000 })
+      .poll(async () => (await audioState(page)).paused === false, {
+        timeout: 5000,
+      })
       .toBe(true)
   })
 
   test('下一首切换当前曲目', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
     await expect
-      .poll(async () => (await audioState(page)).paused === false, { timeout: 20000 })
+      .poll(async () => (await audioState(page)).paused === false, {
+        timeout: 20000,
+      })
       .toBe(true)
 
     const titleBefore = await page.locator('.playerbar__title').textContent()
     await page.getByRole('button', { name: '下一首' }).click()
     await expect
-      .poll(async () => page.locator('.playerbar__title').textContent(), { timeout: 8000 })
+      .poll(async () => page.locator('.playerbar__title').textContent(), {
+        timeout: 8000,
+      })
       .not.toBe(titleBefore)
   })
 })
@@ -338,7 +432,9 @@ test.describe('搜索与播放', () => {
 test.describe('全屏播放页与歌词', () => {
   test('展开播放页显示歌词并可 Esc 关闭', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
     await expect(page.locator('.nowplaying')).toHaveCount(0)
 
@@ -347,7 +443,9 @@ test.describe('全屏播放页与歌词', () => {
     await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
 
     // 歌词应加载（该曲目有词）
-    await expect(page.locator('.lyric-line').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.lyric-line').first()).toBeVisible({
+      timeout: 15000,
+    })
     const lines = await page.locator('.lyric-line').count()
     expect(lines).toBeGreaterThan(0)
 
@@ -358,13 +456,17 @@ test.describe('全屏播放页与歌词', () => {
 
   test('沉浸页的专辑 / 歌手可点击跳转', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
     await page.locator('.playerbar__cover-btn').click()
     await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
 
     // 歌手名可点 → 跳转艺人页，且沉浸页自动收起
-    const artistLink = page.locator('.nowplaying__artist .nowplaying__link').first()
+    const artistLink = page
+      .locator('.nowplaying__artist .nowplaying__link')
+      .first()
     await expect(artistLink).toBeVisible({ timeout: 15000 })
     await artistLink.click()
     await expect(page).toHaveURL(/\/artist\//)
@@ -373,7 +475,9 @@ test.describe('全屏播放页与歌词', () => {
     // 再次展开：专辑名同样可点 → 跳转专辑页
     await page.locator('.playerbar__cover-btn').click()
     await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
-    const albumLink = page.locator('.nowplaying__header-title .nowplaying__link').first()
+    const albumLink = page
+      .locator('.nowplaying__header-title .nowplaying__link')
+      .first()
     await expect(albumLink).toBeVisible({ timeout: 5000 })
     await albumLink.click()
     await expect(page).toHaveURL(/\/album\//)
@@ -381,10 +485,14 @@ test.describe('全屏播放页与歌词', () => {
 
   test('首行 / 末行歌词同样垂直居中', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
     await page.locator('.playerbar__cover-btn').click()
-    await expect(page.locator('.nowplaying__lyrics .lyric-line').first()).toBeVisible({ timeout: 15000 })
+    await expect(
+      page.locator('.nowplaying__lyrics .lyric-line').first(),
+    ).toBeVisible({ timeout: 15000 })
 
     // 当前高亮行中心与歌词区中心之差（px）
     const centerDelta = () =>
@@ -399,24 +507,34 @@ test.describe('全屏播放页与歌词', () => {
 
     const clickLine = (i: number) =>
       page.evaluate((idx) => {
-        const lines = document.querySelectorAll('.nowplaying__lyrics .lyric-line')
-        ;(lines[Math.min(Math.max(idx, 0), lines.length - 1)] as HTMLElement).click()
+        const lines = document.querySelectorAll(
+          '.nowplaying__lyrics .lyric-line',
+        )
+        ;(
+          lines[Math.min(Math.max(idx, 0), lines.length - 1)] as HTMLElement
+        ).click()
       }, i)
 
     const count = await page.locator('.nowplaying__lyrics .lyric-line').count()
 
     // 首行（无法靠「滚动」贴到中线，需靠容器内边距）
     await clickLine(0)
-    await expect.poll(async () => Math.abs(await centerDelta()), { timeout: 3000 }).toBeLessThan(3)
+    await expect
+      .poll(async () => Math.abs(await centerDelta()), { timeout: 3000 })
+      .toBeLessThan(3)
 
     // 末行
     await clickLine(count - 1)
-    await expect.poll(async () => Math.abs(await centerDelta()), { timeout: 3000 }).toBeLessThan(3)
+    await expect
+      .poll(async () => Math.abs(await centerDelta()), { timeout: 3000 })
+      .toBeLessThan(3)
   })
 
   test('共享元素：展开 / 收起时封面持名互斥', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
     await expect(page.locator('.nowplaying')).toHaveCount(0)
 
@@ -435,13 +553,17 @@ test.describe('全屏播放页与歌词', () => {
     await expect(page.locator('.nowplaying')).toBeVisible({ timeout: 5000 })
 
     // 展开后：大封面持 np-cover，底部小封面让名（二者绝不同时持名）
-    await expect.poll(async () => (await names()).np, { timeout: 3000 }).toBe('np-cover')
+    await expect
+      .poll(async () => (await names()).np, { timeout: 3000 })
+      .toBe('np-cover')
     expect((await names()).pb).not.toBe('np-cover')
 
     // 收起（Esc）后：小封面重新持名
     await page.keyboard.press('Escape')
     await expect(page.locator('.nowplaying')).toHaveCount(0, { timeout: 3000 })
-    await expect.poll(async () => (await names()).pb, { timeout: 3000 }).toBe('np-cover')
+    await expect
+      .poll(async () => (await names()).pb, { timeout: 3000 })
+      .toBe('np-cover')
   })
 
   test('减少动效下开合仍然可用且无报错', async ({ page }) => {
@@ -450,7 +572,9 @@ test.describe('全屏播放页与歌词', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' })
 
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
 
     await page.locator('.playerbar__cover-btn').click()
@@ -465,15 +589,21 @@ test.describe('全屏播放页与歌词', () => {
 test.describe('播放队列', () => {
   test('打开队列面板显示当前队列曲目', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
 
     // 关闭态：面板在屏外，不应带可见投影（实心投影会漏进窗口右缘）
-    const closedShadow = await page.locator('.queue-panel').evaluate((el) => getComputedStyle(el).boxShadow)
+    const closedShadow = await page
+      .locator('.queue-panel')
+      .evaluate((el) => getComputedStyle(el).boxShadow)
     expect(closedShadow).toContain('rgba(0, 0, 0, 0)')
 
     await page.getByRole('button', { name: '播放队列' }).click()
-    await expect(page.locator('.queue-panel--open')).toBeVisible({ timeout: 3000 })
+    await expect(page.locator('.queue-panel--open')).toBeVisible({
+      timeout: 3000,
+    })
 
     // 关闭按钮已移除（改用遮罩 / 播放队列按钮关闭）
     await expect(page.getByRole('button', { name: '关闭队列' })).toHaveCount(0)
@@ -488,9 +618,14 @@ test.describe('播放队列', () => {
 test.describe('资料库与收藏', () => {
   test('收藏曲目后出现在「我喜欢的音乐」并持久化', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
 
-    const firstTitle = await page.locator('.track-row .col-title__name').first().textContent()
+    const firstTitle = await page
+      .locator('.track-row .col-title__name')
+      .first()
+      .textContent()
 
     // 悬停行后点击「喜欢」
     const firstRow = page.locator('.track-row').first()
@@ -501,13 +636,21 @@ test.describe('资料库与收藏', () => {
 
     // 进入收藏页
     await page.goto('/favorites')
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 8000 })
-    await expect(page.locator('.track-row').first()).toContainText((firstTitle ?? '').trim())
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 8000,
+    })
+    await expect(page.locator('.track-row').first()).toContainText(
+      (firstTitle ?? '').trim(),
+    )
 
     // 刷新后仍在（IndexedDB 持久化）
     await page.reload()
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 8000 })
-    await expect(page.locator('.track-row').first()).toContainText((firstTitle ?? '').trim())
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 8000,
+    })
+    await expect(page.locator('.track-row').first()).toContainText(
+      (firstTitle ?? '').trim(),
+    )
   })
 
   test('空收藏时显示空状态', async ({ page, context }) => {
@@ -516,19 +659,28 @@ test.describe('资料库与收藏', () => {
     // 清空 IndexedDB 中的 library 以确保空态（可能因上一用例留有数据）
     await clearLibrary(page)
     await page.reload()
-    await expect(page.getByText('还没有喜欢的音乐')).toBeVisible({ timeout: 8000 })
+    await expect(page.getByText('还没有喜欢的音乐')).toBeVisible({
+      timeout: 8000,
+    })
   })
 
   test('收藏专辑后出现在唱片盒', async ({ page }) => {
     // 从搜索的专辑 tab 进入一张专辑
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
     await page.getByRole('tab', { name: /专辑/ }).click()
-    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
-    const name = ((await page.locator('.card--album .card__title').first().textContent()) ?? '').trim()
+    await expect(page.locator('.card--album').first()).toBeVisible({
+      timeout: 8000,
+    })
+    const name = (
+      (await page.locator('.card--album .card__title').first().textContent()) ??
+      ''
+    ).trim()
 
     await page.locator('.card--album').first().click()
     await expect(page).toHaveURL(/\/album\/[^/]+\/\d+/, { timeout: 8000 })
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 20000,
+    })
 
     // 收藏
     await page.getByRole('button', { name: '收藏到资料库' }).click()
@@ -538,10 +690,14 @@ test.describe('资料库与收藏', () => {
     // 唱片盒中出现该专辑
     await page.goto('/crate')
     await expect(page.locator('.crate__title')).toHaveText('唱片盒')
-    await expect(page.locator('.crate .card--album').first()).toContainText(name)
+    await expect(page.locator('.crate .card--album').first()).toContainText(
+      name,
+    )
   })
 
-  test('唱片盒：艺人 / 专辑上下两区；取消收藏后卡片不立即消失', async ({ page }) => {
+  test('唱片盒：艺人 / 专辑上下两区；取消收藏后卡片不立即消失', async ({
+    page,
+  }) => {
     // 本地种入，零联网（规避网易云限流抖动）
     await page.goto('/')
     await seedLibrary(page, {
@@ -549,23 +705,43 @@ test.describe('资料库与收藏', () => {
       recent: [],
       playlists: [],
       savedPlaylists: [],
-      savedArtists: [{ source: 'netease', id: 'ar1', name: '测试艺人', avatar: '' }],
-      savedAlbums: [{ source: 'netease', id: 'a1', name: '测试专辑', cover: '', artist: '甲' }],
+      savedArtists: [
+        { source: 'netease', id: 'ar1', name: '测试艺人', avatar: '' },
+      ],
+      savedAlbums: [
+        {
+          source: 'netease',
+          id: 'a1',
+          name: '测试专辑',
+          cover: '',
+          artist: '甲',
+        },
+      ],
     })
     await page.goto('/crate')
 
     // 上下两个分区
-    await expect(page.locator('.crate .section-title', { hasText: '艺人' })).toBeVisible()
-    await expect(page.locator('.crate .section-title', { hasText: '专辑' })).toBeVisible()
-    await expect(page.locator('.crate .card--artist').first()).toContainText('测试艺人')
-    await expect(page.locator('.crate .card--album').first()).toContainText('测试专辑')
+    await expect(
+      page.locator('.crate .section-title', { hasText: '艺人' }),
+    ).toBeVisible()
+    await expect(
+      page.locator('.crate .section-title', { hasText: '专辑' }),
+    ).toBeVisible()
+    await expect(page.locator('.crate .card--artist').first()).toContainText(
+      '测试艺人',
+    )
+    await expect(page.locator('.crate .card--album').first()).toContainText(
+      '测试专辑',
+    )
 
     // 悬浮艺人卡片 → 取消收藏：红心转为未收藏态，但卡片**不立即消失**（防误触）
     const artistCard = page.locator('.crate .card--artist').first()
     await artistCard.hover()
     await artistCard.getByRole('button', { name: '取消收藏' }).click()
     await expect(page.locator('.crate .card--artist')).toHaveCount(1)
-    await expect(artistCard.getByRole('button', { name: '收藏到资料库' })).toBeVisible()
+    await expect(
+      artistCard.getByRole('button', { name: '收藏到资料库' }),
+    ).toBeVisible()
 
     // 离开再进入（页内跳转，不刷新）→ 才消失；专辑分区不受影响
     await page.getByRole('link', { name: '我喜欢的音乐' }).click()
@@ -573,7 +749,9 @@ test.describe('资料库与收藏', () => {
     await page.getByRole('link', { name: '唱片盒' }).click()
     await expect(page).toHaveURL(/\/crate/)
     await expect(page.locator('.crate .card--artist')).toHaveCount(0)
-    await expect(page.locator('.crate .card--album').first()).toContainText('测试专辑')
+    await expect(page.locator('.crate .card--album').first()).toContainText(
+      '测试专辑',
+    )
   })
 
   test('唱片盒空态：未收藏任何艺人 / 专辑时提示去收藏', async ({ page }) => {
@@ -587,7 +765,9 @@ test.describe('资料库与收藏', () => {
     // 借专辑页的艺人链接进入艺人页（复用较稳定的搜索路径）
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
     await page.getByRole('tab', { name: /专辑/ }).click()
-    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.card--album').first()).toBeVisible({
+      timeout: 8000,
+    })
     await page.locator('.card--album').first().click()
     await expect(page).toHaveURL(/\/album\/[^/]+\/\d+/, { timeout: 8000 })
 
@@ -603,8 +783,12 @@ test.describe('资料库与收藏', () => {
 
     // 唱片盒的艺人分区出现该艺人
     await page.goto('/crate')
-    await expect(page.locator('.crate .section-title', { hasText: '艺人' })).toBeVisible({ timeout: 8000 })
-    await expect(page.locator('.crate .card--artist').first()).toBeVisible({ timeout: 8000 })
+    await expect(
+      page.locator('.crate .section-title', { hasText: '艺人' }),
+    ).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.crate .card--artist').first()).toBeVisible({
+      timeout: 8000,
+    })
   })
 })
 
@@ -617,7 +801,9 @@ test.describe('歌单详情', () => {
 
     await expect(page.locator('.detail__name')).toBeVisible({ timeout: 8000 })
     // 曲目应加载（可能较慢，给足时间）
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 20000,
+    })
   })
 })
 
@@ -633,7 +819,9 @@ test.describe('卡片播放按钮', () => {
     // 仍停留在浏览页（未跳转到歌单详情）
     await expect(page).toHaveURL(/\/browse/)
     // 底栏出现曲名 → 已进入播放态
-    await expect(page.locator('.playerbar__title')).not.toBeEmpty({ timeout: 10000 })
+    await expect(page.locator('.playerbar__title')).not.toBeEmpty({
+      timeout: 10000,
+    })
   })
 })
 
@@ -643,29 +831,42 @@ test.describe('搜索分栏与艺人 / 专辑跳转', () => {
 
     const tabs = page.getByRole('tab')
     await expect(tabs).toHaveCount(4)
-    await expect(page.getByRole('tab', { name: /歌曲/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: /歌曲/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
 
     // 默认歌曲 tab：显示曲目行
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
 
     // 切到艺人 tab
     await page.getByRole('tab', { name: /艺人/ }).click()
-    await expect(page.locator('.card--artist').first()).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.card--artist').first()).toBeVisible({
+      timeout: 8000,
+    })
 
     // 切到专辑 tab
     await page.getByRole('tab', { name: /专辑/ }).click()
-    await expect(page.locator('.card--album').first()).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.card--album').first()).toBeVisible({
+      timeout: 8000,
+    })
   })
 
   test('从搜索的艺人卡片进入艺人页', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
     await page.getByRole('tab', { name: /艺人/ }).click()
-    await expect(page.locator('.card--artist').first()).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.card--artist').first()).toBeVisible({
+      timeout: 8000,
+    })
 
     await page.locator('.card--artist').first().click()
     await expect(page).toHaveURL(/\/artist\/[^/]+\/\d+/, { timeout: 8000 })
     await expect(page.locator('.detail__name')).toBeVisible({ timeout: 8000 })
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 20000,
+    })
   })
 
   test('歌单曲目行点击专辑名跳转专辑页', async ({ page }) => {
@@ -674,19 +875,29 @@ test.describe('搜索分栏与艺人 / 专辑跳转', () => {
     await expect(page.locator('.card').first()).toBeVisible({ timeout: 15000 })
     await page.locator('.card').first().click()
     await expect(page).toHaveURL(/\/playlist\/[^/]+\/\d+/, { timeout: 8000 })
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 20000,
+    })
 
     // 点击首行的专辑链接
-    await page.locator('.track-row').first().locator('.col-album .track-link').click()
+    await page
+      .locator('.track-row')
+      .first()
+      .locator('.col-album .track-link')
+      .click()
     await expect(page).toHaveURL(/\/album\/[^/]+\/\d+/, { timeout: 8000 })
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 20000,
+    })
   })
 })
 
 test.describe('队列面板毛玻璃', () => {
   test('队列面板具备 backdrop-filter 毛玻璃', async ({ page }) => {
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
 
     await page.getByRole('button', { name: '播放队列' }).click()
@@ -695,7 +906,9 @@ test.describe('队列面板毛玻璃', () => {
 
     const backdrop = await panel.evaluate((el) => {
       const cs = getComputedStyle(el)
-      const webkit = (cs as unknown as { webkitBackdropFilter?: string }).webkitBackdropFilter ?? ''
+      const webkit =
+        (cs as unknown as { webkitBackdropFilter?: string })
+          .webkitBackdropFilter ?? ''
       return `${cs.backdropFilter ?? ''} ${webkit}`
     })
     expect(backdrop).toContain('blur')
@@ -751,7 +964,9 @@ test.describe('后端 API 契约', () => {
   })
 
   test('搜索接口返回规范化曲目', async ({ request }) => {
-    const res = await request.get('/api/search', { params: { keywords: FREE_SONG_KEYWORD, limit: 5 } })
+    const res = await request.get('/api/search', {
+      params: { keywords: FREE_SONG_KEYWORD, limit: 5 },
+    })
     expect(res.ok()).toBe(true)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -768,7 +983,9 @@ test.describe('后端 API 契约', () => {
 
   test('音频流代理支持 Range 分段', async ({ request }) => {
     // 先搜到一个可播放曲目
-    const s = await request.get('/api/search', { params: { keywords: FREE_SONG_KEYWORD, limit: 5 } })
+    const s = await request.get('/api/search', {
+      params: { keywords: FREE_SONG_KEYWORD, limit: 5 },
+    })
     const songs = (await s.json()).data
     const id = songs.find((x: { id: string }) => x.id)?.id
     expect(id).toBeTruthy()
@@ -784,7 +1001,9 @@ test.describe('后端 API 契约', () => {
   })
 
   test('多类型搜索接口返回四类结果', async ({ request }) => {
-    const res = await request.get('/api/search/all', { params: { keywords: FREE_SONG_KEYWORD, limit: 3 } })
+    const res = await request.get('/api/search/all', {
+      params: { keywords: FREE_SONG_KEYWORD, limit: 3 },
+    })
     expect(res.ok()).toBe(true)
     const body = await res.json()
     expect(body.ok).toBe(true)
@@ -799,7 +1018,9 @@ test.describe('后端 API 契约', () => {
   })
 
   test('艺人 / 专辑详情接口返回契约', async ({ request }) => {
-    const s = await request.get('/api/search/all', { params: { keywords: FREE_SONG_KEYWORD, limit: 3 } })
+    const s = await request.get('/api/search/all', {
+      params: { keywords: FREE_SONG_KEYWORD, limit: 3 },
+    })
     const data = (await s.json()).data
 
     const artistId = data.artists?.[0]?.id
@@ -831,7 +1052,9 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
     await page.reload()
 
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
 
     // 缓存发生在整文件下载完成时，故轮询 audioMeta 表直至出现记录
@@ -850,7 +1073,10 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
                     resolve(0)
                     return
                   }
-                  const c = d.transaction('mediaMeta', 'readonly').objectStore('mediaMeta').count()
+                  const c = d
+                    .transaction('mediaMeta', 'readonly')
+                    .objectStore('mediaMeta')
+                    .count()
                   c.onsuccess = () => {
                     d.close()
                     resolve(c.result)
@@ -877,7 +1103,9 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
 
     // 搜索结果行带封面，触发对网易云 CDN 的图片请求
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
 
     // SW 以 CORS 拉取图片字节后写入 mediaMeta，轮询直至出现 image 条目
     await expect
@@ -894,7 +1122,10 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
                     resolve(0)
                     return
                   }
-                  const g = d.transaction('mediaMeta', 'readonly').objectStore('mediaMeta').getAll()
+                  const g = d
+                    .transaction('mediaMeta', 'readonly')
+                    .objectStore('mediaMeta')
+                    .getAll()
                   g.onsuccess = () => {
                     d.close()
                     const rows = g.result as { kind?: string }[]
@@ -916,18 +1147,30 @@ test.describe('媒体缓存（Service Worker + IndexedDB）', () => {
 })
 
 test.describe('弱网韧性', () => {
-  test('音频流挂起：播放键显示缓冲动画，超时后提示并回到暂停', async ({ page, context }) => {
+  test('音频流挂起：播放键显示缓冲动画，超时后提示并回到暂停', async ({
+    page,
+    context,
+  }) => {
     test.slow()
     // 拦截音频流并保持挂起（模拟弱网：请求发出但迟迟无响应）
     await context.route('**/stream/**', () => new Promise(() => {}))
 
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
-    const title = ((await page.locator('.track-row .col-title__name').first().textContent()) ?? '').trim()
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
+    const title = (
+      (await page
+        .locator('.track-row .col-title__name')
+        .first()
+        .textContent()) ?? ''
+    ).trim()
     await page.locator('.track-row').first().click()
 
     // 缓冲态可视化：播放键显示加载动画
-    await expect(page.getByTestId('play-buffering')).toBeVisible({ timeout: 8000 })
+    await expect(page.getByTestId('play-buffering')).toBeVisible({
+      timeout: 8000,
+    })
 
     // 起播超时兜底：出现提示，且最终回到暂停态（不无限等待）
     await expect(page.locator('.toast')).toBeVisible({ timeout: 20000 })
@@ -939,11 +1182,16 @@ test.describe('弱网韧性', () => {
     await expect(page.locator('.playerbar__title')).toContainText(title)
   })
 
-  test('音频流请求失败：提示错误并回暂停，解除故障后可重试播放', async ({ page, context }) => {
+  test('音频流请求失败：提示错误并回暂停，解除故障后可重试播放', async ({
+    page,
+    context,
+  }) => {
     await context.route('**/stream/**', (route) => route.abort('failed'))
 
     await page.goto('/search?q=' + encodeURIComponent(FREE_SONG_KEYWORD))
-    await expect(page.locator('.track-row').first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.track-row').first()).toBeVisible({
+      timeout: 15000,
+    })
     await page.locator('.track-row').first().click()
 
     // 请求失败：给出提示且回到暂停态（不静默停在「播放中」）

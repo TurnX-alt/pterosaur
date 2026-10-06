@@ -12,7 +12,7 @@
 ## 行为
 
 - 预期行为：
-  - **实体身份**：`Track`/`Artist`/`Album`/`Playlist` 均带 `source`；全仓以 `keyOf(e) = \`${sourceOf(e)}:${e.id}\`` 认曲/认实体。`sourceOf` 对缺失 `source` 的旧数据回填 `'netease'`。
+  - **实体身份**：`Track`/`Artist`/`Album`/`Playlist` 均带 `source`；全仓以 `keyOf(e) = \`${sourceOf(e)}:${e.id}\`` 认曲/认实体。`sourceOf`对缺失`source`的旧数据回填`'netease'`。
   - **音频流**：`streamUrl(source, id)` → `/stream/:source/:id`；后端按源分派适配器解析真实地址（带 15 分钟 LRU，键含源与凭证指纹），https 改写 + Range 转发。**保留 2 段式 `/stream/:id` 别名**（视为缺省源）。
   - **内容路由**：`/api/search`、`/api/search/all`、`/api/songs` 用 `?source=`（默认 netease）；`/api/artist|album|playlist|lyric/:source/:id` 用路径段，并保留 2 段式别名。`/api/discover/*` 与 `/api/user/playlists` 为**网易云专属**，不带源。
   - **能力可缺**：`SourceAdapter` 的可选成员（`searchArtists`/`searchAlbums`/`searchPlaylists`/`artistDetail`/`playlistTracks`/`songDetail`/`qrLoginUrl`/`userPlaylists`）缺失时，路由回 501，`/api/search/all` 对应类别返回空数组并在 `capabilities` 标记，前端隐藏该分类 tab。**登录一律扫码**（无帐密登录）。

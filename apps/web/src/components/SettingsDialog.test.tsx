@@ -18,8 +18,13 @@ describe('SettingsDialog 音质选择', () => {
     for (const lv of AUDIO_LEVELS) {
       expect(screen.getByTestId(`quality-${lv}`)).toBeInTheDocument()
     }
-    expect(screen.getByTestId(`quality-${DEFAULT_AUDIO_LEVEL}`)).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByTestId('quality-lossless')).toHaveAttribute('aria-checked', 'false')
+    expect(
+      screen.getByTestId(`quality-${DEFAULT_AUDIO_LEVEL}`),
+    ).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('quality-lossless')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
   })
 
   it('点击档位写入 settings store', () => {

@@ -17,8 +17,8 @@
   grid-template-columns: var(--sidebar-width) 1fr;
   grid-template-rows: 1fr var(--playerbar-height);
   grid-template-areas:
-    "sidebar main"
-    "playerbar playerbar";
+    'sidebar main'
+    'playerbar playerbar';
   height: 100vh;
   height: 100dvh;
   width: 100vw;
@@ -124,8 +124,8 @@
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
     grid-template-areas:
-      "main"
-      "playerbar";
+      'main'
+      'playerbar';
   }
 
   .page,

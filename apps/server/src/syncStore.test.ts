@@ -3,10 +3,23 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SyncEnvelope } from '@pterosaur/shared/types'
-import { MAX_PAYLOAD_BYTES, clearLibrary, isSyncEnvelope, readLibrary, writeLibrary } from './syncStore.js'
+import {
+  MAX_PAYLOAD_BYTES,
+  clearLibrary,
+  isSyncEnvelope,
+  readLibrary,
+  writeLibrary,
+} from './syncStore.js'
 
 const envelope = (updatedAt = 1): SyncEnvelope => ({
-  state: { favorites: [], recent: [], playlists: [], savedPlaylists: [], savedArtists: [], savedAlbums: [] },
+  state: {
+    favorites: [],
+    recent: [],
+    playlists: [],
+    savedPlaylists: [],
+    savedArtists: [],
+    savedAlbums: [],
+  },
   updatedAt,
 })
 
@@ -47,30 +60,49 @@ describe('syncStore 校验与安全', () => {
   it('非法载荷被拒（缺字段 / updatedAt 非数）', () => {
     expect(isSyncEnvelope(null)).toBe(false)
     expect(isSyncEnvelope({ state: {}, updatedAt: 1 })).toBe(false)
-    expect(isSyncEnvelope({ state: envelope().state, updatedAt: 'x' })).toBe(false)
+    expect(isSyncEnvelope({ state: envelope().state, updatedAt: 'x' })).toBe(
+      false,
+    )
     expect(isSyncEnvelope(envelope())).toBe(true)
   })
 
   it('宽容解析：缺失与未知的新字段都不影响校验（旧载荷不被误判非法）', () => {
     // 缺 savedArtists 的旧载荷
     const legacy = {
-      state: { favorites: [], recent: [], playlists: [], savedPlaylists: [], savedAlbums: [] },
+      state: {
+        favorites: [],
+        recent: [],
+        playlists: [],
+        savedPlaylists: [],
+        savedAlbums: [],
+      },
       updatedAt: 1,
     }
     expect(isSyncEnvelope(legacy)).toBe(true)
 
     // 含任意新增 / 未知字段的载荷也放行（服务端有意不枚举后续字段）
-    const future = { state: { ...legacy.state, savedArtists: [], someFutureField: 123 }, updatedAt: 1 }
+    const future = {
+      state: { ...legacy.state, savedArtists: [], someFutureField: 123 },
+      updatedAt: 1,
+    }
     expect(isSyncEnvelope(future)).toBe(true)
   })
 
   it('写入非法载荷抛错', async () => {
-    await expect(writeLibrary('42', { state: {}, updatedAt: 1 } as unknown as SyncEnvelope, dir)).rejects.toThrow()
+    await expect(
+      writeLibrary(
+        '42',
+        { state: {}, updatedAt: 1 } as unknown as SyncEnvelope,
+        dir,
+      ),
+    ).rejects.toThrow()
   })
 
   it('超过体积上限抛错', async () => {
     const big = envelope()
-    big.state.favorites = [{ id: 'x', title: 'y'.repeat(MAX_PAYLOAD_BYTES) }] as never
+    big.state.favorites = [
+      { id: 'x', title: 'y'.repeat(MAX_PAYLOAD_BYTES) },
+    ] as never
     await expect(writeLibrary('42', big, dir)).rejects.toThrow()
   })
 

@@ -34,20 +34,43 @@ export function Browse() {
   // 发现内容跟随活动账号（未登录用缺省源）。
   const source = activeSource(status) ?? DEFAULT_SOURCE
 
-  const recommend = useAsync<Playlist[]>(() => api.recommend(source, 30), [source], [])
-  const playlists = useAsync<Playlist[]>(() => api.playlists(source, 30), [source], [])
-  const toplists = useAsync<Playlist[]>(() => api.toplists(source), [source], [])
+  const recommend = useAsync<Playlist[]>(
+    () => api.recommend(source, 30),
+    [source],
+    [],
+  )
+  const playlists = useAsync<Playlist[]>(
+    () => api.playlists(source, 30),
+    [source],
+    [],
+  )
+  const toplists = useAsync<Playlist[]>(
+    () => api.toplists(source),
+    [source],
+    [],
+  )
 
   // 该源支持哪些分区（如 QQ 暂无排行榜）——不支持的 tab 隐藏。
-  const caps = useAsync<{ recommend: boolean; playlists: boolean; toplists: boolean }>(
-    () => api.discoverCapabilities(source),
-    [source],
-    { recommend: true, playlists: true, toplists: true },
-  )
+  const caps = useAsync<{
+    recommend: boolean
+    playlists: boolean
+    toplists: boolean
+  }>(() => api.discoverCapabilities(source), [source], {
+    recommend: true,
+    playlists: true,
+    toplists: true,
+  })
   const visibleTabs = TABS.filter((t) => caps.data?.[t.key] !== false)
-  const activeTab: Tab = visibleTabs.some((t) => t.key === tab) ? tab : (visibleTabs[0]?.key ?? 'recommend')
+  const activeTab: Tab = visibleTabs.some((t) => t.key === tab)
+    ? tab
+    : (visibleTabs[0]?.key ?? 'recommend')
 
-  const active = activeTab === 'recommend' ? recommend : activeTab === 'playlists' ? playlists : toplists
+  const active =
+    activeTab === 'recommend'
+      ? recommend
+      : activeTab === 'playlists'
+        ? playlists
+        : toplists
 
   return (
     <div className="browse">
@@ -80,7 +103,11 @@ export function Browse() {
               <PlaylistCard
                 key={p.id}
                 playlist={p}
-                subtitle={fmtCount(p.playCount) ? `${fmtCount(p.playCount)} 次播放` : undefined}
+                subtitle={
+                  fmtCount(p.playCount)
+                    ? `${fmtCount(p.playCount)} 次播放`
+                    : undefined
+                }
                 onClick={() => navigate(`/playlist/${p.source}/${p.id}`)}
               />
             ))}

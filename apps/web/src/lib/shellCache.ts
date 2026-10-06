@@ -30,11 +30,15 @@ export function registerShellRoutes(): void {
       networkTimeoutSeconds: 3,
       plugins: [
         {
-          cacheKeyWillBeUsed: async () => new URL('/index.html', self.location.origin).href,
+          cacheKeyWillBeUsed: async () =>
+            new URL('/index.html', self.location.origin).href,
         },
         // 只缓存 200，避免把瞬时 5xx 当成外壳
         new CacheableResponsePlugin({ statuses: [200] }),
-        new ExpirationPlugin({ maxEntries: 1, maxAgeSeconds: SHELL_MAX_AGE_SECONDS }),
+        new ExpirationPlugin({
+          maxEntries: 1,
+          maxAgeSeconds: SHELL_MAX_AGE_SECONDS,
+        }),
       ],
     }),
   )
@@ -46,7 +50,12 @@ export function registerShellRoutes(): void {
       (request.destination === 'script' || request.destination === 'style'),
     new StaleWhileRevalidate({
       cacheName: SHELL_ASSET_CACHE,
-      plugins: [new ExpirationPlugin({ maxEntries: 64, maxAgeSeconds: SHELL_MAX_AGE_SECONDS })],
+      plugins: [
+        new ExpirationPlugin({
+          maxEntries: 64,
+          maxAgeSeconds: SHELL_MAX_AGE_SECONDS,
+        }),
+      ],
     }),
   )
 }

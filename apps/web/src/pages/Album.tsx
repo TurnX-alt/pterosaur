@@ -7,7 +7,11 @@ import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { confirmDialog } from '../store/ui.js'
 import type { Album, Track } from '@pterosaur/shared/types'
-import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
+import {
+  DEFAULT_SOURCE,
+  isMusicSource,
+  type MusicSource,
+} from '@pterosaur/shared/types'
 import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
 import { useSettings } from '../store/settings.js'
 import { TrackList } from '../components/TrackList.js'
@@ -28,7 +32,9 @@ interface AlbumDetail {
  */
 export function AlbumPage() {
   const params = useParams()
-  const source: MusicSource = isMusicSource(params.source) ? params.source : DEFAULT_SOURCE
+  const source: MusicSource = isMusicSource(params.source)
+    ? params.source
+    : DEFAULT_SOURCE
   const id = params.id ?? ''
   const navigate = useViewNavigate()
   const playTracks = usePlayer((s) => s.playTracks)
@@ -41,7 +47,10 @@ export function AlbumPage() {
   // 翻录进度：从全局 store 认领属于本专辑的那份（切走再回自动恢复）
   const ripKey = `album:${source}:${id}`
   const ripJob = useRip((s) => s.job)
-  const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
+  const myRip =
+    ripJob?.key === ripKey
+      ? { current: ripJob.current, total: ripJob.total }
+      : null
 
   const { data, loading, error, reload } = useAsync<AlbumDetail>(
     () => api.album(source, id),
@@ -94,12 +103,22 @@ export function AlbumPage() {
     )
   }
 
-  const meta = [album.year ? String(album.year) : '', tracks.length ? `${tracks.length} 首` : ''].filter(Boolean).join(' · ')
+  const meta = [
+    album.year ? String(album.year) : '',
+    tracks.length ? `${tracks.length} 首` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <div className="detail" aria-busy={loading}>
       <header className="detail__hero">
-        <Cover src={coverAt(album.cover, COVER_LARGE)} alt={album.name} radius="lg" className="detail__cover" />
+        <Cover
+          src={coverAt(album.cover, COVER_LARGE)}
+          alt={album.name}
+          radius="lg"
+          className="detail__cover"
+        />
         <div className="detail__info">
           <span className="detail__type">专辑</span>
           <h1 className="detail__name">{album.name}</h1>
@@ -108,7 +127,11 @@ export function AlbumPage() {
               <button
                 type="button"
                 className="detail__artist-link"
-                onClick={() => navigate(`/artist/${album.source}/${album.artistId}?name=${encodeURIComponent(album.artist)}`)}
+                onClick={() =>
+                  navigate(
+                    `/artist/${album.source}/${album.artistId}?name=${encodeURIComponent(album.artist)}`,
+                  )
+                }
               >
                 {album.artist}
               </button>
@@ -121,11 +144,21 @@ export function AlbumPage() {
       </header>
 
       <div className="detail__actions">
-        <button type="button" className="detail__play" onClick={() => handlePlay(false)} disabled={!tracks.length}>
+        <button
+          type="button"
+          className="detail__play"
+          onClick={() => handlePlay(false)}
+          disabled={!tracks.length}
+        >
           <Play size={18} fill="currentColor" strokeWidth={0} />
           播放
         </button>
-        <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!tracks.length}>
+        <IconButton
+          label="随机播放"
+          size="lg"
+          onClick={() => handlePlay(true)}
+          disabled={!tracks.length}
+        >
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
         <IconButton
@@ -134,11 +167,17 @@ export function AlbumPage() {
           active={isSaved}
           onClick={() => toggleSaveAlbum(album)}
         >
-          <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          <Heart
+            size={20}
+            strokeWidth={2}
+            fill={isSaved ? 'currentColor' : 'none'}
+          />
         </IconButton>
         <RipButton
           progress={myRip}
-          disabled={!tracks.length || (ripJob !== null && ripJob.key !== ripKey)}
+          disabled={
+            !tracks.length || (ripJob !== null && ripJob.key !== ripKey)
+          }
           onClick={handleDownloadPlaylist}
         />
       </div>

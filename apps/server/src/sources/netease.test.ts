@@ -32,13 +32,22 @@ describe('normalizeTrack', () => {
       id: 3,
       name: '歌',
       ar: [],
-      al: { id: 1, name: '专辑', picUrl: 'http://p4.music.126.net/y.jpg?param=200y200' },
+      al: {
+        id: 1,
+        name: '专辑',
+        picUrl: 'http://p4.music.126.net/y.jpg?param=200y200',
+      },
     })
     expect(t.cover).toBe(`https://${NETEASE_IMAGE_HOST}/y.jpg?param=1200y1200`)
   })
 
   it('缺少 id 时 artistRefs / albumId 为 undefined（供前端降级为纯文本）', () => {
-    const t = normalizeTrack({ id: 2, name: 'x', ar: [{ name: '甲' }], al: { name: '专辑' } })
+    const t = normalizeTrack({
+      id: 2,
+      name: 'x',
+      ar: [{ name: '甲' }],
+      al: { name: '专辑' },
+    })
     expect(t.artistRefs).toBeUndefined()
     expect(t.albumId).toBeUndefined()
     expect(t.artist).toBe('甲')

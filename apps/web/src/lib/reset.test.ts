@@ -30,7 +30,11 @@ describe('resetAll', () => {
     const reload = vi.fn()
     await resetAll({ reload })
 
-    expect(mocks.idbClear.mock.calls.map((c) => c[0]).sort()).toEqual(['library', 'media', 'mediaMeta'])
+    expect(mocks.idbClear.mock.calls.map((c) => c[0]).sort()).toEqual([
+      'library',
+      'media',
+      'mediaMeta',
+    ])
     expect(mocks.clearAllCaches).toHaveBeenCalledOnce()
     expect(mocks.unregisterServiceWorkers).toHaveBeenCalledOnce()
     expect(localStorage.length).toBe(0)

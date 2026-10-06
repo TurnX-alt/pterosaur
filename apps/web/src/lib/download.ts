@@ -1,4 +1,8 @@
-import { streamUrlOf, type AudioLevel, type Track } from '@pterosaur/shared/types'
+import {
+  streamUrlOf,
+  type AudioLevel,
+  type Track,
+} from '@pterosaur/shared/types'
 
 /** 根据 Content-Type 推断音频文件扩展名，默认 mp3。 */
 function extFromMime(mime: string | null): string {
@@ -13,7 +17,9 @@ function extFromMime(mime: string | null): string {
 
 /** 将曲目名清洗为安全的文件名（去除路径分隔符与非法字符）。 */
 function safeFileName(track: Track, ext: string): string {
-  const base = `${track.title} - ${track.artist}`.replace(/[\\/:*?"<>|]/g, '_').trim()
+  const base = `${track.title} - ${track.artist}`
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .trim()
   return `${base || 'track'}.${ext}`
 }
 
@@ -25,11 +31,18 @@ function safeFileName(track: Track, ext: string): string {
  *
  * @throws 拉取失败或音源不可用（如未登录的 VIP 曲目）时抛出错误。
  */
-export async function downloadTrack(track: Track, level?: AudioLevel): Promise<void> {
-  const res = await fetch(streamUrlOf(track, level ? { level } : undefined), { credentials: 'include' })
+export async function downloadTrack(
+  track: Track,
+  level?: AudioLevel,
+): Promise<void> {
+  const res = await fetch(streamUrlOf(track, level ? { level } : undefined), {
+    credentials: 'include',
+  })
   if (!res.ok) {
     const needLogin = res.status === 403
-    throw new Error(needLogin ? '该曲目暂不可下载' : `下载失败（${res.status}）`)
+    throw new Error(
+      needLogin ? '该曲目暂不可下载' : `下载失败（${res.status}）`,
+    )
   }
   const blob = await res.blob()
   const ext = extFromMime(res.headers.get('content-type'))

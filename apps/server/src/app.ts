@@ -23,7 +23,10 @@ import {
 import { isSyncEnvelope, readLibrary, writeLibrary } from './syncStore.js'
 
 /** 音频地址缓存：id|level|凭证指纹 -> https url。网易云地址有时效，TTL 设短一些。 */
-const urlCache = new LRUCache<string, string>({ max: 2000, ttl: 15 * 60 * 1000 })
+const urlCache = new LRUCache<string, string>({
+  max: 2000,
+  ttl: 15 * 60 * 1000,
+})
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
@@ -55,9 +58,12 @@ function sourceQuery(c: Context): MusicSource {
  * 解析路由的源：`:source` 段**缺省为缺省源**（兼容 2 段式别名路由，如 `/api/album/:id`）；
  * 非法（如本地歌单 id `pl-…`）或未注册返回 null（调用方回 404）。
  */
-function ctxAdapter(c: Context): { source: MusicSource; adapter: SourceAdapter } | null {
+function ctxAdapter(
+  c: Context,
+): { source: MusicSource; adapter: SourceAdapter } | null {
   const raw = c.req.param('source')
-  const source = raw === undefined ? DEFAULT_SOURCE : isMusicSource(raw) ? raw : null
+  const source =
+    raw === undefined ? DEFAULT_SOURCE : isMusicSource(raw) ? raw : null
   if (!source) return null
   const adapter = adapterOf(source)
   return adapter ? { source, adapter } : null
@@ -104,7 +110,9 @@ function credentialKey(cookie?: string): string {
  * 解析**访客本人**的活动账号身份 `{ source, id }`（最多一个源已登录）；未登录返回 `null`。
  * 身份接口专用——**绝不回退到缺省凭证**，否则会把匿名访客当成运营者账号。
  */
-async function requireIdentity(c: Context): Promise<{ source: MusicSource; id: string } | null> {
+async function requireIdentity(
+  c: Context,
+): Promise<{ source: MusicSource; id: string } | null> {
   for (const source of MUSIC_SOURCES) {
     const adapter = adapterOf(source)
     if (!adapter) continue
@@ -124,7 +132,11 @@ function syncKey(identity: { source: MusicSource; id: string }): string {
  * 上游会附带数十条无关 cookie，且部分带 `Domain=…` / `Secure` / `SameSite`——须剥离，
  * 否则浏览器会把这些 cookie 存到上游域而非本域，导致会话建立失败。
  */
-function forwardSessionCookies(c: Context, adapter: SourceAdapter, cookies?: string[]) {
+function forwardSessionCookies(
+  c: Context,
+  adapter: SourceAdapter,
+  cookies?: string[],
+) {
   if (!cookies?.length) return
   const names = adapter.sessionCookieNames
   for (const raw of cookies) {
@@ -148,7 +160,11 @@ async function streamHandler(c: Context): Promise<Response> {
   // 2 段式 `/stream/:id` 视为缺省源（兼容旧页面 / 旧 SW 缓存）；3 段式显式带源。
   const rawSource = c.req.param('source')
   const source: MusicSource | null =
-    rawSource === undefined ? DEFAULT_SOURCE : isMusicSource(rawSource) ? rawSource : null
+    rawSource === undefined
+      ? DEFAULT_SOURCE
+      : isMusicSource(rawSource)
+        ? rawSource
+        : null
   const adapter = source ? adapterOf(source) : undefined
   if (!source || !adapter) return c.json(fail('未知音源'), 404)
 
@@ -172,11 +188,17 @@ async function streamHandler(c: Context): Promise<Response> {
   }
 
   const range = c.req.header('range')
-  const upstreamHeaders: Record<string, string> = { 'User-Agent': UA, ...adapter.streamHeaders?.(id) }
+  const upstreamHeaders: Record<string, string> = {
+    'User-Agent': UA,
+    ...adapter.streamHeaders?.(id),
+  }
   if (range) upstreamHeaders['Range'] = range
 
   const controller = new AbortController()
-  const headersTimer = setTimeout(() => controller.abort(), UPSTREAM_HEADERS_TIMEOUT_MS)
+  const headersTimer = setTimeout(
+    () => controller.abort(),
+    UPSTREAM_HEADERS_TIMEOUT_MS,
+  )
   let upstream: Response
   try {
     upstream = await fetch(url, {
@@ -197,7 +219,10 @@ async function streamHandler(c: Context): Promise<Response> {
   }
 
   const headers = new Headers()
-  headers.set('Content-Type', upstream.headers.get('content-type') ?? 'audio/mpeg')
+  headers.set(
+    'Content-Type',
+    upstream.headers.get('content-type') ?? 'audio/mpeg',
+  )
   const contentLength = upstream.headers.get('content-length')
   if (contentLength) headers.set('Content-Length', contentLength)
   const contentRange = upstream.headers.get('content-range')
@@ -207,14 +232,20 @@ async function streamHandler(c: Context): Promise<Response> {
 
   const status = upstream.status === 206 ? 206 : 200
   // HEAD 请求不返回 body
-  return new Response(c.req.method === 'HEAD' ? null : upstream.body, { status, headers })
+  return new Response(c.req.method === 'HEAD' ? null : upstream.body, {
+    status,
+    headers,
+  })
 }
 
 export function createApp() {
   const app = new Hono()
 
   // 同源部署；开发期由 Vite 代理转发，这里放开 CORS 便于本地联调。
-  app.use('/api/*', cors({ origin: '*', allowHeaders: ['Content-Type'], credentials: true }))
+  app.use(
+    '/api/*',
+    cors({ origin: '*', allowHeaders: ['Content-Type'], credentials: true }),
+  )
 
   app.get('/api/health', (c) => c.json(ok({ status: 'ok', time: Date.now() })))
 
@@ -227,7 +258,11 @@ export function createApp() {
     const adapter = adapterOf(sourceQuery(c))
     if (!adapter) return c.json(fail('未知音源'), 404)
     try {
-      const tracks = await adapter.searchSongs(keywords, Math.min(limit, 60), credentialOf(c, adapter))
+      const tracks = await adapter.searchSongs(
+        keywords,
+        Math.min(limit, 60),
+        credentialOf(c, adapter),
+      )
       return c.json(ok<Track[]>(tracks))
     } catch (e) {
       return c.json(fail(`搜索失败：${(e as Error).message}`), 502)
@@ -238,16 +273,25 @@ export function createApp() {
   app.get('/api/search/all', async (c) => {
     const keywords = (c.req.query('keywords') ?? '').trim()
     if (!keywords) return c.json(fail('缺少搜索关键词'), 400)
-    const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 20) || 20, 1), 50)
+    const limit = Math.min(
+      Math.max(Number(c.req.query('limit') ?? 20) || 20, 1),
+      50,
+    )
     const adapter = adapterOf(sourceQuery(c))
     if (!adapter) return c.json(fail('未知音源'), 404)
     const cookie = credentialOf(c, adapter)
     try {
       const [songs, artists, albums, playlists] = await Promise.all([
         adapter.searchSongs(keywords, 50, cookie),
-        adapter.searchArtists ? adapter.searchArtists(keywords, limit, cookie) : Promise.resolve([] as Artist[]),
-        adapter.searchAlbums ? adapter.searchAlbums(keywords, limit, cookie) : Promise.resolve([] as Album[]),
-        adapter.searchPlaylists ? adapter.searchPlaylists(keywords, limit, cookie) : Promise.resolve([] as Playlist[]),
+        adapter.searchArtists
+          ? adapter.searchArtists(keywords, limit, cookie)
+          : Promise.resolve([] as Artist[]),
+        adapter.searchAlbums
+          ? adapter.searchAlbums(keywords, limit, cookie)
+          : Promise.resolve([] as Album[]),
+        adapter.searchPlaylists
+          ? adapter.searchPlaylists(keywords, limit, cookie)
+          : Promise.resolve([] as Playlist[]),
       ])
       const capabilities = {
         songs: true,
@@ -276,9 +320,13 @@ export function createApp() {
 
   app.get('/api/discover/recommend', async (c) => {
     const adapter = adapterOf(sourceQuery(c))
-    if (!adapter?.recommendPlaylists) return c.json(fail('该音源暂不支持推荐'), 501)
+    if (!adapter?.recommendPlaylists)
+      return c.json(fail('该音源暂不支持推荐'), 501)
     try {
-      const list = await adapter.recommendPlaylists(Number(c.req.query('limit') ?? 12), credentialOf(c, adapter))
+      const list = await adapter.recommendPlaylists(
+        Number(c.req.query('limit') ?? 12),
+        credentialOf(c, adapter),
+      )
       return c.json(ok<Playlist[]>(list))
     } catch (e) {
       return c.json(fail(`获取推荐失败：${(e as Error).message}`), 502)
@@ -289,7 +337,10 @@ export function createApp() {
     const adapter = adapterOf(sourceQuery(c))
     if (!adapter?.toplists) return c.json(fail('该音源暂不支持排行榜'), 501)
     try {
-      const list = await adapter.toplists(Number(c.req.query('limit') ?? 50), credentialOf(c, adapter))
+      const list = await adapter.toplists(
+        Number(c.req.query('limit') ?? 50),
+        credentialOf(c, adapter),
+      )
       return c.json(ok<Playlist[]>(list))
     } catch (e) {
       return c.json(fail(`获取排行榜失败：${(e as Error).message}`), 502)
@@ -298,11 +349,16 @@ export function createApp() {
 
   app.get('/api/discover/playlists', async (c) => {
     const adapter = adapterOf(sourceQuery(c))
-    if (!adapter?.topPlaylists) return c.json(fail('该音源暂不支持精品歌单'), 501)
+    if (!adapter?.topPlaylists)
+      return c.json(fail('该音源暂不支持精品歌单'), 501)
     try {
       const cat = c.req.query('cat') ?? '全部'
       const limit = Number(c.req.query('limit') ?? 12)
-      return c.json(ok<Playlist[]>(await adapter.topPlaylists(limit, cat, credentialOf(c, adapter))))
+      return c.json(
+        ok<Playlist[]>(
+          await adapter.topPlaylists(limit, cat, credentialOf(c, adapter)),
+        ),
+      )
     } catch (e) {
       return c.json(fail(`获取歌单失败：${(e as Error).message}`), 502)
     }
@@ -312,10 +368,14 @@ export function createApp() {
   const playlistHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
-    if (!ctx.adapter.playlistTracks) return c.json(fail('该音源暂不支持歌单页'), 501)
+    if (!ctx.adapter.playlistTracks)
+      return c.json(fail('该音源暂不支持歌单页'), 501)
     try {
       const id = c.req.param('id') ?? ''
-      const { playlist, tracks } = await ctx.adapter.playlistTracks(id, credentialOf(c, ctx.adapter))
+      const { playlist, tracks } = await ctx.adapter.playlistTracks(
+        id,
+        credentialOf(c, ctx.adapter),
+      )
       return c.json(ok({ playlist, tracks }))
     } catch (e) {
       return c.json(fail(`获取歌单详情失败：${(e as Error).message}`), 502)
@@ -327,10 +387,19 @@ export function createApp() {
   const artistHandler = async (c: Context) => {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
-    if (!ctx.adapter.artistDetail) return c.json(fail('该音源暂不支持艺人页'), 501)
+    if (!ctx.adapter.artistDetail)
+      return c.json(fail('该音源暂不支持艺人页'), 501)
     try {
       const name = c.req.query('name')
-      return c.json(ok(await ctx.adapter.artistDetail(c.req.param('id') ?? '', credentialOf(c, ctx.adapter), name)))
+      return c.json(
+        ok(
+          await ctx.adapter.artistDetail(
+            c.req.param('id') ?? '',
+            credentialOf(c, ctx.adapter),
+            name,
+          ),
+        ),
+      )
     } catch (e) {
       return c.json(fail(`获取艺人详情失败：${(e as Error).message}`), 502)
     }
@@ -342,7 +411,14 @@ export function createApp() {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
     try {
-      return c.json(ok(await ctx.adapter.albumDetail(c.req.param('id') ?? '', credentialOf(c, ctx.adapter))))
+      return c.json(
+        ok(
+          await ctx.adapter.albumDetail(
+            c.req.param('id') ?? '',
+            credentialOf(c, ctx.adapter),
+          ),
+        ),
+      )
     } catch (e) {
       return c.json(fail(`获取专辑详情失败：${(e as Error).message}`), 502)
     }
@@ -360,7 +436,10 @@ export function createApp() {
     if (!adapter) return c.json(fail('未知音源'), 404)
     if (!adapter.songDetail) return c.json(fail('该音源暂不支持批量曲目'), 501)
     try {
-      const tracks = await adapter.songDetail(ids.slice(0, 200), credentialOf(c, adapter))
+      const tracks = await adapter.songDetail(
+        ids.slice(0, 200),
+        credentialOf(c, adapter),
+      )
       return c.json(ok<Track[]>(tracks))
     } catch (e) {
       return c.json(fail(`获取曲目详情失败：${(e as Error).message}`), 502)
@@ -371,7 +450,14 @@ export function createApp() {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
     try {
-      return c.json(ok<Lyric>(await ctx.adapter.getLyric(c.req.param('id') ?? '', credentialOf(c, ctx.adapter))))
+      return c.json(
+        ok<Lyric>(
+          await ctx.adapter.getLyric(
+            c.req.param('id') ?? '',
+            credentialOf(c, ctx.adapter),
+          ),
+        ),
+      )
     } catch (e) {
       return c.json(fail(`获取歌词失败：${(e as Error).message}`), 502)
     }
@@ -385,7 +471,11 @@ export function createApp() {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
     try {
-      return c.json(ok<LoginStatus>(await ctx.adapter.loginStatus(cookieOf(c, ctx.adapter))))
+      return c.json(
+        ok<LoginStatus>(
+          await ctx.adapter.loginStatus(cookieOf(c, ctx.adapter)),
+        ),
+      )
     } catch {
       return c.json(ok<LoginStatus>({ logged: false }))
     }
@@ -420,7 +510,10 @@ export function createApp() {
     const key = c.req.query('key')
     if (!key) return c.json(fail('缺少 key'), 400)
     try {
-      const { code, cookies, message } = await ctx.adapter.qrCheck(key, cookieOf(c, ctx.adapter))
+      const { code, cookies, message } = await ctx.adapter.qrCheck(
+        key,
+        cookieOf(c, ctx.adapter),
+      )
       if (code !== 803) {
         return c.json(ok({ code, logged: false, message }))
       }
@@ -433,10 +526,18 @@ export function createApp() {
         const oa = adapterOf(other)
         if (!oa) continue
         for (const name of oa.logoutCookieNames) {
-          c.header('Set-Cookie', `${name}=; Path=/; Max-Age=0; SameSite=Lax`, { append: true })
+          c.header('Set-Cookie', `${name}=; Path=/; Max-Age=0; SameSite=Lax`, {
+            append: true,
+          })
         }
       }
-      return c.json(ok<LoginStatus & { code: number; message?: string }>({ ...status, code, message }))
+      return c.json(
+        ok<LoginStatus & { code: number; message?: string }>({
+          ...status,
+          code,
+          message,
+        }),
+      )
     } catch (e) {
       return c.json(fail(`检查登录状态失败：${(e as Error).message}`), 502)
     }
@@ -448,7 +549,9 @@ export function createApp() {
     const ctx = ctxAdapter(c)
     if (!ctx) return c.json(fail('未知音源'), 404)
     for (const name of ctx.adapter.logoutCookieNames) {
-      c.header('Set-Cookie', `${name}=; Path=/; Max-Age=0; SameSite=Lax`, { append: true })
+      c.header('Set-Cookie', `${name}=; Path=/; Max-Age=0; SameSite=Lax`, {
+        append: true,
+      })
     }
     return c.json(ok<LoginStatus>({ logged: false }))
   }
@@ -457,14 +560,17 @@ export function createApp() {
 
   app.get('/api/user/playlists', async (c) => {
     const netease = adapterOf('netease')
-    if (!netease?.userPlaylists) return c.json(fail('该音源暂不支持用户歌单'), 501)
+    if (!netease?.userPlaylists)
+      return c.json(fail('该音源暂不支持用户歌单'), 501)
     const cookie = cookieOf(c, netease)
     const uid = c.req.query('uid')
     try {
       if (!uid) {
         const st = await netease.loginStatus(cookie)
         if (!st.logged || !st.userId) return c.json(fail('未登录', true), 401)
-        return c.json(ok<Playlist[]>(await netease.userPlaylists(st.userId, cookie)))
+        return c.json(
+          ok<Playlist[]>(await netease.userPlaylists(st.userId, cookie)),
+        )
       }
       return c.json(ok<Playlist[]>(await netease.userPlaylists(uid, cookie)))
     } catch (e) {
@@ -482,7 +588,11 @@ export function createApp() {
     const identity = await requireIdentity(c)
     if (!identity) return c.json(fail('未登录', true), 401)
     try {
-      return c.json(ok<{ payload: SyncEnvelope | null }>({ payload: await readLibrary(syncKey(identity)) }))
+      return c.json(
+        ok<{ payload: SyncEnvelope | null }>({
+          payload: await readLibrary(syncKey(identity)),
+        }),
+      )
     } catch (e) {
       return c.json(fail(`读取云同步失败：${(e as Error).message}`), 502)
     }

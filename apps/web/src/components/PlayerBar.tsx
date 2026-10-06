@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback } from 'react'
 import {
   Play,
   Pause,
@@ -12,63 +12,65 @@ import {
   MoreHorizontal,
   Disc3,
   Loader2,
-} from "lucide-react";
-import { usePlayer, currentPlayMode } from "../store/player.js";
-import { useLibrary } from "../store/library.js";
-import { useQueuePanel } from "../store/ui.js";
-import { startNowPlayingTransition } from "../lib/nowPlayingTransition.js";
-import { seekTo } from "../hooks/audioElement.js";
+} from 'lucide-react'
+import { usePlayer, currentPlayMode } from '../store/player.js'
+import { useLibrary } from '../store/library.js'
+import { useQueuePanel } from '../store/ui.js'
+import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
+import { seekTo } from '../hooks/audioElement.js'
 import { formatTime, keyOf } from '@pterosaur/shared/types'
-import { coverAt, COVER_SMALL } from "@pterosaur/shared/image";
-import { Cover } from "./Cover.js";
-import { IconButton } from "./IconButton.js";
-import { Slider } from "./Slider.js";
-import { AddToPlaylistMenu } from "./AddToPlaylistMenu.js";
-import { PLAY_MODE_META } from "./playMode.js";
-import "./PlayerBar.css";
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
+import { Cover } from './Cover.js'
+import { IconButton } from './IconButton.js'
+import { Slider } from './Slider.js'
+import { AddToPlaylistMenu } from './AddToPlaylistMenu.js'
+import { PLAY_MODE_META } from './playMode.js'
+import './PlayerBar.css'
 
 export function PlayerBar() {
-  const current = usePlayer((s) => s.current);
-  const isPlaying = usePlayer((s) => s.isPlaying);
-  const position = usePlayer((s) => s.position);
-  const duration = usePlayer((s) => s.duration);
-  const volume = usePlayer((s) => s.volume);
-  const muted = usePlayer((s) => s.muted);
-  const repeat = usePlayer((s) => s.repeat);
-  const shuffle = usePlayer((s) => s.shuffle);
-  const buffering = usePlayer((s) => s.buffering);
-  const toggle = usePlayer((s) => s.toggle);
-  const next = usePlayer((s) => s.next);
-  const prev = usePlayer((s) => s.prev);
-  const setVolume = usePlayer((s) => s.setVolume);
-  const toggleMute = usePlayer((s) => s.toggleMute);
-  const cyclePlayMode = usePlayer((s) => s.cyclePlayMode);
+  const current = usePlayer((s) => s.current)
+  const isPlaying = usePlayer((s) => s.isPlaying)
+  const position = usePlayer((s) => s.position)
+  const duration = usePlayer((s) => s.duration)
+  const volume = usePlayer((s) => s.volume)
+  const muted = usePlayer((s) => s.muted)
+  const repeat = usePlayer((s) => s.repeat)
+  const shuffle = usePlayer((s) => s.shuffle)
+  const buffering = usePlayer((s) => s.buffering)
+  const toggle = usePlayer((s) => s.toggle)
+  const next = usePlayer((s) => s.next)
+  const prev = usePlayer((s) => s.prev)
+  const setVolume = usePlayer((s) => s.setVolume)
+  const toggleMute = usePlayer((s) => s.toggleMute)
+  const cyclePlayMode = usePlayer((s) => s.cyclePlayMode)
   // 订阅 expanded：展开态下需让本侧封面让出 `view-transition-name: np-cover`（见 PlayerBar.css）
-  const expanded = usePlayer((s) => s.expanded);
+  const expanded = usePlayer((s) => s.expanded)
 
-  const favorites = useLibrary((s) => s.favorites);
-  const toggleFavorite = useLibrary((s) => s.toggleFavorite);
-  const isFav = current ? favorites.some((t) => keyOf(t) === keyOf(current)) : false;
+  const favorites = useLibrary((s) => s.favorites)
+  const toggleFavorite = useLibrary((s) => s.toggleFavorite)
+  const isFav = current
+    ? favorites.some((t) => keyOf(t) === keyOf(current))
+    : false
 
-  const queueOpen = useQueuePanel((s) => s.queueOpen);
-  const toggleQueue = useQueuePanel((s) => s.toggleQueue);
+  const queueOpen = useQueuePanel((s) => s.queueOpen)
+  const toggleQueue = useQueuePanel((s) => s.toggleQueue)
 
   // 拖拽进度：本地即时反馈，松手才真正 seek（避免频繁请求音频）
   const handleScrub = useCallback(() => {
     /* 拖拽中的值由 Slider 内部维护，这里无需处理 */
-  }, []);
+  }, [])
 
   const handleSeek = useCallback((v: number) => {
-    seekTo(v);
-  }, []);
+    seekTo(v)
+  }, [])
 
   const VolumeIcon =
-    muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+    muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2
   // 播放中且处于缓冲态：播放键显示加载动画（暂停态不显示）
-  const showBuffering = buffering && isPlaying;
-  const mode = currentPlayMode(shuffle, repeat);
-  const modeMeta = PLAY_MODE_META[mode];
-  const ModeIcon = modeMeta.icon;
+  const showBuffering = buffering && isPlaying
+  const mode = currentPlayMode(shuffle, repeat)
+  const modeMeta = PLAY_MODE_META[mode]
+  const ModeIcon = modeMeta.icon
 
   return (
     <footer className="playerbar">
@@ -78,7 +80,7 @@ export function PlayerBar() {
           <>
             <button
               type="button"
-              className={`playerbar__cover-btn${expanded ? " playerbar__cover-btn--vt-hidden" : ""}`}
+              className={`playerbar__cover-btn${expanded ? ' playerbar__cover-btn--vt-hidden' : ''}`}
               onClick={() => startNowPlayingTransition(true)}
               aria-label="展开播放页"
             >
@@ -95,7 +97,7 @@ export function PlayerBar() {
             </div>
             <IconButton
               className="playerbar__fav-desktop"
-              label={isFav ? "取消喜欢" : "喜欢"}
+              label={isFav ? '取消喜欢' : '喜欢'}
               size="sm"
               active={isFav}
               onClick={() => toggleFavorite(current)}
@@ -103,7 +105,7 @@ export function PlayerBar() {
               <Heart
                 size={17}
                 strokeWidth={2}
-                fill={isFav ? "currentColor" : "none"}
+                fill={isFav ? 'currentColor' : 'none'}
               />
             </IconButton>
           </>
@@ -139,7 +141,7 @@ export function PlayerBar() {
             <SkipBack size={20} strokeWidth={2} fill="currentColor" />
           </IconButton>
           <IconButton
-            label={showBuffering ? "缓冲中" : isPlaying ? "暂停" : "播放"}
+            label={showBuffering ? '缓冲中' : isPlaying ? '暂停' : '播放'}
             size="lg"
             primary
             onClick={toggle}
@@ -169,7 +171,7 @@ export function PlayerBar() {
           </IconButton>
           {/* 原循环按钮位置改为播放队列 */}
           <IconButton
-            label={queueOpen ? "关闭播放队列" : "播放队列"}
+            label={queueOpen ? '关闭播放队列' : '播放队列'}
             size="sm"
             active={queueOpen}
             onClick={toggleQueue}
@@ -196,7 +198,7 @@ export function PlayerBar() {
       {/* ---------- 右：音量 + 菜单（原「展开播放页」位置改放添加到歌单菜单） ---------- */}
       <div className="playerbar__right">
         <IconButton
-          label={muted ? "取消静音" : "静音"}
+          label={muted ? '取消静音' : '静音'}
           size="sm"
           onClick={toggleMute}
           disabled={!current}
@@ -215,7 +217,7 @@ export function PlayerBar() {
         {/* 移动端播放键（桌面端由 center 提供） */}
         <IconButton
           className="playerbar__play-mobile"
-          label={showBuffering ? "缓冲中" : isPlaying ? "暂停" : "播放"}
+          label={showBuffering ? '缓冲中' : isPlaying ? '暂停' : '播放'}
           size="sm"
           primary
           onClick={toggle}
@@ -239,7 +241,7 @@ export function PlayerBar() {
           <>
             <IconButton
               className="playerbar__fav-mobile"
-              label={isFav ? "取消喜欢" : "喜欢"}
+              label={isFav ? '取消喜欢' : '喜欢'}
               size="sm"
               active={isFav}
               onClick={() => toggleFavorite(current)}
@@ -247,7 +249,7 @@ export function PlayerBar() {
               <Heart
                 size={17}
                 strokeWidth={2}
-                fill={isFav ? "currentColor" : "none"}
+                fill={isFav ? 'currentColor' : 'none'}
               />
             </IconButton>
             <AddToPlaylistMenu track={current} direction="up">
@@ -266,5 +268,5 @@ export function PlayerBar() {
         )}
       </div>
     </footer>
-  );
+  )
 }

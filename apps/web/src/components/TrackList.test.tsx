@@ -21,7 +21,11 @@ function track(id: string, title: string, extra: Partial<Track> = {}): Track {
   }
 }
 
-const SONGS = [track('1', '第一首'), track('2', '第二首', { fee: 'vip' }), track('3', '第三首')]
+const SONGS = [
+  track('1', '第一首'),
+  track('2', '第二首', { fee: 'vip' }),
+  track('3', '第三首'),
+]
 
 /** 显示当前路径，用于断言导航。 */
 function LocationProbe() {
@@ -54,7 +58,12 @@ beforeEach(() => {
     playError: null,
     expanded: false,
   })
-  useLibrary.setState({ favorites: [], recent: [], playlists: [], savedPlaylists: [] })
+  useLibrary.setState({
+    favorites: [],
+    recent: [],
+    playlists: [],
+    savedPlaylists: [],
+  })
 })
 
 describe('TrackList', () => {
@@ -108,7 +117,12 @@ describe('TrackList', () => {
   })
 
   it('当前播放曲目行高亮', () => {
-    usePlayer.setState({ current: SONGS[1], queue: SONGS, index: 1, isPlaying: true })
+    usePlayer.setState({
+      current: SONGS[1],
+      queue: SONGS,
+      index: 1,
+      isPlaying: true,
+    })
     const { container } = renderList(<TrackList tracks={SONGS} />)
     const activeRows = container.querySelectorAll('.track-row--current')
     expect(activeRows).toHaveLength(1)
@@ -116,7 +130,9 @@ describe('TrackList', () => {
   })
 
   it('showHeader=false 时不渲染表头', () => {
-    const { container } = renderList(<TrackList tracks={SONGS} showHeader={false} />)
+    const { container } = renderList(
+      <TrackList tracks={SONGS} showHeader={false} />,
+    )
     expect(container.querySelector('.track-list__head')).toBeNull()
   })
 
@@ -129,7 +145,12 @@ describe('TrackList', () => {
   })
 
   it('点击艺人名跳转艺人页，且不触发行播放', () => {
-    const t = [track('1', '第一首', { artist: '某艺人', artistRefs: [{ id: '9', name: '某艺人' }] })]
+    const t = [
+      track('1', '第一首', {
+        artist: '某艺人',
+        artistRefs: [{ id: '9', name: '某艺人' }],
+      }),
+    ]
     renderList(<TrackList tracks={t} />)
     fireEvent.click(screen.getByRole('button', { name: '某艺人' }))
     expect(screen.getByTestId('loc')).toHaveTextContent('/artist/netease/9')

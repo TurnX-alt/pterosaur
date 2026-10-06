@@ -28,7 +28,10 @@ export function ArtistCard({ artist, onClick }: ArtistCardProps) {
 
   const meta =
     artist.musicSize || artist.albumSize
-      ? [artist.musicSize ? `${artist.musicSize} 首单曲` : '', artist.albumSize ? `${artist.albumSize} 张专辑` : '']
+      ? [
+          artist.musicSize ? `${artist.musicSize} 首单曲` : '',
+          artist.albumSize ? `${artist.albumSize} 张专辑` : '',
+        ]
           .filter(Boolean)
           .join(' · ')
       : (artist.alias?.[0] ?? '')
@@ -48,7 +51,12 @@ export function ArtistCard({ artist, onClick }: ArtistCardProps) {
       }}
     >
       <div className="card__art card__art--circle">
-        <Cover src={coverAt(artist.avatar, COVER_SMALL)} alt={artist.name} rounded className="card__cover" />
+        <Cover
+          src={coverAt(artist.avatar, COVER_SMALL)}
+          alt={artist.name}
+          rounded
+          className="card__cover"
+        />
         <button
           type="button"
           className={`card__fav${isSaved ? ' card__fav--active' : ''}`}
@@ -58,11 +66,17 @@ export function ArtistCard({ artist, onClick }: ArtistCardProps) {
             toggleSaveArtist(artist)
           }}
         >
-          <Heart size={18} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+          <Heart
+            size={18}
+            strokeWidth={2}
+            fill={isSaved ? 'currentColor' : 'none'}
+          />
         </button>
       </div>
       <div className="card__body">
-        <div className="card__title card__title--center ellipsis">{artist.name}</div>
+        <div className="card__title card__title--center ellipsis">
+          {artist.name}
+        </div>
         {meta && <div className="card__subtitle ellipsis">{meta}</div>}
       </div>
     </div>
@@ -99,7 +113,12 @@ export function AlbumCard({ album, onClick }: AlbumCardProps) {
       }}
     >
       <div className="card__art">
-        <Cover src={coverAt(album.cover, COVER_SMALL)} alt={album.name} radius="md" className="card__cover" />
+        <Cover
+          src={coverAt(album.cover, COVER_SMALL)}
+          alt={album.name}
+          radius="md"
+          className="card__cover"
+        />
         <button
           type="button"
           className="card__play"

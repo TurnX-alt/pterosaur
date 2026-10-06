@@ -4,7 +4,12 @@ import type { Lyric, Track } from '@pterosaur/shared/types'
 vi.mock('../api/client.js', () => ({ api: { lyric: vi.fn() } }))
 
 import { api } from '../api/client.js'
-import { clearLyricCache, getCachedLyric, prefetchLyric, putCachedLyric } from './lyricCache.js'
+import {
+  clearLyricCache,
+  getCachedLyric,
+  prefetchLyric,
+  putCachedLyric,
+} from './lyricCache.js'
 
 const lyricMock = api.lyric as unknown as ReturnType<typeof vi.fn>
 const sample: Lyric = { lines: [{ time: 0, text: 'hi' }], timed: true }
@@ -48,7 +53,9 @@ describe('lyricCache', () => {
   })
 
   it('并发预取同一曲目只发一次请求（in-flight 去重）', async () => {
-    lyricMock.mockImplementation(() => new Promise((r) => setTimeout(() => r(sample), 5)))
+    lyricMock.mockImplementation(
+      () => new Promise((r) => setTimeout(() => r(sample), 5)),
+    )
     await Promise.all([prefetchLyric(track('a')), prefetchLyric(track('a'))])
     expect(lyricMock).toHaveBeenCalledTimes(1)
     expect(getCachedLyric(track('a'))).toBe(sample)

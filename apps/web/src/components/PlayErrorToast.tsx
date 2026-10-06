@@ -33,11 +33,20 @@ export function PlayErrorToast() {
       <AlertCircle size={18} className="toast__icon" />
       <span className="toast__text">{playError}</span>
       {!logged && playErrorNeedLogin && (
-        <button type="button" className="toast__action" onClick={() => openModal(src)}>
+        <button
+          type="button"
+          className="toast__action"
+          onClick={() => openModal(src)}
+        >
           登录解锁
         </button>
       )}
-      <button type="button" className="toast__close" onClick={() => setPlayError(null)} aria-label="关闭提示">
+      <button
+        type="button"
+        className="toast__close"
+        onClick={() => setPlayError(null)}
+        aria-label="关闭提示"
+      >
         <X size={16} />
       </button>
     </div>

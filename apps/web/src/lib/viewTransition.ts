@@ -1,6 +1,11 @@
 import { flushSync } from 'react-dom'
 import { usePlayer } from '../store/player.js'
-import { useQueuePanel, useCreatePlaylist, useConfirmDialog, useSidebarDrawer } from '../store/ui.js'
+import {
+  useQueuePanel,
+  useCreatePlaylist,
+  useConfirmDialog,
+  useSidebarDrawer,
+} from '../store/ui.js'
 import { useAuth } from '../store/auth.js'
 
 /**
@@ -47,12 +52,17 @@ function hasBlockingOverlay(): boolean {
 
 /** 是否支持原生 View Transition（用于决定启用 CSS 降级进场动画）。 */
 export function supportsViewTransition(): boolean {
-  return typeof (document as Document & { startViewTransition?: unknown }).startViewTransition === 'function'
+  return (
+    typeof (document as Document & { startViewTransition?: unknown })
+      .startViewTransition === 'function'
+  )
 }
 
 /** 用户是否偏好减少动效。 */
 export function prefersReducedMotion(): boolean {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  return (
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+  )
 }
 
 /**
@@ -63,8 +73,14 @@ export function prefersReducedMotion(): boolean {
  * 这是 React 配合 View Transitions 的官方推荐做法。
  */
 export function startRouteTransition(update: () => void): void {
-  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown }
-  if (!doc.startViewTransition || prefersReducedMotion() || hasBlockingOverlay()) {
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void) => unknown
+  }
+  if (
+    !doc.startViewTransition ||
+    prefersReducedMotion() ||
+    hasBlockingOverlay()
+  ) {
     // 非转场路径同样以 flushSync 提交：让滚动恢复的布局 effect 先于归零执行，
     // 否则归零会先跑、把旧条目的位置错误地记成 0。
     flushSync(update)

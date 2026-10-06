@@ -8,7 +8,11 @@ import { usePlayer } from '../store/player.js'
 import { useLibrary } from '../store/library.js'
 import { confirmDialog } from '../store/ui.js'
 import type { Playlist, Track } from '@pterosaur/shared/types'
-import { DEFAULT_SOURCE, isMusicSource, type MusicSource } from '@pterosaur/shared/types'
+import {
+  DEFAULT_SOURCE,
+  isMusicSource,
+  type MusicSource,
+} from '@pterosaur/shared/types'
 import { TrackList } from '../components/TrackList.js'
 import { coverAt, COVER_LARGE } from '@pterosaur/shared/image'
 import { Cover } from '../components/Cover.js'
@@ -36,7 +40,9 @@ function fmtCount(n?: number): string {
  */
 export function PlaylistPage() {
   const params = useParams()
-  const source: MusicSource = isMusicSource(params.source) ? params.source : DEFAULT_SOURCE
+  const source: MusicSource = isMusicSource(params.source)
+    ? params.source
+    : DEFAULT_SOURCE
   const id = params.id ?? ''
   const navigate = useViewNavigate()
   const isLocal = id.startsWith('pl-')
@@ -58,16 +64,25 @@ export function PlaylistPage() {
   // 翻录进度：从全局 store 认领属于本歌单的那份（切走再回自动恢复）
   const ripKey = `playlist:${source}:${id}`
   const ripJob = useRip((s) => s.job)
-  const myRip = ripJob?.key === ripKey ? { current: ripJob.current, total: ripJob.total } : null
+  const myRip =
+    ripJob?.key === ripKey
+      ? { current: ripJob.current, total: ripJob.total }
+      : null
 
   // 本地歌单：直接从 store 取
-  const local = useMemo(() => (isLocal ? playlists.find((p) => p.id === id) : undefined), [isLocal, playlists, id])
+  const local = useMemo(
+    () => (isLocal ? playlists.find((p) => p.id === id) : undefined),
+    [isLocal, playlists, id],
+  )
 
   // 远程歌单：通过 API 拉取（带缓存键，参数切换时命中缓存可免于加载态，转场更顺滑）
   const remote = useAsync<{ playlist: Playlist; tracks: Track[] }>(
     () =>
       isLocal
-        ? Promise.resolve({ playlist: { source: DEFAULT_SOURCE, id, name: '', cover: '' }, tracks: [] })
+        ? Promise.resolve({
+            playlist: { source: DEFAULT_SOURCE, id, name: '', cover: '' },
+            tracks: [],
+          })
         : api.playlist(source, id),
     [source, id, isLocal],
     null,
@@ -85,10 +100,15 @@ export function PlaylistPage() {
     : remote.data?.playlist
   const tracks = isLocal ? (local?.tracks ?? []) : (remote.data?.tracks ?? [])
   const loading = !isLocal && remote.loading
-  const error = !isLocal ? remote.error : isLocal && !local ? '歌单不存在' : null
+  const error = !isLocal
+    ? remote.error
+    : isLocal && !local
+      ? '歌单不存在'
+      : null
 
   // 在线歌单是否已收藏到资料库（仅保存引用，按路由 id 判断）
-  const isSaved = !isLocal && savedPlaylists.some((p) => p.source === source && p.id === id)
+  const isSaved =
+    !isLocal && savedPlaylists.some((p) => p.source === source && p.id === id)
 
   const handlePlay = (shuffle = false) => {
     if (!tracks.length) return
@@ -144,7 +164,12 @@ export function PlaylistPage() {
       confirmText: '开始翻录',
     })
     if (!ok) return
-    await runRip({ key: ripKey, tracks, zipName: playlist?.name ?? '歌单', level })
+    await runRip({
+      key: ripKey,
+      tracks,
+      zipName: playlist?.name ?? '歌单',
+      level,
+    })
   }
 
   if (loading) {
@@ -158,7 +183,10 @@ export function PlaylistPage() {
   if (error || !playlist) {
     return (
       <div className="detail">
-        <ErrorState message={error ?? '歌单不存在'} onRetry={isLocal ? undefined : remote.reload} />
+        <ErrorState
+          message={error ?? '歌单不存在'}
+          onRetry={isLocal ? undefined : remote.reload}
+        />
       </div>
     )
   }
@@ -168,7 +196,12 @@ export function PlaylistPage() {
   return (
     <div className="detail">
       <header className="detail__hero">
-        <Cover src={coverAt(playlist.cover, COVER_LARGE)} alt={playlist.name} radius="lg" className="detail__cover" />
+        <Cover
+          src={coverAt(playlist.cover, COVER_LARGE)}
+          alt={playlist.name}
+          radius="lg"
+          className="detail__cover"
+        />
         <div className="detail__info">
           <span className="detail__type">{isLocal ? '本地歌单' : '歌单'}</span>
           {isLocal && renaming ? (
@@ -196,22 +229,38 @@ export function PlaylistPage() {
           ) : (
             <h1 className="detail__name">{playlist.name}</h1>
           )}
-          {!isLocal && playlist.description && <p className="detail__desc">{playlist.description}</p>}
+          {!isLocal && playlist.description && (
+            <p className="detail__desc">{playlist.description}</p>
+          )}
           <p className="detail__meta">
             {playlist.creator && <span>{playlist.creator} · </span>}
             <span>{tracks.length} 首</span>
-            {totalDuration > 0 && <span> · 约 {Math.round(totalDuration / 60)} 分钟</span>}
-            {!isLocal && playlist.playCount ? ` · ${fmtCount(playlist.playCount)}` : ''}
+            {totalDuration > 0 && (
+              <span> · 约 {Math.round(totalDuration / 60)} 分钟</span>
+            )}
+            {!isLocal && playlist.playCount
+              ? ` · ${fmtCount(playlist.playCount)}`
+              : ''}
           </p>
         </div>
       </header>
 
       <div className="detail__actions">
-        <button type="button" className="detail__play" onClick={() => handlePlay(false)} disabled={!tracks.length}>
+        <button
+          type="button"
+          className="detail__play"
+          onClick={() => handlePlay(false)}
+          disabled={!tracks.length}
+        >
           <Play size={18} fill="currentColor" strokeWidth={0} />
           播放
         </button>
-        <IconButton label="随机播放" size="lg" onClick={() => handlePlay(true)} disabled={!tracks.length}>
+        <IconButton
+          label="随机播放"
+          size="lg"
+          onClick={() => handlePlay(true)}
+          disabled={!tracks.length}
+        >
           <Shuffle size={20} strokeWidth={2} />
         </IconButton>
         {!isLocal && (
@@ -221,7 +270,11 @@ export function PlaylistPage() {
             active={isSaved}
             onClick={() => toggleSavePlaylist(playlist)}
           >
-            <Heart size={20} strokeWidth={2} fill={isSaved ? 'currentColor' : 'none'} />
+            <Heart
+              size={20}
+              strokeWidth={2}
+              fill={isSaved ? 'currentColor' : 'none'}
+            />
           </IconButton>
         )}
         {isLocal && (
@@ -231,7 +284,9 @@ export function PlaylistPage() {
         )}
         <RipButton
           progress={myRip}
-          disabled={!tracks.length || (ripJob !== null && ripJob.key !== ripKey)}
+          disabled={
+            !tracks.length || (ripJob !== null && ripJob.key !== ripKey)
+          }
           onClick={handleDownloadPlaylist}
         />
       </div>

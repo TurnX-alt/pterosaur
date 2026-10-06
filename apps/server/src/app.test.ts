@@ -59,16 +59,24 @@ function loginCookies() {
 
 /** 会话必需 cookie 白名单：测试独立维护字面量，避免与实现同源导致断言失真。 */
 const SESSION_COOKIE_NAMES = ['MUSIC_U', '__csrf', 'MUSIC_A', 'NMTID']
-const cookieName = (setCookie: string) => setCookie.slice(0, setCookie.indexOf('='))
+const cookieName = (setCookie: string) =>
+  setCookie.slice(0, setCookie.indexOf('='))
 
 describe('扫码登录 803 响应', () => {
   it('只下发会话必需的 cookie，避免大响应头触发网关 502', async () => {
     qrCheckMock.mockResolvedValue({ code: 803, cookies: loginCookies() })
-    loginStatusMock.mockResolvedValue({ logged: true, nickname: 'tester', vip: true })
+    loginStatusMock.mockResolvedValue({
+      logged: true,
+      nickname: 'tester',
+      vip: true,
+    })
 
     const res = await app.request('/api/auth/qr/check?key=test-key')
     expect(res.status).toBe(200)
-    const body = (await res.json()) as { ok: boolean; data: { code: number; logged?: boolean } }
+    const body = (await res.json()) as {
+      ok: boolean
+      data: { code: number; logged?: boolean }
+    }
     expect(body.ok).toBe(true)
     expect(body.data.code).toBe(803)
     expect(body.data.logged).toBe(true)
@@ -78,7 +86,9 @@ describe('扫码登录 803 响应', () => {
     // 会话 cookie 只含网易云白名单项
     for (const n of SESSION_COOKIE_NAMES) expect(names).toContain(n)
     // 单活动账号：登入网易云时同时清掉其它源（QQ）的会话 cookie（空值 + Max-Age=0）
-    const otherClears = setCookies.filter((c) => /^(uin|qqmusic_uin|qqmusic_key|qm_keyst)=;/.test(c))
+    const otherClears = setCookies.filter((c) =>
+      /^(uin|qqmusic_uin|qqmusic_key|qm_keyst)=;/.test(c),
+    )
     expect(otherClears.length).toBeGreaterThan(0)
     for (const c of otherClears) expect(c).toContain('Max-Age=0')
     // 响应头仍克制（不因透传无关 cookie 而撑大）
@@ -95,7 +105,9 @@ describe('扫码登录 803 响应', () => {
       .map((sc) => sc.split(';')[0])
       .join('; ')
 
-    const statusRes = await app.request('/api/auth/status', { headers: { cookie: cookieHeader } })
+    const statusRes = await app.request('/api/auth/status', {
+      headers: { cookie: cookieHeader },
+    })
     expect(statusRes.status).toBe(200)
     const forwarded = loginStatusMock.mock.calls.at(-1)?.[0]
     expect(forwarded).toContain('MUSIC_U=')
@@ -126,7 +138,9 @@ describe('服务端缺省凭证（NETEASE_COOKIE）', () => {
 
     const res = await app.request('/api/search?keywords=test')
     expect(res.status).toBe(200)
-    expect(searchSongsMock.mock.calls.at(-1)?.[2]).toBe('MUSIC_U=default; __csrf=d')
+    expect(searchSongsMock.mock.calls.at(-1)?.[2]).toBe(
+      'MUSIC_U=default; __csrf=d',
+    )
   })
 
   it('访客本人会话优先于缺省凭证', async () => {
@@ -136,7 +150,9 @@ describe('服务端缺省凭证（NETEASE_COOKIE）', () => {
     await app.request('/api/search?keywords=test', {
       headers: { cookie: 'MUSIC_U=mine; __csrf=m' },
     })
-    expect(searchSongsMock.mock.calls.at(-1)?.[2]).toBe('MUSIC_U=mine; __csrf=m')
+    expect(searchSongsMock.mock.calls.at(-1)?.[2]).toBe(
+      'MUSIC_U=mine; __csrf=m',
+    )
   })
 
   it('缺省凭证不影响身份：auth/status 仍为未登录', async () => {

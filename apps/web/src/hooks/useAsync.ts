@@ -28,7 +28,11 @@ export function useAsync<T>(
   initial: T | null = null,
   cacheKey?: string,
 ): AsyncState<T> & { reload: () => void } {
-  const [state, setState] = useState<AsyncState<T>>({ data: initial, loading: true, error: null })
+  const [state, setState] = useState<AsyncState<T>>({
+    data: initial,
+    loading: true,
+    error: null,
+  })
   const [nonce, setNonce] = useState(0)
   const aliveRef = useRef(true)
   const reqIdRef = useRef(0)
@@ -53,7 +57,11 @@ export function useAsync<T>(
       })
       .catch((e: unknown) => {
         if (cancelled || !aliveRef.current || reqId !== reqIdRef.current) return
-        setState((s) => ({ data: s.data, loading: false, error: (e as Error).message }))
+        setState((s) => ({
+          data: s.data,
+          loading: false,
+          error: (e as Error).message,
+        }))
       })
 
     return () => {

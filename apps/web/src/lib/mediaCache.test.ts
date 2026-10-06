@@ -43,7 +43,9 @@ describe('imageKey', () => {
     expect(imageKey('https://cdn.example.com/a.jpg?param=600y600')).toBe(
       'image|https://cdn.example.com/a.jpg?param=600y600',
     )
-    expect(imageKey(new URL('https://cdn.example.com/a.jpg'))).toBe('image|https://cdn.example.com/a.jpg')
+    expect(imageKey(new URL('https://cdn.example.com/a.jpg'))).toBe(
+      'image|https://cdn.example.com/a.jpg',
+    )
   })
 
   it('网易云镜像主机轮换（p1/p4）与 http 均规范化为同一 key（ADR-020）', () => {
@@ -56,9 +58,9 @@ describe('imageKey', () => {
   })
 
   it('不同 param 尺寸仍各占一条（同图不同字节）', () => {
-    expect(imageKey('https://p1.music.126.net/h==/1.jpg?param=300y300')).not.toBe(
-      imageKey('https://p2.music.126.net/h==/1.jpg?param=600y600'),
-    )
+    expect(
+      imageKey('https://p1.music.126.net/h==/1.jpg?param=300y300'),
+    ).not.toBe(imageKey('https://p2.music.126.net/h==/1.jpg?param=600y600'))
   })
 })
 
@@ -81,7 +83,9 @@ describe('isExpired / expiredKeys', () => {
 
   it('封面未满 7 天不过期，满 7 天（含边界）过期', () => {
     const now = 1_000_000_000_000
-    expect(isExpired(image('image|x', now - (IMAGE_TTL_MS - 1)), now)).toBe(false)
+    expect(isExpired(image('image|x', now - (IMAGE_TTL_MS - 1)), now)).toBe(
+      false,
+    )
     expect(isExpired(image('image|x', now - IMAGE_TTL_MS), now)).toBe(true)
     expect(isExpired(image('image|x', now - IMAGE_TTL_MS - 1), now)).toBe(true)
   })
@@ -156,7 +160,13 @@ describe('pickEvictions', () => {
   it('音频与封面在同一预算内跨类别淘汰', () => {
     const mixed: MediaMeta[] = [
       { ...meta('audio|1', 100, 2), kind: 'audio' },
-      { key: 'image|x', kind: 'image', mime: 'image/jpeg', size: 400, lastAccess: 1 },
+      {
+        key: 'image|x',
+        kind: 'image',
+        mime: 'image/jpeg',
+        size: 400,
+        lastAccess: 1,
+      },
     ]
     // total 500 + 300 = 800 > 600；先淘汰最久未用的封面(image|x, 400) → 400 ≤ 600 停止
     expect(pickEvictions(mixed, 600, 300)).toEqual(['image|x'])
@@ -183,13 +193,35 @@ describe('mediaUsage / clearMediaCache', () => {
   beforeEach(() => clearMediaCache())
 
   it('按类别分项统计', async () => {
-    await putCached({ ...meta('123|exhigh', 100, 1), level: 'exhigh' }, blobOf(100))
-    await putCached({ key: 'image|x', kind: 'image', mime: 'image/jpeg', size: 40, lastAccess: 1 }, blobOf(40))
+    await putCached(
+      { ...meta('123|exhigh', 100, 1), level: 'exhigh' },
+      blobOf(100),
+    )
+    await putCached(
+      {
+        key: 'image|x',
+        kind: 'image',
+        mime: 'image/jpeg',
+        size: 40,
+        lastAccess: 1,
+      },
+      blobOf(40),
+    )
 
     const usage = await mediaUsage()
-    expect(usage).toEqual({ count: 2, bytes: 140, audioBytes: 100, imageBytes: 40 })
+    expect(usage).toEqual({
+      count: 2,
+      bytes: 140,
+      audioBytes: 100,
+      imageBytes: 40,
+    })
 
     await clearMediaCache()
-    expect(await mediaUsage()).toEqual({ count: 0, bytes: 0, audioBytes: 0, imageBytes: 0 })
+    expect(await mediaUsage()).toEqual({
+      count: 0,
+      bytes: 0,
+      audioBytes: 0,
+      imageBytes: 0,
+    })
   })
 })

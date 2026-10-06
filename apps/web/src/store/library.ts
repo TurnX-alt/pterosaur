@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Track, Playlist, Album, Artist, LibraryData, LocalPlaylist } from '@pterosaur/shared/types'
+import type {
+  Track,
+  Playlist,
+  Album,
+  Artist,
+  LibraryData,
+  LocalPlaylist,
+} from '@pterosaur/shared/types'
 import { keyOf } from '@pterosaur/shared/types'
 import { libraryStorage } from '../lib/libraryStorage.js'
 
@@ -46,11 +53,14 @@ export const useLibrary = create<LibraryStore>()(
         set((s) => {
           const exists = s.favorites.some((t) => keyOf(t) === keyOf(track))
           return {
-            favorites: exists ? s.favorites.filter((t) => keyOf(t) !== keyOf(track)) : [track, ...s.favorites],
+            favorites: exists
+              ? s.favorites.filter((t) => keyOf(t) !== keyOf(track))
+              : [track, ...s.favorites],
           }
         }),
 
-      isFavorite: (track) => get().favorites.some((t) => keyOf(t) === keyOf(track)),
+      isFavorite: (track) =>
+        get().favorites.some((t) => keyOf(t) === keyOf(track)),
 
       addRecent: (track) =>
         set((s) => {
@@ -63,20 +73,27 @@ export const useLibrary = create<LibraryStore>()(
       createPlaylist: (name, tracks = []) => {
         const id = genId()
         set((s) => ({
-          playlists: [...s.playlists, { id, name: name || '新建歌单', createdAt: Date.now(), tracks }],
+          playlists: [
+            ...s.playlists,
+            { id, name: name || '新建歌单', createdAt: Date.now(), tracks },
+          ],
         }))
         return id
       },
 
-      deletePlaylist: (id) => set((s) => ({ playlists: s.playlists.filter((p) => p.id !== id) })),
+      deletePlaylist: (id) =>
+        set((s) => ({ playlists: s.playlists.filter((p) => p.id !== id) })),
 
       renamePlaylist: (id, name) =>
-        set((s) => ({ playlists: s.playlists.map((p) => (p.id === id ? { ...p, name } : p)) })),
+        set((s) => ({
+          playlists: s.playlists.map((p) => (p.id === id ? { ...p, name } : p)),
+        })),
 
       addToPlaylist: (playlistId, track) =>
         set((s) => ({
           playlists: s.playlists.map((p) =>
-            p.id === playlistId && !p.tracks.some((t) => keyOf(t) === keyOf(track))
+            p.id === playlistId &&
+            !p.tracks.some((t) => keyOf(t) === keyOf(track))
               ? { ...p, tracks: [...p.tracks, track] }
               : p,
           ),
@@ -85,13 +102,20 @@ export const useLibrary = create<LibraryStore>()(
       removeFromPlaylist: (playlistId, track) =>
         set((s) => ({
           playlists: s.playlists.map((p) =>
-            p.id === playlistId ? { ...p, tracks: p.tracks.filter((t) => keyOf(t) !== keyOf(track)) } : p,
+            p.id === playlistId
+              ? {
+                  ...p,
+                  tracks: p.tracks.filter((t) => keyOf(t) !== keyOf(track)),
+                }
+              : p,
           ),
         })),
 
       toggleSavePlaylist: (playlist) =>
         set((s) => {
-          const exists = s.savedPlaylists.some((p) => keyOf(p) === keyOf(playlist))
+          const exists = s.savedPlaylists.some(
+            (p) => keyOf(p) === keyOf(playlist),
+          )
           return {
             savedPlaylists: exists
               ? s.savedPlaylists.filter((p) => keyOf(p) !== keyOf(playlist))
@@ -103,7 +127,9 @@ export const useLibrary = create<LibraryStore>()(
         set((s) => {
           const exists = s.savedArtists.some((a) => keyOf(a) === keyOf(artist))
           return {
-            savedArtists: exists ? s.savedArtists.filter((a) => keyOf(a) !== keyOf(artist)) : [artist, ...s.savedArtists],
+            savedArtists: exists
+              ? s.savedArtists.filter((a) => keyOf(a) !== keyOf(artist))
+              : [artist, ...s.savedArtists],
           }
         }),
 
@@ -111,7 +137,9 @@ export const useLibrary = create<LibraryStore>()(
         set((s) => {
           const exists = s.savedAlbums.some((a) => keyOf(a) === keyOf(album))
           return {
-            savedAlbums: exists ? s.savedAlbums.filter((a) => keyOf(a) !== keyOf(album)) : [album, ...s.savedAlbums],
+            savedAlbums: exists
+              ? s.savedAlbums.filter((a) => keyOf(a) !== keyOf(album))
+              : [album, ...s.savedAlbums],
           }
         }),
     }),

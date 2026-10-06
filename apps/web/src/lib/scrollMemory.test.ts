@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearScrollMemory, saveCurrentScroll, savedScroll, setCurrentScrollKey } from './scrollMemory.js'
+import {
+  clearScrollMemory,
+  saveCurrentScroll,
+  savedScroll,
+  setCurrentScrollKey,
+} from './scrollMemory.js'
 
 beforeEach(() => {
   clearScrollMemory()

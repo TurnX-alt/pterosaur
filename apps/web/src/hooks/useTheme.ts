@@ -20,7 +20,8 @@ export const useTheme = create<ThemeState>()(
         const { mode } = get()
         const prefersDark =
           mode === 'system'
-            ? window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true
+            ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ??
+              true)
             : mode === 'dark'
         set({ mode: prefersDark ? 'light' : 'dark' })
       },

@@ -27,5 +27,7 @@ if (isProd) {
 
 serve({ fetch: app.fetch, port, hostname: host }, (info) => {
   const url = `http://${host === '0.0.0.0' ? 'localhost' : host}:${info.port}`
-  console.log(`[pterosaur] ${isProd ? 'production' : 'dev'} server listening on ${url}`)
+  console.log(
+    `[pterosaur] ${isProd ? 'production' : 'dev'} server listening on ${url}`,
+  )
 })

@@ -20,7 +20,11 @@ export function useLibrarySync(): void {
   const accountId = source ? status[source]?.userId : undefined
 
   const active =
-    enabled && source != null && accountId != null && source === boundSource && accountId === boundAccountId
+    enabled &&
+    source != null &&
+    accountId != null &&
+    source === boundSource &&
+    accountId === boundAccountId
 
   useEffect(() => {
     if (!active) return

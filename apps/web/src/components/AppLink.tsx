@@ -14,7 +14,15 @@ export function AppLink({ to, onClick, ...rest }: NavLinkProps) {
       to={to}
       onClick={(e) => {
         onClick?.(e)
-        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+        if (
+          e.defaultPrevented ||
+          e.button !== 0 ||
+          e.metaKey ||
+          e.ctrlKey ||
+          e.shiftKey ||
+          e.altKey
+        )
+          return
         e.preventDefault()
         startRouteTransition(() => navigate(to, { replace: rest.replace }))
       }}

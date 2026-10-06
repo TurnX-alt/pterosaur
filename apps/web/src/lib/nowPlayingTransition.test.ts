@@ -24,7 +24,9 @@ function installFakeVT(): { spy: ReturnType<typeof vi.fn>; list: FakeVT[] } {
       .then(() => settle())
     return vt
   })
-  ;(document as unknown as { startViewTransition: unknown }).startViewTransition = spy
+  ;(
+    document as unknown as { startViewTransition: unknown }
+  ).startViewTransition = spy
   return { spy, list }
 }
 
@@ -53,14 +55,16 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete (document as unknown as { startViewTransition?: unknown }).startViewTransition
+  delete (document as unknown as { startViewTransition?: unknown })
+    .startViewTransition
   delete root().dataset.npVt
   setReducedMotion(false)
 })
 
 describe('startNowPlayingTransition', () => {
   it('不支持 View Transitions 时直接切换、不设 data-np-vt', () => {
-    delete (document as unknown as { startViewTransition?: unknown }).startViewTransition
+    delete (document as unknown as { startViewTransition?: unknown })
+      .startViewTransition
     startNowPlayingTransition(true)
     expect(usePlayer.getState().expanded).toBe(true)
     expect(root().dataset.npVt).toBeUndefined()

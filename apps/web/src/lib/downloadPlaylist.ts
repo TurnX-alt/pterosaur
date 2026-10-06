@@ -1,6 +1,10 @@
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import { streamUrlOf, type AudioLevel, type Track } from '@pterosaur/shared/types'
+import {
+  streamUrlOf,
+  type AudioLevel,
+  type Track,
+} from '@pterosaur/shared/types'
 
 /** 根据 Content-Type 推断音频文件扩展名，默认 mp3。 */
 function extFromMime(mime: string | null): string {
@@ -89,7 +93,9 @@ export async function downloadPlaylist(
     let ext = 'mp3'
 
     try {
-      const res = await fetch(streamUrlOf(t, level ? { level } : undefined), { credentials: 'include' })
+      const res = await fetch(streamUrlOf(t, level ? { level } : undefined), {
+        credentials: 'include',
+      })
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
@@ -97,7 +103,11 @@ export async function downloadPlaylist(
       ext = extFromMime(res.headers.get('content-type'))
     } catch (err) {
       // 单首失败跳过，继续打包其余曲目
-      onProgress?.({ current: i + 1, total: tracks.length, lastError: `${t.title}: ${err instanceof Error ? err.message : '未知错误'}` })
+      onProgress?.({
+        current: i + 1,
+        total: tracks.length,
+        lastError: `${t.title}: ${err instanceof Error ? err.message : '未知错误'}`,
+      })
       continue
     }
 

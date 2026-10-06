@@ -4,8 +4,21 @@ import { PlaylistCard } from './PlaylistCard.js'
 import { AlbumCard } from './EntityCards.js'
 import type { Album, Playlist } from '@pterosaur/shared/types'
 
-const playlist = (trackCount?: number): Playlist => ({ source: 'netease', id: 'p1', name: '歌单', cover: '', trackCount })
-const album = (trackCount?: number): Album => ({ source: 'netease', id: 'a1', name: '专辑', cover: '', artist: '甲', trackCount })
+const playlist = (trackCount?: number): Playlist => ({
+  source: 'netease',
+  id: 'p1',
+  name: '歌单',
+  cover: '',
+  trackCount,
+})
+const album = (trackCount?: number): Album => ({
+  source: 'netease',
+  id: 'a1',
+  name: '专辑',
+  cover: '',
+  artist: '甲',
+  trackCount,
+})
 
 /** 播放按钮（aria-label 恰为「播放」；Testing Library 的 name 默认精确匹配）。 */
 const playBtn = () => screen.getByRole('button', { name: '播放' })

@@ -25,8 +25,10 @@ async function seedMedia(page: Page, entry: SeedEntry): Promise<void> {
         const req = indexedDB.open(db, 2)
         req.onupgradeneeded = () => {
           const d = req.result
-          if (!d.objectStoreNames.contains('library')) d.createObjectStore('library')
-          if (!d.objectStoreNames.contains('media')) d.createObjectStore('media')
+          if (!d.objectStoreNames.contains('library'))
+            d.createObjectStore('library')
+          if (!d.objectStoreNames.contains('media'))
+            d.createObjectStore('media')
           if (!d.objectStoreNames.contains('mediaMeta')) {
             const m = d.createObjectStore('mediaMeta', { keyPath: 'key' })
             m.createIndex('lastAccess', 'lastAccess')
@@ -35,7 +37,10 @@ async function seedMedia(page: Page, entry: SeedEntry): Promise<void> {
         req.onsuccess = () => {
           const d = req.result
           const tx = d.transaction(['media', 'mediaMeta'], 'readwrite')
-          tx.objectStore('media').put(new Blob([new Uint8Array(entry.size)], { type: entry.mime }), entry.key)
+          tx.objectStore('media').put(
+            new Blob([new Uint8Array(entry.size)], { type: entry.mime }),
+            entry.key,
+          )
           tx.objectStore('mediaMeta').put({ ...entry, lastAccess: Date.now() })
           tx.oncomplete = () => {
             d.close()
@@ -58,7 +63,10 @@ async function seedLibrary(page: Page): Promise<void> {
         req.onsuccess = () => {
           const d = req.result
           const tx = d.transaction('library', 'readwrite')
-          tx.objectStore('library').put({ state: { favorites: [{ id: '1' }] }, version: 0 }, key)
+          tx.objectStore('library').put(
+            { state: { favorites: [{ id: '1' }] }, version: 0 },
+            key,
+          )
           tx.oncomplete = () => {
             d.close()
             resolve()
@@ -72,20 +80,26 @@ async function seedLibrary(page: Page): Promise<void> {
 }
 
 /** 读取 media / mediaMeta / library 的条目数。 */
-async function storeCounts(page: Page): Promise<{ media: number; meta: number; favorites: number }> {
+async function storeCounts(
+  page: Page,
+): Promise<{ media: number; meta: number; favorites: number }> {
   return page.evaluate(
     (db) =>
       new Promise((resolve) => {
         const req = indexedDB.open(db, 2)
         req.onsuccess = () => {
           const d = req.result
-          const tx = d.transaction(['media', 'mediaMeta', 'library'], 'readonly')
+          const tx = d.transaction(
+            ['media', 'mediaMeta', 'library'],
+            'readonly',
+          )
           const a = tx.objectStore('media').count()
           const b = tx.objectStore('mediaMeta').count()
           const g = tx.objectStore('library').get('pterosaur-library')
           let favorites = 0
           g.onsuccess = () => {
-            const v = g.result as { state?: { favorites?: unknown[] } } | undefined
+            const v = g.result as
+              { state?: { favorites?: unknown[] } } | undefined
             favorites = v?.state?.favorites?.length ?? 0
           }
           tx.oncomplete = () => {
@@ -155,8 +169,18 @@ test.describe('设置弹窗', () => {
 
   test('查看占用并清理缓存，资料库保留', async ({ page }) => {
     await page.goto('/')
-    await seedMedia(page, { key: 'image|https://example.com/a.jpg', kind: 'image', size: 2048, mime: 'image/jpeg' })
-    await seedMedia(page, { key: 'netease:123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
+    await seedMedia(page, {
+      key: 'image|https://example.com/a.jpg',
+      kind: 'image',
+      size: 2048,
+      mime: 'image/jpeg',
+    })
+    await seedMedia(page, {
+      key: 'netease:123|exhigh',
+      kind: 'audio',
+      size: 4096,
+      mime: 'audio/mpeg',
+    })
     await seedLibrary(page)
 
     await page.getByTestId('settings-button').click()
@@ -172,8 +196,12 @@ test.describe('设置弹窗', () => {
 
     // 媒体缓存归零，资料库保留
     // 注：按 key 判定（而非总量），避免与应用后台写入封面缓存的竞态
-    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('netease:123|exhigh')
-    await expect.poll(() => mediaKeys(page)).not.toContain('image|https://example.com/a.jpg')
+    await expect
+      .poll(() => mediaKeys(page), { timeout: 5000 })
+      .not.toContain('netease:123|exhigh')
+    await expect
+      .poll(() => mediaKeys(page))
+      .not.toContain('image|https://example.com/a.jpg')
     expect(await favoriteCount(page)).toBe(1)
   })
 
@@ -183,15 +211,27 @@ test.describe('设置弹窗', () => {
     await expect(page.getByRole('dialog', { name: '设置' })).toBeVisible()
 
     // 默认档位为 exhigh（选中态）
-    await expect(page.getByTestId('quality-exhigh')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('quality-exhigh')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
     await page.getByTestId('quality-lossless').click()
-    await expect(page.getByTestId('quality-lossless')).toHaveAttribute('aria-checked', 'true')
-    await expect(page.getByTestId('quality-exhigh')).toHaveAttribute('aria-checked', 'false')
+    await expect(page.getByTestId('quality-lossless')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    await expect(page.getByTestId('quality-exhigh')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
 
     // 刷新后仍为无损（localStorage 持久化）
     await page.reload()
     await page.getByTestId('settings-button').click()
-    await expect(page.getByTestId('quality-lossless')).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('quality-lossless')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
   })
 
   test('检查更新触发整页刷新', async ({ page }) => {
@@ -206,14 +246,26 @@ test.describe('设置弹窗', () => {
       confirm.getByRole('button', { name: '刷新', exact: true }).click(),
     ])
 
-    const navType = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type ?? '')
+    const navType = await page.evaluate(
+      () => performance.getEntriesByType('navigation')[0]?.type ?? '',
+    )
     expect(navType).toBe('reload')
   })
 
   test('重置清空本机全部内容并刷新', async ({ page }) => {
     await page.goto('/')
-    await seedMedia(page, { key: 'image|https://example.com/a.jpg', kind: 'image', size: 2048, mime: 'image/jpeg' })
-    await seedMedia(page, { key: 'netease:123|exhigh', kind: 'audio', size: 4096, mime: 'audio/mpeg' })
+    await seedMedia(page, {
+      key: 'image|https://example.com/a.jpg',
+      kind: 'image',
+      size: 2048,
+      mime: 'image/jpeg',
+    })
+    await seedMedia(page, {
+      key: 'netease:123|exhigh',
+      kind: 'audio',
+      size: 4096,
+      mime: 'audio/mpeg',
+    })
     await seedLibrary(page)
     await page.evaluate(() => localStorage.setItem('pterosaur-probe', '1'))
 
@@ -228,14 +280,22 @@ test.describe('设置弹窗', () => {
     ])
 
     // 整页刷新
-    const navType = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.type ?? '')
+    const navType = await page.evaluate(
+      () => performance.getEntriesByType('navigation')[0]?.type ?? '',
+    )
     expect(navType).toBe('reload')
 
     // 本机内容清空：localStorage 与 IndexedDB（媒体缓存 + 资料库）
-    await expect.poll(() => page.evaluate(() => localStorage.getItem('pterosaur-probe'))).toBeNull()
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('pterosaur-probe')))
+      .toBeNull()
     // 按 key / 收藏数判定，避免与应用后台写入封面缓存的竞态
-    await expect.poll(() => mediaKeys(page), { timeout: 5000 }).not.toContain('netease:123|exhigh')
-    await expect.poll(() => mediaKeys(page)).not.toContain('image|https://example.com/a.jpg')
+    await expect
+      .poll(() => mediaKeys(page), { timeout: 5000 })
+      .not.toContain('netease:123|exhigh')
+    await expect
+      .poll(() => mediaKeys(page))
+      .not.toContain('image|https://example.com/a.jpg')
     expect(await favoriteCount(page)).toBe(0)
   })
 })

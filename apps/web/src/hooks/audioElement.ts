@@ -7,7 +7,9 @@ import { usePlayer } from '../store/player.js'
  * 引擎（useAudioEngine）持有并驱动它，UI（进度条）通过它执行命令式 seek，
  * 从而避免「store.position 回写」与「用户拖拽」互相打架。
  */
-export const audioEl: MutableRefObject<HTMLAudioElement | null> = { current: null }
+export const audioEl: MutableRefObject<HTMLAudioElement | null> = {
+  current: null,
+}
 
 /**
  * 命令式跳转到指定秒数：同时更新真实播放位置与 store。

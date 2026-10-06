@@ -33,7 +33,9 @@ export async function clearAllCaches(): Promise<void> {
  * 后端未给静态资源设 `Cache-Control`，直接 `location.reload()` 可能命中启发式缓存而拿到旧文档。
  * `reload` 可注入以便单测（jsdom 无法真实 reload）。
  */
-export async function hardReload(reload: () => void = () => location.reload()): Promise<void> {
+export async function hardReload(
+  reload: () => void = () => location.reload(),
+): Promise<void> {
   try {
     await fetch(location.href, { cache: 'reload' })
   } catch {

@@ -62,7 +62,11 @@ export function whenCoverReady(src: string): Promise<boolean> {
       img.onload = () => {
         // decode 把解码也提前做完——未解码的大图首绘可能被浏览器推迟。无 decode 的
         // 环境（jsdom）退化为 onload 即就绪。
-        if (typeof img.decode === 'function') img.decode().then(() => settle(true), () => settle(false))
+        if (typeof img.decode === 'function')
+          img.decode().then(
+            () => settle(true),
+            () => settle(false),
+          )
         else settle(true)
       }
       img.onerror = () => settle(false)

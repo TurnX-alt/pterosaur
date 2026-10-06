@@ -55,8 +55,10 @@ function openDB(): Promise<IDBDatabase | null> {
       const oldVersion = event.oldVersion
       // v3：音频缓存键加入源前缀，旧键（无源）不再命中——清空媒体缓存重建（缓存可弃）。
       if (oldVersion > 0 && oldVersion < 3) {
-        if (db.objectStoreNames.contains(MEDIA_STORE)) db.deleteObjectStore(MEDIA_STORE)
-        if (db.objectStoreNames.contains(MEDIA_META_STORE)) db.deleteObjectStore(MEDIA_META_STORE)
+        if (db.objectStoreNames.contains(MEDIA_STORE))
+          db.deleteObjectStore(MEDIA_STORE)
+        if (db.objectStoreNames.contains(MEDIA_META_STORE))
+          db.deleteObjectStore(MEDIA_META_STORE)
       }
       if (!db.objectStoreNames.contains(LIBRARY_STORE)) {
         // out-of-line key：调用方以 persist 的 name 作为 key
@@ -72,8 +74,10 @@ function openDB(): Promise<IDBDatabase | null> {
         meta.createIndex('lastAccess', 'lastAccess')
       }
       // v1 的音频缓存 store 已被 media / mediaMeta 取代：缓存可弃，直接删除
-      if (db.objectStoreNames.contains(LEGACY_AUDIO_STORE)) db.deleteObjectStore(LEGACY_AUDIO_STORE)
-      if (db.objectStoreNames.contains(LEGACY_AUDIO_META_STORE)) db.deleteObjectStore(LEGACY_AUDIO_META_STORE)
+      if (db.objectStoreNames.contains(LEGACY_AUDIO_STORE))
+        db.deleteObjectStore(LEGACY_AUDIO_STORE)
+      if (db.objectStoreNames.contains(LEGACY_AUDIO_META_STORE))
+        db.deleteObjectStore(LEGACY_AUDIO_META_STORE)
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => {
@@ -124,8 +128,16 @@ function withStore<T>(
 }
 
 /** 读取单个 key；不存在或降级时返回 `undefined`。 */
-export function idbGet<T = unknown>(storeName: string, key: IDBValidKey): Promise<T | undefined> {
-  return withStore<T | undefined>(storeName, 'readonly', (s) => s.get(key), undefined)
+export function idbGet<T = unknown>(
+  storeName: string,
+  key: IDBValidKey,
+): Promise<T | undefined> {
+  return withStore<T | undefined>(
+    storeName,
+    'readonly',
+    (s) => s.get(key),
+    undefined,
+  )
 }
 
 /** 读取整个 store；降级时返回 `[]`。 */
@@ -137,13 +149,27 @@ export function idbGetAll<T = unknown>(storeName: string): Promise<T[]> {
  * 写入。`key` 省略时依赖 store 自身的 `keyPath`（如 `audio` 的 `key`）；
  * 提供 `key` 时按 out-of-line key 写入（如 `library`）。
  */
-export function idbPut(storeName: string, value: unknown, key?: IDBValidKey): Promise<void> {
-  return withStore<void>(storeName, 'readwrite', (s) => (key === undefined ? s.put(value) : s.put(value, key)), undefined)
+export function idbPut(
+  storeName: string,
+  value: unknown,
+  key?: IDBValidKey,
+): Promise<void> {
+  return withStore<void>(
+    storeName,
+    'readwrite',
+    (s) => (key === undefined ? s.put(value) : s.put(value, key)),
+    undefined,
+  )
 }
 
 /** 删除单个 key。 */
 export function idbDelete(storeName: string, key: IDBValidKey): Promise<void> {
-  return withStore<void>(storeName, 'readwrite', (s) => s.delete(key), undefined)
+  return withStore<void>(
+    storeName,
+    'readwrite',
+    (s) => s.delete(key),
+    undefined,
+  )
 }
 
 /** 清空整个 store。 */

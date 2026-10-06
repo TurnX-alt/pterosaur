@@ -11,7 +11,13 @@ export function Loading({ text = '加载中…' }: { text?: string }) {
 }
 
 /** 空状态占位。 */
-export function Empty({ text = '暂无内容', icon }: { text?: string; icon?: React.ReactNode }) {
+export function Empty({
+  text = '暂无内容',
+  icon,
+}: {
+  text?: string
+  icon?: React.ReactNode
+}) {
   return (
     <div className="empty-state">
       {icon ?? <Inbox size={32} strokeWidth={1.5} />}
@@ -21,7 +27,13 @@ export function Empty({ text = '暂无内容', icon }: { text?: string; icon?: R
 }
 
 /** 错误状态占位，可选重试。 */
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry?: () => void
+}) {
   return (
     <div className="empty-state">
       <AlertCircle size={32} strokeWidth={1.5} />

@@ -29,7 +29,10 @@ export function CratePage() {
 
       {isEmpty ? (
         <section className="section">
-          <Empty text="唱片盒还空着，去艺人或专辑页点红心收藏吧" icon={<Disc3 size={32} strokeWidth={1.5} />} />
+          <Empty
+            text="唱片盒还空着，去艺人或专辑页点红心收藏吧"
+            icon={<Disc3 size={32} strokeWidth={1.5} />}
+          />
         </section>
       ) : (
         <>
@@ -40,7 +43,15 @@ export function CratePage() {
               </div>
               <div className="card-grid">
                 {savedArtists.map((artist) => (
-                  <ArtistCard key={artist.id} artist={artist} onClick={() => navigate(`/artist/${artist.source}/${artist.id}?name=${encodeURIComponent(artist.name)}`)} />
+                  <ArtistCard
+                    key={artist.id}
+                    artist={artist}
+                    onClick={() =>
+                      navigate(
+                        `/artist/${artist.source}/${artist.id}?name=${encodeURIComponent(artist.name)}`,
+                      )
+                    }
+                  />
                 ))}
               </div>
             </section>
@@ -53,7 +64,13 @@ export function CratePage() {
               </div>
               <div className="card-grid">
                 {savedAlbums.map((album) => (
-                  <AlbumCard key={album.id} album={album} onClick={() => navigate(`/album/${album.source}/${album.id}`)} />
+                  <AlbumCard
+                    key={album.id}
+                    album={album}
+                    onClick={() =>
+                      navigate(`/album/${album.source}/${album.id}`)
+                    }
+                  />
                 ))}
               </div>
             </section>

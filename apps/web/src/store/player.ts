@@ -17,7 +17,10 @@ export type PlayMode = 'order' | 'repeat-all' | 'repeat-one' | 'shuffle'
 const MODE_CYCLE: PlayMode[] = ['order', 'repeat-all', 'repeat-one', 'shuffle']
 
 /** 由底层 `shuffle` + `repeat` 派生当前播放模式。 */
-export function currentPlayMode(shuffle: boolean, repeat: RepeatMode): PlayMode {
+export function currentPlayMode(
+  shuffle: boolean,
+  repeat: RepeatMode,
+): PlayMode {
   if (shuffle) return 'shuffle'
   if (repeat === 'off') return 'order'
   if (repeat === 'one') return 'repeat-one'
@@ -38,7 +41,6 @@ function modeToState(mode: PlayMode): { shuffle: boolean; repeat: RepeatMode } {
       return { shuffle: false, repeat: 'all' }
   }
 }
-
 
 /** 播放状态切片（不持久化的运行时状态）。 */
 interface PlaybackState {
@@ -98,7 +100,11 @@ interface PlaybackActions {
   clearQueue: () => void
   removeAt: (index: number) => void
   setExpanded: (v: boolean) => void
-  setPlayError: (msg: string | null, needLogin?: boolean, source?: MusicSource | null) => void
+  setPlayError: (
+    msg: string | null,
+    needLogin?: boolean,
+    source?: MusicSource | null,
+  ) => void
   setPlaybackEnded: (v: boolean) => void
   setBuffering: (v: boolean) => void
 }
@@ -122,7 +128,11 @@ function shuffledIndexes(n: number, seedCurrent: number): number[] {
 }
 
 /** 根据 repeat 模式计算「自然结束」后的下一动作。 */
-function advanceOnEnd(index: number, len: number, repeat: RepeatMode): number | null {
+function advanceOnEnd(
+  index: number,
+  len: number,
+  repeat: RepeatMode,
+): number | null {
   if (len === 0) return null
   if (repeat === 'one') return index
   if (index + 1 < len) return index + 1
@@ -211,7 +221,14 @@ export const usePlayer = create<PlayerStore>()(
             }
           }
         }
-        set({ index: nextIndex, current: queue[nextIndex] ?? null, position: 0, isPlaying: true, playError: null, playbackEnded: false })
+        set({
+          index: nextIndex,
+          current: queue[nextIndex] ?? null,
+          position: 0,
+          isPlaying: true,
+          playError: null,
+          playbackEnded: false,
+        })
       },
 
       prev: () => {
@@ -229,13 +246,27 @@ export const usePlayer = create<PlayerStore>()(
           prevIndex = index - 1
           if (prevIndex < 0) prevIndex = queue.length - 1
         }
-        set({ index: prevIndex, current: queue[prevIndex] ?? null, position: 0, isPlaying: true, playError: null, playbackEnded: false })
+        set({
+          index: prevIndex,
+          current: queue[prevIndex] ?? null,
+          position: 0,
+          isPlaying: true,
+          playError: null,
+          playbackEnded: false,
+        })
       },
 
       playIndex: (index) => {
         const { queue } = get()
         if (index < 0 || index >= queue.length) return
-        set({ index, current: queue[index], position: 0, isPlaying: true, playError: null, playbackEnded: false })
+        set({
+          index,
+          current: queue[index],
+          position: 0,
+          isPlaying: true,
+          playError: null,
+          playbackEnded: false,
+        })
       },
 
       setPlaying: (v) => set({ isPlaying: v }),
@@ -243,11 +274,22 @@ export const usePlayer = create<PlayerStore>()(
         const { current, queue, index, isPlaying, playbackEnded } = get()
         // 顺序播放自然结束后点击播放 → 从第一首重新开始
         if (playbackEnded && !isPlaying && queue.length) {
-          set({ index: 0, current: queue[0], position: 0, isPlaying: true, playbackEnded: false, playError: null })
+          set({
+            index: 0,
+            current: queue[0],
+            position: 0,
+            isPlaying: true,
+            playbackEnded: false,
+            playError: null,
+          })
           return
         }
         if (!current && queue.length) {
-          set({ index: index < 0 ? 0 : index, current: queue[index < 0 ? 0 : index], isPlaying: true })
+          set({
+            index: index < 0 ? 0 : index,
+            current: queue[index < 0 ? 0 : index],
+            isPlaying: true,
+          })
           return
         }
         set((s) => ({ isPlaying: !s.isPlaying }))
@@ -255,7 +297,8 @@ export const usePlayer = create<PlayerStore>()(
       seek: (sec) => set({ position: Math.max(0, sec) }),
       setPosition: (sec) => set({ position: sec }),
       setDuration: (sec) => set({ duration: Number.isFinite(sec) ? sec : 0 }),
-      setVolume: (v) => set({ volume: Math.min(1, Math.max(0, v)), muted: v <= 0 }),
+      setVolume: (v) =>
+        set({ volume: Math.min(1, Math.max(0, v)), muted: v <= 0 }),
       toggleMute: () => set((s) => ({ muted: !s.muted })),
       cycleRepeat: () =>
         set((s) => {
@@ -267,20 +310,25 @@ export const usePlayer = create<PlayerStore>()(
         const { shuffle, baseQueue, current } = get()
         if (!shuffle) {
           // 开启打乱：基于当前曲目重排
-          const seed = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
+          const seed = current
+            ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current))
+            : 0
           const order = shuffledIndexes(baseQueue.length, Math.max(seed, 0))
           const queue = order.map((i) => baseQueue[i])
           set({ shuffle: true, queue, index: 0, current: queue[0] ?? null })
         } else {
           // 关闭打乱：恢复原始顺序，并保持当前曲目
-          const idx = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
+          const idx = current
+            ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current))
+            : 0
           set({ shuffle: false, queue: baseQueue, index: Math.max(idx, 0) })
         }
       },
       cyclePlayMode: () => {
         const { shuffle, repeat, baseQueue, current } = get()
         const mode = currentPlayMode(shuffle, repeat)
-        const next = MODE_CYCLE[(MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length]
+        const next =
+          MODE_CYCLE[(MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length]
         const target = modeToState(next)
 
         // 仅当随机状态发生翻转时才需要重排 / 恢复队列，其余情况只改 repeat。
@@ -290,18 +338,41 @@ export const usePlayer = create<PlayerStore>()(
         }
         if (target.shuffle) {
           // 进入随机：以当前曲目为种子重排
-          const seed = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
+          const seed = current
+            ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current))
+            : 0
           const order = shuffledIndexes(baseQueue.length, Math.max(seed, 0))
           const queue = order.map((i) => baseQueue[i])
-          set({ shuffle: true, repeat: target.repeat, queue, index: 0, current: queue[0] ?? null })
+          set({
+            shuffle: true,
+            repeat: target.repeat,
+            queue,
+            index: 0,
+            current: queue[0] ?? null,
+          })
         } else {
           // 退出随机：恢复原始顺序并保持当前曲目
-          const idx = current ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current)) : 0
-          set({ shuffle: false, repeat: target.repeat, queue: baseQueue, index: Math.max(idx, 0) })
+          const idx = current
+            ? baseQueue.findIndex((t) => keyOf(t) === keyOf(current))
+            : 0
+          set({
+            shuffle: false,
+            repeat: target.repeat,
+            queue: baseQueue,
+            index: Math.max(idx, 0),
+          })
         }
       },
       clearQueue: () =>
-        set({ queue: [], baseQueue: [], index: -1, current: null, isPlaying: false, position: 0, duration: 0 }),
+        set({
+          queue: [],
+          baseQueue: [],
+          index: -1,
+          current: null,
+          isPlaying: false,
+          position: 0,
+          duration: 0,
+        }),
       removeAt: (index) => {
         const { queue, baseQueue, index: cur } = get()
         if (index < 0 || index >= queue.length) return
@@ -318,12 +389,18 @@ export const usePlayer = create<PlayerStore>()(
           baseQueue: newBase,
           index: newIndex,
           current: newIndex >= 0 ? (newQueue[newIndex] ?? null) : null,
-          ...(newQueue.length === 0 ? { isPlaying: false, position: 0, duration: 0 } : {}),
+          ...(newQueue.length === 0
+            ? { isPlaying: false, position: 0, duration: 0 }
+            : {}),
         })
       },
       setExpanded: (v) => set({ expanded: v }),
       setPlayError: (msg, needLogin = false, source = null) =>
-        set({ playError: msg, playErrorNeedLogin: msg ? needLogin : false, playErrorSource: msg ? source : null }),
+        set({
+          playError: msg,
+          playErrorNeedLogin: msg ? needLogin : false,
+          playErrorSource: msg ? source : null,
+        }),
       setPlaybackEnded: (v) => set({ playbackEnded: v }),
       setBuffering: (v) => set({ buffering: v }),
     }),

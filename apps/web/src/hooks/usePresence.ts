@@ -13,7 +13,10 @@ import { useEffect, useState } from 'react'
  * @param open 目标开合状态
  * @param exitMs 退出动画时长（毫秒）
  */
-export function usePresence(open: boolean, exitMs: number): { mounted: boolean; exiting: boolean } {
+export function usePresence(
+  open: boolean,
+  exitMs: number,
+): { mounted: boolean; exiting: boolean } {
   const [mounted, setMounted] = useState(open)
   const [exiting, setExiting] = useState(false)
 

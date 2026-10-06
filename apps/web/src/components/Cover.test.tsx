@@ -4,11 +4,20 @@ import { Cover } from './Cover.js'
 import { clearCoverRegistry } from '../lib/imageCache.js'
 
 // jsdom 不会真正加载图片，这里直接桩掉 complete / naturalWidth 以覆盖「已缓存」与「加载失败」分支
-const origComplete = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'complete')
-const origNaturalWidth = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'naturalWidth')
+const origComplete = Object.getOwnPropertyDescriptor(
+  HTMLImageElement.prototype,
+  'complete',
+)
+const origNaturalWidth = Object.getOwnPropertyDescriptor(
+  HTMLImageElement.prototype,
+  'naturalWidth',
+)
 
 function stubImage(complete: boolean, naturalWidth: number) {
-  Object.defineProperty(HTMLImageElement.prototype, 'complete', { configurable: true, get: () => complete })
+  Object.defineProperty(HTMLImageElement.prototype, 'complete', {
+    configurable: true,
+    get: () => complete,
+  })
   Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', {
     configurable: true,
     get: () => naturalWidth,
@@ -16,8 +25,14 @@ function stubImage(complete: boolean, naturalWidth: number) {
 }
 
 afterEach(() => {
-  if (origComplete) Object.defineProperty(HTMLImageElement.prototype, 'complete', origComplete)
-  if (origNaturalWidth) Object.defineProperty(HTMLImageElement.prototype, 'naturalWidth', origNaturalWidth)
+  if (origComplete)
+    Object.defineProperty(HTMLImageElement.prototype, 'complete', origComplete)
+  if (origNaturalWidth)
+    Object.defineProperty(
+      HTMLImageElement.prototype,
+      'naturalWidth',
+      origNaturalWidth,
+    )
 })
 
 // 就绪登记表是模块级状态，逐例清空避免相互影响

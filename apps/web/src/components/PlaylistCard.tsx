@@ -19,7 +19,11 @@ interface PlaylistCardProps {
  * - 点击卡片本体：进入详情页；
  * - 悬浮浮现的播放按钮：立即播放该歌单（不进入详情页）。
  */
-export function PlaylistCard({ playlist, onClick, subtitle }: PlaylistCardProps) {
+export function PlaylistCard({
+  playlist,
+  onClick,
+  subtitle,
+}: PlaylistCardProps) {
   const { playPlaylist } = usePlayCollection()
   return (
     <div
@@ -37,7 +41,12 @@ export function PlaylistCard({ playlist, onClick, subtitle }: PlaylistCardProps)
       }}
     >
       <div className="card__art">
-        <Cover src={coverAt(playlist.cover, COVER_SMALL)} alt={playlist.name} radius="md" className="card__cover" />
+        <Cover
+          src={coverAt(playlist.cover, COVER_SMALL)}
+          alt={playlist.name}
+          radius="md"
+          className="card__cover"
+        />
         <button
           type="button"
           className="card__play"
@@ -53,7 +62,11 @@ export function PlaylistCard({ playlist, onClick, subtitle }: PlaylistCardProps)
       </div>
       <div className="card__body">
         <div className="card__title ellipsis">{playlist.name}</div>
-        <div className="card__subtitle ellipsis">{subtitle ?? playlist.description ?? (playlist.creator ? `by ${playlist.creator}` : '')}</div>
+        <div className="card__subtitle ellipsis">
+          {subtitle ??
+            playlist.description ??
+            (playlist.creator ? `by ${playlist.creator}` : '')}
+        </div>
       </div>
     </div>
   )

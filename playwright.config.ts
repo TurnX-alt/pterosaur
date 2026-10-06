@@ -14,16 +14,16 @@ export default defineConfig({
   // 本套 E2E 依赖实时网易云：偶发限流（405「操作频繁」）会让搜索类用例抖动，故本地与 CI 均开启重试。
   retries: 2,
   workers: 1,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
+  reporter: process.env.CI
+    ? [['list'], ['html', { open: 'never' }]]
+    : [['list']],
   timeout: 60_000,
   use: {
     baseURL: `http://127.0.0.1:${WEB_PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  ],
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `pnpm build && cross-env NODE_ENV=production PORT=${WEB_PORT} API_PORT=${API_PORT} pnpm start`,
     url: `http://127.0.0.1:${WEB_PORT}`,

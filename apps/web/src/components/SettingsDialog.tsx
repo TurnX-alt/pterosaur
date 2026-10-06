@@ -4,7 +4,11 @@ import { AUDIO_LEVELS, type AudioLevel } from '@pterosaur/shared/types'
 import { useSettingsDialog, confirmDialog } from '../store/ui.js'
 import { useSync } from '../store/sync.js'
 import { useSettings } from '../store/settings.js'
-import { clearMediaCache, mediaUsage, type MediaUsage } from '../lib/mediaCache.js'
+import {
+  clearMediaCache,
+  mediaUsage,
+  type MediaUsage,
+} from '../lib/mediaCache.js'
 import { checkForUpdates, postToServiceWorker } from '../lib/pwa.js'
 import { pushEmptyLibrary } from '../lib/sync.js'
 import { resetAll } from '../lib/reset.js'
@@ -87,7 +91,8 @@ export function SettingsDialog() {
     if (busy) return
     const ok = await confirmDialog({
       title: '检查更新？',
-      message: '将注销离线缓存并强制刷新页面，以拉取最新版本。资料库与本机缓存不受影响。',
+      message:
+        '将注销离线缓存并强制刷新页面，以拉取最新版本。资料库与本机缓存不受影响。',
       confirmText: '刷新',
       danger: true,
     })
@@ -113,7 +118,9 @@ export function SettingsDialog() {
     try {
       // 已开启云同步：先推送空 library 清空云端副本，再清本机（顺序不可颠倒）
       if (syncing) {
-        await pushEmptyLibrary().catch((e) => console.warn('[reset] 清空云端 library 失败', e))
+        await pushEmptyLibrary().catch((e) =>
+          console.warn('[reset] 清空云端 library 失败', e),
+        )
       }
       await resetAll()
     } finally {
@@ -122,8 +129,17 @@ export function SettingsDialog() {
   }
 
   return (
-    <div className="settings-dialog" role="dialog" aria-modal="true" aria-label="设置">
-      <div className="settings-dialog__scrim" onClick={closeSettings} aria-hidden />
+    <div
+      className="settings-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-label="设置"
+    >
+      <div
+        className="settings-dialog__scrim"
+        onClick={closeSettings}
+        aria-hidden
+      />
       <div className="settings-dialog__card" ref={cardRef} tabIndex={-1}>
         <header className="settings-dialog__head">
           <h2>设置</h2>
@@ -134,8 +150,14 @@ export function SettingsDialog() {
 
         <section className="settings-dialog__section">
           <h3 className="settings-dialog__section-title">音质</h3>
-          <p className="settings-dialog__desc">播放与下载的音质档位；该曲不可得时自动降级到最接近的可得档。</p>
-          <div className="settings-dialog__segmented" role="radiogroup" aria-label="音质">
+          <p className="settings-dialog__desc">
+            播放与下载的音质档位；该曲不可得时自动降级到最接近的可得档。
+          </p>
+          <div
+            className="settings-dialog__segmented"
+            role="radiogroup"
+            aria-label="音质"
+          >
             {AUDIO_LEVELS.map((lv) => (
               <button
                 key={lv}
@@ -155,7 +177,8 @@ export function SettingsDialog() {
         <section className="settings-dialog__section">
           <h3 className="settings-dialog__section-title">更新</h3>
           <p className="settings-dialog__desc">
-            当前版本 <code className="settings-dialog__code">{__COMMIT_HASH__}</code>。
+            当前版本{' '}
+            <code className="settings-dialog__code">{__COMMIT_HASH__}</code>。
           </p>
           <button
             type="button"
@@ -164,7 +187,11 @@ export function SettingsDialog() {
             disabled={busy !== null}
             data-testid="check-update"
           >
-            {busy === 'update' ? <Loader2 size={15} className="spinner" /> : <RefreshCw size={15} />}
+            {busy === 'update' ? (
+              <Loader2 size={15} className="spinner" />
+            ) : (
+              <RefreshCw size={15} />
+            )}
             检查更新
           </button>
         </section>
@@ -173,12 +200,19 @@ export function SettingsDialog() {
           <h3 className="settings-dialog__section-title">缓存与数据</h3>
           <div className="settings-dialog__stat">
             <span className="settings-dialog__stat-label">已占用</span>
-            <span className="settings-dialog__stat-value" data-testid="cache-total">
+            <span
+              className="settings-dialog__stat-value"
+              data-testid="cache-total"
+            >
               {formatBytes(total)}
             </span>
           </div>
-          <p className="settings-dialog__breakdown" data-testid="cache-breakdown">
-            歌曲 {formatBytes(usage?.audioBytes ?? 0)} · 封面 {formatBytes(usage?.imageBytes ?? 0)}
+          <p
+            className="settings-dialog__breakdown"
+            data-testid="cache-breakdown"
+          >
+            歌曲 {formatBytes(usage?.audioBytes ?? 0)} · 封面{' '}
+            {formatBytes(usage?.imageBytes ?? 0)}
             {quota ? ` · 浏览器配额 ${formatBytes(quota)}` : ''}
           </p>
           <div className="settings-dialog__btnrow">
@@ -189,7 +223,11 @@ export function SettingsDialog() {
               disabled={busy !== null}
               data-testid="clear-cache"
             >
-              {busy === 'clear' ? <Loader2 size={15} className="spinner" /> : <Trash2 size={15} />}
+              {busy === 'clear' ? (
+                <Loader2 size={15} className="spinner" />
+              ) : (
+                <Trash2 size={15} />
+              )}
               清理缓存
             </button>
             <button
@@ -199,7 +237,11 @@ export function SettingsDialog() {
               disabled={busy !== null}
               data-testid="reset-all"
             >
-              {busy === 'reset' ? <Loader2 size={15} className="spinner" /> : <RotateCcw size={15} />}
+              {busy === 'reset' ? (
+                <Loader2 size={15} className="spinner" />
+              ) : (
+                <RotateCcw size={15} />
+              )}
               重置
             </button>
           </div>

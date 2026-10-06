@@ -14,7 +14,11 @@ const API_TARGET = process.env.API_TARGET ?? `http://127.0.0.1:${API_PORT}`
  */
 function commitHash(): string {
   try {
-    return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+    return execSync('git rev-parse --short=7 HEAD', {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim()
   } catch {
     return 'dev'
   }
@@ -74,7 +78,12 @@ export default defineConfig({
         icons: [
           { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
       },
     }),

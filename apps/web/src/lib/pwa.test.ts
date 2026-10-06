@@ -13,7 +13,11 @@ describe('unregisterServiceWorkers', () => {
   it('注销全部注册', async () => {
     const unregister = vi.fn().mockResolvedValue(true)
     vi.stubGlobal('navigator', {
-      serviceWorker: { getRegistrations: vi.fn().mockResolvedValue([{ unregister }, { unregister }]) },
+      serviceWorker: {
+        getRegistrations: vi
+          .fn()
+          .mockResolvedValue([{ unregister }, { unregister }]),
+      },
     })
     await unregisterServiceWorkers()
     expect(unregister).toHaveBeenCalledTimes(2)
@@ -28,7 +32,10 @@ describe('unregisterServiceWorkers', () => {
 describe('clearAllCaches', () => {
   it('删除全部 cache key', async () => {
     const del = vi.fn().mockResolvedValue(true)
-    vi.stubGlobal('caches', { keys: vi.fn().mockResolvedValue(['a', 'b']), delete: del })
+    vi.stubGlobal('caches', {
+      keys: vi.fn().mockResolvedValue(['a', 'b']),
+      delete: del,
+    })
     await clearAllCaches()
     expect(del).toHaveBeenCalledWith('a')
     expect(del).toHaveBeenCalledWith('b')
@@ -62,10 +69,15 @@ describe('checkForUpdates', () => {
   it('注销 + 清缓存 + 硬刷新，且不碰 IndexedDB', async () => {
     const unregister = vi.fn().mockResolvedValue(true)
     vi.stubGlobal('navigator', {
-      serviceWorker: { getRegistrations: vi.fn().mockResolvedValue([{ unregister }]) },
+      serviceWorker: {
+        getRegistrations: vi.fn().mockResolvedValue([{ unregister }]),
+      },
     })
     const del = vi.fn().mockResolvedValue(true)
-    vi.stubGlobal('caches', { keys: vi.fn().mockResolvedValue(['x']), delete: del })
+    vi.stubGlobal('caches', {
+      keys: vi.fn().mockResolvedValue(['x']),
+      delete: del,
+    })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }))
     const reload = vi.fn()
 
@@ -80,7 +92,9 @@ describe('checkForUpdates', () => {
 describe('postToServiceWorker', () => {
   it('向 controller 广播消息', () => {
     const postMessage = vi.fn()
-    vi.stubGlobal('navigator', { serviceWorker: { controller: { postMessage } } })
+    vi.stubGlobal('navigator', {
+      serviceWorker: { controller: { postMessage } },
+    })
     postToServiceWorker({ type: 'MEDIA_CACHE_CLEARED' })
     expect(postMessage).toHaveBeenCalledWith({ type: 'MEDIA_CACHE_CLEARED' })
   })

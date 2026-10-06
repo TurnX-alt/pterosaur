@@ -10,7 +10,10 @@ const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const
  */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
-  const i = Math.min(UNITS.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)))
+  const i = Math.min(
+    UNITS.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  )
   const value = bytes / 1024 ** i
   // 整数级字节（B）不带小数，其余保留一位
   return `${value.toFixed(i === 0 ? 0 : 1)} ${UNITS[i]}`

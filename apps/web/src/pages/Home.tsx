@@ -31,7 +31,14 @@ interface ShortcutProps {
  * 快捷入口磁贴：点击本体进入页面；悬浮浮现的播放按钮直接播放（不跳转）。
  * 集合为空时播放按钮仍在（保持 hover 反馈一致），但置为禁用态。
  */
-function Shortcut({ variant, title, count, icon, onOpen, onPlay }: ShortcutProps) {
+function Shortcut({
+  variant,
+  title,
+  count,
+  icon,
+  onOpen,
+  onPlay,
+}: ShortcutProps) {
   return (
     <div
       className="shortcut"
@@ -48,7 +55,9 @@ function Shortcut({ variant, title, count, icon, onOpen, onPlay }: ShortcutProps
         }
       }}
     >
-      <span className={`shortcut__icon shortcut__icon--${variant}`}>{icon}</span>
+      <span className={`shortcut__icon shortcut__icon--${variant}`}>
+        {icon}
+      </span>
       <span className="shortcut__text">
         <strong>{title}</strong>
         <small>{count} 首</small>
@@ -85,7 +94,11 @@ export function Home() {
   // 推荐跟随活动账号（未登录用缺省源）。
   const source = activeSource(status) ?? DEFAULT_SOURCE
 
-  const recommend = useAsync<Playlist[]>(() => api.recommend(source, 12), [source], [])
+  const recommend = useAsync<Playlist[]>(
+    () => api.recommend(source, 12),
+    [source],
+    [],
+  )
   const [featured, setFeatured] = useState<Track[]>([])
 
   // 从第一个推荐歌单里取若干曲目作为「精选单曲」
@@ -105,7 +118,8 @@ export function Home() {
   }, [recommend.data])
 
   const hour = new Date().getHours()
-  const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
+  const greeting =
+    hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好'
 
   return (
     <div className="home">
@@ -113,7 +127,9 @@ export function Home() {
         <div>
           <h1 className="home__greeting">
             {greeting}
-            {status[source]?.logged && status[source].nickname ? `，${status[source].nickname}` : ''}
+            {status[source]?.logged && status[source].nickname
+              ? `，${status[source].nickname}`
+              : ''}
           </h1>
         </div>
       </header>
@@ -145,7 +161,11 @@ export function Home() {
             <h2 className="section-title">为你推荐</h2>
             <p className="section-subtitle">根据热门与个性化推荐为你挑选</p>
           </div>
-          <button type="button" className="section-link" onClick={() => navigate('/browse')}>
+          <button
+            type="button"
+            className="section-link"
+            onClick={() => navigate('/browse')}
+          >
             查看全部
           </button>
         </div>
@@ -156,7 +176,11 @@ export function Home() {
         ) : (
           <div className="card-grid">
             {recommend.data?.map((p) => (
-              <PlaylistCard key={p.id} playlist={p} onClick={() => navigate(`/playlist/${p.source}/${p.id}`)} />
+              <PlaylistCard
+                key={p.id}
+                playlist={p}
+                onClick={() => navigate(`/playlist/${p.source}/${p.id}`)}
+              />
             ))}
           </div>
         )}
@@ -170,11 +194,25 @@ export function Home() {
           </div>
           <div className="home__featured">
             {featured.map((t, i) => (
-              <button key={t.id} type="button" className="featured-item" onClick={() => playTracks(featured, i)}>
-                <Cover src={coverAt(t.cover, COVER_SMALL)} alt={t.title} radius="sm" size={48} />
+              <button
+                key={t.id}
+                type="button"
+                className="featured-item"
+                onClick={() => playTracks(featured, i)}
+              >
+                <Cover
+                  src={coverAt(t.cover, COVER_SMALL)}
+                  alt={t.title}
+                  radius="sm"
+                  size={48}
+                />
                 <span className="featured-item__text">
-                  <span className="featured-item__title ellipsis">{t.title}</span>
-                  <span className="featured-item__artist ellipsis">{t.artist}</span>
+                  <span className="featured-item__title ellipsis">
+                    {t.title}
+                  </span>
+                  <span className="featured-item__artist ellipsis">
+                    {t.artist}
+                  </span>
                 </span>
                 <span className="featured-item__play">
                   <Play size={16} fill="currentColor" strokeWidth={0} />
@@ -190,7 +228,11 @@ export function Home() {
         <section className="section">
           <div className="section-head">
             <h2 className="section-title">继续收听</h2>
-            <button type="button" className="section-link" onClick={() => navigate('/recent')}>
+            <button
+              type="button"
+              className="section-link"
+              onClick={() => navigate('/recent')}
+            >
               查看全部
             </button>
           </div>

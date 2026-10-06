@@ -25,7 +25,10 @@ function isStorageValue(v: unknown): v is StorageValue<LibraryState> {
 const base: PersistStorage<LibraryState> = {
   async getItem(name) {
     // 1) 一次性迁移：旧 localStorage 数据 -> IDB，并删除旧键（幂等）
-    const legacy = typeof localStorage !== 'undefined' ? localStorage.getItem(LEGACY_KEY) : null
+    const legacy =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem(LEGACY_KEY)
+        : null
     if (legacy) {
       try {
         const parsed: unknown = JSON.parse(legacy)

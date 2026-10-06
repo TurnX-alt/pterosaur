@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clearCoverRegistry, isCoverReady, preloadCover, whenCoverReady } from './imageCache.js'
+import {
+  clearCoverRegistry,
+  isCoverReady,
+  preloadCover,
+  whenCoverReady,
+} from './imageCache.js'
 
 /**
  * jsdom 不真正加载图片：用可控假 Image 替身——构造即登记，由测试手动触发
@@ -89,8 +94,12 @@ describe('whenCoverReady', () => {
   })
 
   it('登记键经规范化：不同镜像主机的同一封面互相命中', async () => {
-    const p1 = whenCoverReady('https://p1.music.126.net/h==/1.jpg?param=600y600')
-    expect(lastImage().src).toBe('https://p1.music.126.net/h==/1.jpg?param=600y600')
+    const p1 = whenCoverReady(
+      'https://p1.music.126.net/h==/1.jpg?param=600y600',
+    )
+    expect(lastImage().src).toBe(
+      'https://p1.music.126.net/h==/1.jpg?param=600y600',
+    )
     lastImage().onload!()
     await p1
 
@@ -100,6 +109,8 @@ describe('whenCoverReady', () => {
       whenCoverReady('http://p4.music.126.net/h==/1.jpg?param=600y600'),
     ).resolves.toBe(true)
     expect(created.length).toBe(createdBefore)
-    expect(isCoverReady('https://p9.music.126.net/h==/1.jpg?param=600y600')).toBe(true)
+    expect(
+      isCoverReady('https://p9.music.126.net/h==/1.jpg?param=600y600'),
+    ).toBe(true)
   })
 })

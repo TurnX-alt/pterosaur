@@ -1,5 +1,8 @@
 import { flushSync } from 'react-dom'
-import { supportsViewTransition, prefersReducedMotion } from './viewTransition.js'
+import {
+  supportsViewTransition,
+  prefersReducedMotion,
+} from './viewTransition.js'
 
 /**
  * 主题切换的根转场（View Transitions）。
@@ -27,7 +30,10 @@ let active: ViewTransitionLike | null = null
  * @param origin 揭示圆心（视口坐标，取主题按钮中心）
  * @param apply  实际切换主题的同步更新（内部以 flushSync 提交）
  */
-export function startThemeTransition(origin: { x: number; y: number }, apply: () => void): void {
+export function startThemeTransition(
+  origin: { x: number; y: number },
+  apply: () => void,
+): void {
   if (!supportsViewTransition() || prefersReducedMotion()) {
     flushSync(apply)
     return

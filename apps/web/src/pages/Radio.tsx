@@ -81,7 +81,12 @@ export function Radio() {
           <h2>Pterosaur 电台</h2>
           <p>从热门曲目中随机播放，永远不知道下一首是什么。</p>
         </div>
-        <button type="button" className="detail__play" onClick={startRadio} disabled={loading || !pool?.length}>
+        <button
+          type="button"
+          className="detail__play"
+          onClick={startRadio}
+          disabled={loading || !pool?.length}
+        >
           <Shuffle size={18} strokeWidth={2.2} />
           {loading ? '准备中…' : '开始随机播放'}
         </button>

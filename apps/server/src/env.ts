@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url'
  */
 function resolveEnvPath(): string {
   const url = import.meta.url
-  if (url.startsWith('file:')) return fileURLToPath(new URL('../../../.env', url))
+  if (url.startsWith('file:'))
+    return fileURLToPath(new URL('../../../.env', url))
   return resolve(process.cwd(), '.env')
 }
 
@@ -46,7 +47,9 @@ export function loadEnv(path: string = ENV_PATH): void {
   try {
     process.loadEnvFile(path)
   } catch (e) {
-    console.warn(`[pterosaur] 加载 .env 失败（${path}）：${(e as Error).message}`)
+    console.warn(
+      `[pterosaur] 加载 .env 失败（${path}）：${(e as Error).message}`,
+    )
   }
 }
 
@@ -61,9 +64,15 @@ const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
  *
  * 只读写目标文件，不触碰 `process.env`，便于测试与避免污染进程环境。
  */
-export function upsertEnv(key: string, value: string, path: string = ENV_PATH): void {
+export function upsertEnv(
+  key: string,
+  value: string,
+  path: string = ENV_PATH,
+): void {
   const line = `${key}=${value}`
-  const lines = existsSync(path) ? readFileSync(path, 'utf8').split(/\r?\n/) : []
+  const lines = existsSync(path)
+    ? readFileSync(path, 'utf8').split(/\r?\n/)
+    : []
 
   const re = new RegExp(`^\\s*(?:export\\s+)?${escapeRegExp(key)}\\s*=`)
   let replaced = false

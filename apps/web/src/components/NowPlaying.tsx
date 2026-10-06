@@ -17,7 +17,11 @@ import { seekTo } from '../hooks/audioElement.js'
 import { api } from '../api/client.js'
 import { getCachedLyric, putCachedLyric } from '../lib/lyricCache.js'
 import { whenCoverReady } from '../lib/imageCache.js'
-import { canonicalNeteaseImage, coverAt, COVER_LARGE } from '@pterosaur/shared/image'
+import {
+  canonicalNeteaseImage,
+  coverAt,
+  COVER_LARGE,
+} from '@pterosaur/shared/image'
 import { startNowPlayingTransition } from '../lib/nowPlayingTransition.js'
 import { formatTime, keyOf } from '@pterosaur/shared/types'
 import type { Lyric } from '@pterosaur/shared/types'
@@ -72,7 +76,9 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
 
   const favorites = useLibrary((s) => s.favorites)
   const toggleFavorite = useLibrary((s) => s.toggleFavorite)
-  const isFav = current ? favorites.some((t) => keyOf(t) === keyOf(current)) : false
+  const isFav = current
+    ? favorites.some((t) => keyOf(t) === keyOf(current))
+    : false
   const toggleQueue = useQueuePanel((s) => s.toggleQueue)
   const queueOpen = useQueuePanel((s) => s.queueOpen)
 
@@ -95,7 +101,9 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
       if (cancelled || !ok) return // 加载失败维持旧背景：稳定优先于空白
       setBg((prev) => {
         // 规范化后比较：旧持久化数据（轮换前的 host）与新鲜 API 数据是同一封面时不重复淡入
-        const same = (a: string | null) => a !== null && canonicalNeteaseImage(a) === canonicalNeteaseImage(coverUrl)
+        const same = (a: string | null) =>
+          a !== null &&
+          canonicalNeteaseImage(a) === canonicalNeteaseImage(coverUrl)
         if (same(prev.stable) || same(prev.incoming)) return prev
         // 首张直接落位（进场动画本就有整体淡入），此后才走「旧图垫底 + 新图盖上」的交叉淡入
         return prev.stable === null
@@ -112,7 +120,10 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
   useEffect(() => {
     if (!bg.incoming) return
     const t = setTimeout(
-      () => setBg((prev) => (prev.incoming ? { stable: prev.incoming, incoming: null } : prev)),
+      () =>
+        setBg((prev) =>
+          prev.incoming ? { stable: prev.incoming, incoming: null } : prev,
+        ),
       BG_FADE_SETTLE_MS,
     )
     return () => clearTimeout(t)
@@ -183,7 +194,8 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
     } else {
       const elRect = el.getBoundingClientRect()
       const lineRect = line.getBoundingClientRect()
-      const delta = lineRect.top - elRect.top - (el.clientHeight - line.clientHeight) / 2
+      const delta =
+        lineRect.top - elRect.top - (el.clientHeight - line.clientHeight) / 2
       el.scrollTo({ top: el.scrollTop + delta, behavior: 'smooth' })
     }
   }, [activeIndex, lyric])
@@ -218,11 +230,19 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
           aria-hidden
         />
       )}
-      <div className="nowplaying__scrim" onClick={() => startNowPlayingTransition(false)} aria-hidden />
+      <div
+        className="nowplaying__scrim"
+        onClick={() => startNowPlayingTransition(false)}
+        aria-hidden
+      />
 
       <div className="nowplaying__inner">
         <header className="nowplaying__header">
-          <IconButton label="收起播放页" size="md" onClick={() => startNowPlayingTransition(false)}>
+          <IconButton
+            label="收起播放页"
+            size="md"
+            onClick={() => startNowPlayingTransition(false)}
+          >
             <ChevronDown size={24} strokeWidth={2.2} />
           </IconButton>
           <div className="nowplaying__header-title">
@@ -232,7 +252,9 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
                 <button
                   type="button"
                   className="nowplaying__link"
-                  onClick={() => openEntity(`/album/${current.source}/${current.albumId}`)}
+                  onClick={() =>
+                    openEntity(`/album/${current.source}/${current.albumId}`)
+                  }
                 >
                   {current.album}
                 </button>
@@ -247,7 +269,11 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
             active={isFav}
             onClick={() => toggleFavorite(current)}
           >
-            <Heart size={20} strokeWidth={2} fill={isFav ? 'currentColor' : 'none'} />
+            <Heart
+              size={20}
+              strokeWidth={2}
+              fill={isFav ? 'currentColor' : 'none'}
+            />
           </IconButton>
         </header>
 
@@ -267,22 +293,24 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
             <div className="nowplaying__info">
               <h1 className="nowplaying__title ellipsis">{current.title}</h1>
               <p className="nowplaying__artist ellipsis">
-                {current.artistRefs?.length ? (
-                  current.artistRefs.map((a, i) => (
-                    <span key={`${a.id}-${i}`}>
-                      {i > 0 && ' / '}
-                      <button
-                        type="button"
-                        className="nowplaying__link"
-                        onClick={() => openEntity(`/artist/${current.source}/${a.id}?name=${encodeURIComponent(a.name)}`)}
-                      >
-                        {a.name}
-                      </button>
-                    </span>
-                  ))
-                ) : (
-                  current.artist
-                )}
+                {current.artistRefs?.length
+                  ? current.artistRefs.map((a, i) => (
+                      <span key={`${a.id}-${i}`}>
+                        {i > 0 && ' / '}
+                        <button
+                          type="button"
+                          className="nowplaying__link"
+                          onClick={() =>
+                            openEntity(
+                              `/artist/${current.source}/${a.id}?name=${encodeURIComponent(a.name)}`,
+                            )
+                          }
+                        >
+                          {a.name}
+                        </button>
+                      </span>
+                    ))
+                  : current.artist}
               </p>
             </div>
 
@@ -305,7 +333,9 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
                     tabIndex={-1}
                   >
                     <span>{l.text || '♪'}</span>
-                    {l.translation && <span className="lyric-line__trans">{l.translation}</span>}
+                    {l.translation && (
+                      <span className="lyric-line__trans">{l.translation}</span>
+                    )}
                   </p>
                 ))
               ) : (
@@ -346,9 +376,20 @@ export function NowPlaying({ open, exiting }: NowPlayingProps) {
               <IconButton label="上一首" size="lg" onClick={prev}>
                 <SkipBack size={26} strokeWidth={2} fill="currentColor" />
               </IconButton>
-              <IconButton label={showBuffering ? '缓冲中' : isPlaying ? '暂停' : '播放'} size="lg" primary onClick={toggle} className="nowplaying__play">
+              <IconButton
+                label={showBuffering ? '缓冲中' : isPlaying ? '暂停' : '播放'}
+                size="lg"
+                primary
+                onClick={toggle}
+                className="nowplaying__play"
+              >
                 {showBuffering ? (
-                  <Loader2 size={28} strokeWidth={2.2} className="spinner" data-testid="play-buffering-np" />
+                  <Loader2
+                    size={28}
+                    strokeWidth={2.2}
+                    className="spinner"
+                    data-testid="play-buffering-np"
+                  />
                 ) : isPlaying ? (
                   <Pause size={28} strokeWidth={2.2} fill="currentColor" />
                 ) : (

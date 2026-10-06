@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Search,
   ChevronLeft,
@@ -11,25 +11,25 @@ import {
   Menu,
   Settings,
   Cloud,
-} from "lucide-react";
-import { useTheme } from "../hooks/useTheme.js";
-import { startThemeTransition } from "../lib/themeTransition.js";
-import { useViewNavigate } from "../hooks/useViewNavigate.js";
-import { useAuth, activeSource } from "../store/auth.js";
-import type { MusicSource } from "@pterosaur/shared/types";
-import { useSync } from "../store/sync.js";
-import { syncNow } from "../lib/sync.js";
-import { useSidebarDrawer, useSettingsDialog } from "../store/ui.js";
-import { coverAt, COVER_SMALL } from "@pterosaur/shared/image";
-import { Cover } from "./Cover.js";
-import "./Topbar.css";
+} from 'lucide-react'
+import { useTheme } from '../hooks/useTheme.js'
+import { startThemeTransition } from '../lib/themeTransition.js'
+import { useViewNavigate } from '../hooks/useViewNavigate.js'
+import { useAuth, activeSource } from '../store/auth.js'
+import type { MusicSource } from '@pterosaur/shared/types'
+import { useSync } from '../store/sync.js'
+import { syncNow } from '../lib/sync.js'
+import { useSidebarDrawer, useSettingsDialog } from '../store/ui.js'
+import { coverAt, COVER_SMALL } from '@pterosaur/shared/image'
+import { Cover } from './Cover.js'
+import './Topbar.css'
 
 interface TopbarProps {
-  searchRef: React.RefObject<HTMLInputElement | null>;
+  searchRef: React.RefObject<HTMLInputElement | null>
 }
 
 /** 会员计划标签：网易云 → `Plan N`，QQ → `Plan T`。 */
-const planOf = (src: MusicSource): string => `Plan ${src === "qq" ? "T" : "N"}`;
+const planOf = (src: MusicSource): string => `Plan ${src === 'qq' ? 'T' : 'N'}`
 
 /**
  * 顶部栏：前进/后退、全局搜索、主题切换、账户菜单。
@@ -37,65 +37,68 @@ const planOf = (src: MusicSource): string => `Plan ${src === "qq" ? "T" : "N"}`;
  * 采用半透明毛玻璃 + sticky，滚动时内容从其下方穿过。
  */
 export function Topbar({ searchRef }: TopbarProps) {
-  const navigate = useViewNavigate();
-  const [params] = useSearchParams();
-  const [keyword, setKeyword] = useState(params.get("q") ?? "");
-  const mode = useTheme((s) => s.mode);
-  const setMode = useTheme((s) => s.setMode);
-  const status = useAuth((s) => s.status);
-  const openModal = useAuth((s) => s.openModal);
-  const logout = useAuth((s) => s.logout);
+  const navigate = useViewNavigate()
+  const [params] = useSearchParams()
+  const [keyword, setKeyword] = useState(params.get('q') ?? '')
+  const mode = useTheme((s) => s.mode)
+  const setMode = useTheme((s) => s.setMode)
+  const status = useAuth((s) => s.status)
+  const openModal = useAuth((s) => s.openModal)
+  const logout = useAuth((s) => s.logout)
   // 单活动账号：最多一个源登录；登录后不再显示登录入口，只有退出。
-  const src = activeSource(status);
-  const account = src ? status[src] : undefined;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const toggleSidebar = useSidebarDrawer((s) => s.toggleSidebar);
-  const openSettings = useSettingsDialog((s) => s.openSettings);
-  const syncEnabled = useSync((s) => s.enabled);
+  const src = activeSource(status)
+  const account = src ? status[src] : undefined
+  const [menuOpen, setMenuOpen] = useState(false)
+  const toggleSidebar = useSidebarDrawer((s) => s.toggleSidebar)
+  const openSettings = useSettingsDialog((s) => s.openSettings)
+  const syncEnabled = useSync((s) => s.enabled)
 
   /** 切换云同步开关：开启时绑定当前账号并立即同步一次。 */
   const toggleSync = () => {
-    const store = useSync.getState();
+    const store = useSync.getState()
     if (store.enabled) {
-      store.disable();
+      store.disable()
     } else {
-      store.enable(src ?? undefined, account?.userId);
-      void syncNow().catch((e) => console.warn("[sync] 首次同步失败", e));
+      store.enable(src ?? undefined, account?.userId)
+      void syncNow().catch((e) => console.warn('[sync] 首次同步失败', e))
     }
-  };
+  }
 
   // URL 上的 q 变化时同步输入框（例如从其他页面跳来搜索）
   useEffect(() => {
-    setKeyword(params.get("q") ?? "");
-  }, [params]);
+    setKeyword(params.get('q') ?? '')
+  }, [params])
 
   // 点击外部关闭账户菜单
   useEffect(() => {
-    if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [menuOpen]);
+    if (!menuOpen) return
+    const close = () => setMenuOpen(false)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [menuOpen])
 
   const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = keyword.trim();
-    if (!q) return;
-    navigate(`/search?q=${encodeURIComponent(q)}`);
-  };
+    e.preventDefault()
+    const q = keyword.trim()
+    if (!q) return
+    navigate(`/search?q=${encodeURIComponent(q)}`)
+  }
 
   // 解析当前系统偏好下的「实际」明暗，用于决定切换目标与图标
   const prefersDark =
-    mode === "system"
-      ? (window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true)
-      : mode === "dark";
+    mode === 'system'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
+      : mode === 'dark'
 
   // 切换主题：自按钮中心做圆形揭示转场（不支持 VT / 减少动效时内部自动降级为直连）
   const toggleTheme = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const origin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-    startThemeTransition(origin, () => setMode(prefersDark ? "light" : "dark"));
-  };
+    const rect = e.currentTarget.getBoundingClientRect()
+    const origin = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    }
+    startThemeTransition(origin, () => setMode(prefersDark ? 'light' : 'dark'))
+  }
 
   return (
     <header className="topbar">
@@ -147,8 +150,8 @@ export function Topbar({ searchRef }: TopbarProps) {
           type="button"
           className="topbar__round"
           onClick={toggleTheme}
-          aria-label={prefersDark ? "切换到浅色" : "切换到深色"}
-          title={prefersDark ? "浅色模式" : "深色模式"}
+          aria-label={prefersDark ? '切换到浅色' : '切换到深色'}
+          title={prefersDark ? '浅色模式' : '深色模式'}
         >
           {prefersDark ? (
             <Sun size={17} strokeWidth={2} />
@@ -174,15 +177,15 @@ export function Topbar({ searchRef }: TopbarProps) {
               type="button"
               className="topbar__avatar"
               onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((v) => !v);
+                e.stopPropagation()
+                setMenuOpen((v) => !v)
               }}
               aria-label="账户菜单"
               aria-expanded={menuOpen}
             >
               <Cover
                 src={coverAt(account.avatarUrl, COVER_SMALL)}
-                alt={account.nickname ?? "用户"}
+                alt={account.nickname ?? '用户'}
                 rounded
                 size={28}
               />
@@ -193,7 +196,12 @@ export function Topbar({ searchRef }: TopbarProps) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="topbar__menu-head">
-                  <Cover src={coverAt(account.avatarUrl, COVER_SMALL)} alt="" rounded size={36} />
+                  <Cover
+                    src={coverAt(account.avatarUrl, COVER_SMALL)}
+                    alt=""
+                    rounded
+                    size={36}
+                  />
                   <div>
                     <div className="topbar__menu-name">{account.nickname}</div>
                     <div className="topbar__menu-plan">{planOf(src)}</div>
@@ -208,9 +216,9 @@ export function Topbar({ searchRef }: TopbarProps) {
                   data-testid="sync-toggle"
                 >
                   <Cloud size={15} />
-                  <span>{syncEnabled ? "云同步已开启" : "开启云同步"}</span>
+                  <span>{syncEnabled ? '云同步已开启' : '开启云同步'}</span>
                   <span
-                    className={`topbar__switch${syncEnabled ? " topbar__switch--on" : ""}`}
+                    className={`topbar__switch${syncEnabled ? ' topbar__switch--on' : ''}`}
                     aria-hidden
                   >
                     <span className="topbar__switch-knob" />
@@ -221,8 +229,8 @@ export function Topbar({ searchRef }: TopbarProps) {
                   type="button"
                   className="topbar__menu-item"
                   onClick={() => {
-                    void logout(src);
-                    setMenuOpen(false);
+                    void logout(src)
+                    setMenuOpen(false)
                   }}
                 >
                   <LogOut size={15} /> 退出登录
@@ -231,12 +239,16 @@ export function Topbar({ searchRef }: TopbarProps) {
             )}
           </div>
         ) : (
-          <button type="button" className="topbar__login" onClick={() => openModal()}>
+          <button
+            type="button"
+            className="topbar__login"
+            onClick={() => openModal()}
+          >
             <User size={16} strokeWidth={2.1} />
             <span>登录</span>
           </button>
         )}
       </div>
     </header>
-  );
+  )
 }
